@@ -65,5 +65,32 @@ export function detectPitch(samples, sampleRate) {
   return null;
 }
 
+const FLATS = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+const STANDARD = { 4: [28, 33, 38, 43], 5: [23, 28, 33, 38, 43], 6: [40, 45, 50, 55, 59, 64], 7: [35, 40, 45, 50, 55, 59, 64] };
+
+// open-string MIDI notes, lowest string first → "E Standard", "Drop D", or the string names
+export function tuningName(open) {
+  const standard = STANDARD[open.length], shift = standard && open.map((m, i) => m - standard[i]);
+  if (shift?.every((d) => d === shift[0])) return `${FLATS[open[0] % 12]} Standard`;
+  if (shift && shift[0] === shift[1] - 2 && shift.slice(1).every((d) => d === shift[1])) return `Drop ${FLATS[open[0] % 12]}`;
+  return open.map((m) => FLATS[m % 12]).join(' ');
+}
+
 export const noteName = (midi) =>
   ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][midi % 12] + (Math.floor(midi / 12) - 1);
+
+// Marks what only repeats the notes just played: the same strings, frets and techniques again within `gap` seconds.
+// The highway draws those as beats instead of full notes: single notes get `repeat`, chords become `highDensity`
+// (the format's own flag for a repeated chord).
+const fingering = (n) => [n.string, n.fret, n.mute, n.palmMute, n.harmonic, n.slideTo, n.bend, n.hammerOn, n.pullOff, n.tap].join(':');
+export function markRepeats(notes, chords, gap = 1) {
+  let before = null;
+  for (let i = 0, j; i < notes.length; i = j) {
+    for (j = i + 1; j < notes.length && notes[j].time - notes[i].time < 0.005; j++);
+    const group = notes.slice(i, j), shape = group.map(fingering).sort().join('|');
+    const repeat = !!before && before.shape === shape && group[0].time - before.time <= gap;
+    for (const n of group) n.repeat = repeat;
+    if (repeat && group[0].chord !== null) chords[group[0].chord].highDensity = true;
+    before = { shape, time: group[0].time };
+  }
+}

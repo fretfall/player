@@ -19,9 +19,11 @@
   .song { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
   .song b { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 26vw; }
   .song span { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16vw; }
-  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--chip); border: 1px solid var(--chip-border); overflow-x: auto; }
+  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--chip); border: 1px solid var(--chip-border); overflow-x: auto; scrollbar-width: none; }
   .seg button { border: 0; background: none; cursor: pointer; padding: 5px 12px; border-radius: 6px; font: 500 13px var(--ui); color: var(--muted); white-space: nowrap; }
   .seg button[aria-pressed="true"] { background: var(--text); color: var(--ink); font-weight: 600; }
+  .seg select { max-width: 22vw; border: 0; padding: 4px 6px; background: none; color: var(--text); font: 600 13px var(--ui); }
+  .seg option { background: var(--ink); color: var(--text); }
   .icon { flex: none; cursor: pointer; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border-radius: 8px; background: var(--chip); border: 1px solid var(--chip-border); color: var(--text); }
   .icon[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink); }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -34,13 +36,15 @@
   #phrases div { flex-basis: 0; min-width: 2px; border-radius: 2px; background: var(--todo); cursor: pointer; }
   #phrases div.done { background: var(--done); }
   #phrases div.loop { box-shadow: 0 -3px 0 var(--accent); }
-  #progress { position: fixed; left: 32px; right: 32px; top: 134px; height: 2px; background: var(--todo); }
-  #progress div { width: 0; height: 2px; background: var(--accent); }
-  #lyrics { position: fixed; left: 40px; top: 164px; max-width: min(520px, 42vw); display: flex; flex-direction: column; gap: 8px; pointer-events: none; font-family: var(--lyric); font-style: var(--lyric-style); }
+  #progress { position: fixed; left: 32px; right: 32px; top: 134px; height: 5px; border-radius: 3px; overflow: hidden; background: var(--todo); }
+  #progress div { width: 0; height: 100%; background: var(--accent); opacity: .9; }
+  #lyrics { position: fixed; left: 40px; top: 164px; max-width: min(560px, 46vw); display: flex; flex-direction: column; gap: 8px; pointer-events: none; font-family: var(--lyric); font-style: var(--lyric-style); text-shadow: 0 2px 14px var(--ink), 0 0 4px var(--ink); }
   #section { min-height: 16px; font: 600 12px var(--num); letter-spacing: .18em; color: var(--accent); }
-  #line { min-height: 37px; font-size: 32px; line-height: 1.15; color: var(--muted); }
+  #line { min-height: 1.15em; font-size: clamp(20px, 2.3vw, 32px); line-height: 1.15; color: var(--muted); }
   #line .sung { color: var(--text); }
-  #next { min-height: 28px; font-size: 24px; line-height: 1.15; color: var(--muted); opacity: .6; }
+  #next { min-height: 1.15em; font-size: clamp(16px, 1.7vw, 24px); line-height: 1.15; color: var(--muted); opacity: .6; }
+  #info { position: fixed; left: 40px; bottom: 14px; font-size: 13px; color: var(--muted); pointer-events: none; }
+  #info b { color: var(--text); font-weight: 600; }
   #score { position: fixed; right: 40px; top: 164px; text-align: right; }
   #score b { display: block; font: 600 40px/1 var(--num); }
   #score span { font-size: 13px; color: var(--muted); }
@@ -52,6 +56,8 @@
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
   #drop { position: fixed; inset: 12px; z-index: 3; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgba(0, 0, 0, .45); font: 600 20px var(--num); }
   #tab { position: fixed; left: -10000px; top: 0; width: 1000px; }
+  @media (max-width: 1200px) { .wordmark, .song span { display: none; } .song b { max-width: 18vw; } }
+  @media (max-width: 900px) { .time { display: none; } }
 </style>
 </head>
 <body>
@@ -73,32 +79,40 @@
     <button class="icon" id="listen" aria-pressed="false" title="Listen to your guitar and score hits (use headphones)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="6" height="10" rx="3"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></button>
     <button class="icon" id="play" title="Play / pause (Space)"></button>
     <div class="divider"></div>
-    <button class="icon" id="open" title="Open a .pak or Guitar Pro file (or drop it anywhere)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"/></svg></button>
+    <button class="icon" id="open" title="Open a .pak, a Guitar Pro file, or a tab with its recording (or drop them anywhere)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"/></svg></button>
     <button class="icon" id="settingsButton" aria-expanded="false" aria-controls="settings" title="Settings"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 6h8M15.5 6h1M3.5 14h2M9.5 14h7"/><circle cx="13.5" cy="6" r="2"/><circle cx="7.5" cy="14" r="2"/></svg></button>
   </div>
 </header>
 <div id="phrases"></div>
 <div id="progress"><div></div></div>
 <div id="lyrics"><div id="section"></div><div id="line"></div><div id="next"></div></div>
+<div id="info"></div>
 <div id="score" hidden><b id="accuracy">–</b><span id="heard">accuracy</span></div>
 <div id="settings" hidden>
   <div class="field">Look<div class="seg" data-setting="look"></div></div>
   <div class="field">Colours<div class="seg" data-setting="colors"></div></div>
   <div class="field">Fonts<div class="seg" data-setting="fonts"></div></div>
-  <label class="field" title="Raise it if notes reach the strings before you hear them">Audio delay <output id="offsetOut"></output><input id="offset" type="range" min="-300" max="300" step="10"></label>
+  <div class="field">Chord frames<div class="seg" data-setting="frames"></div></div>
+  <label class="field" title="Lower for a flatter view along the highway, higher to look down on it">View angle <output id="viewAngleOut"></output><input id="viewAngle" type="range" min="20" max="65" step="1"></label>
+  <label class="field" title="Higher spreads the notes further apart and brings them in faster. The song keeps its tempo.">Note speed <output id="noteSpeedOut"></output><input id="noteSpeed" type="range" min="0.25" max="2" step="0.05"></label>
+  <label class="field" title="How far down the highway notes are drawn">Drawing distance <output id="drawDistanceOut"></output><input id="drawDistance" type="range" min="0.2" max="2" step="0.05"></label>
+  <label class="field" title="Raise it if notes reach the strings before you hear them">Audio delay <output id="offsetOut"></output><input id="offset" type="range" min="-1000" max="1000" step="10"></label>
+  <label class="check"><input id="guides" type="checkbox"> Hand position guides on the highway</label>
   <label class="check"><input id="mute" type="checkbox"> Mute my part (Guitar Pro files)</label>
 </div>
 <div id="status" role="status" hidden></div>
-<div id="drop" hidden>Drop a .pak or Guitar Pro file</div>
-<input type="file" id="file" hidden accept=".pak,.gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.mxl,.xml">
+<div id="drop" hidden>Drop a .pak, a Guitar Pro file, or a tab with its recording</div>
+<input type="file" id="file" hidden multiple accept=".pak,.gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.mxl,.xml,.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac">
 <div id="tab"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
 <script type="module">
-import { tempoMap, tickToMs, msToTick, detectPitch, noteName } from './music.js';
+import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats } from './music.js';
+import { suggestPositions, fingerFor } from './fingering.js';
 import { loadSong } from './the reference game.js';
 import { LOOKS, COLORS, FONTS, DEFAULT_STYLE, theme as makeTheme } from './themes.js';
-import { drawHighway } from './highway.js';
+import { drawHighway, lookAhead } from './highway.js';
+import { onsetEnvelope, align } from './sync.js';
 
 const $ = (id) => document.getElementById(id);
 const CDN = 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/';
@@ -106,7 +120,7 @@ const WW2OGG = 'https://cdn.jsdelivr.net/npm/ww2ogg-ts@0.2.0/+esm';
 const OPEN_STRINGS = { 4: [28, 33, 38, 43], 5: [23, 28, 33, 38, 43], 6: [40, 45, 50, 55, 59, 64], 7: [35, 40, 45, 50, 55, 59, 64] };
 const PLAY = '<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4.2v11.6L16 10z"/></svg>';
 const PAUSE = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7.5 4.5v11M12.5 4.5v11"/></svg>';
-const clock = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
+const clock = (s) => `${s < 0 ? '-' : ''}${Math.floor(Math.abs(s) / 60)}:${String(Math.floor(Math.abs(s) % 60)).padStart(2, '0')}`; // negative: the recording's intro before the tab starts
 const paint = () => new Promise((r) => { requestAnimationFrame(() => setTimeout(r)); setTimeout(r, 100); }); // background tabs get no frames
 
 // Original practice riff so there's something to play before you open a file.
@@ -118,10 +132,11 @@ const DEMO = `
 \\track "Guitar"
 \\staff {tabs}
 \\instrument distortionguitar
-\\ro :8 (0.6 2.5) (0.6 2.5) (0.6 2.5) (0.6 2.5) (3.6 5.5) (3.6 5.5) (5.6 7.5) (5.6 7.5) |
-\\rc 2 (7.6 9.5) (7.6 9.5) (5.5 7.4) (5.5 7.4) (3.6 5.5) (3.6 5.5) (5.6 7.5) r |
-:16 12.1 15.1 12.2 15.2 12.3 14.3 12.4 14.4 :8 14.3 12.3 14.4 12.4 |
-:4 14.5 :8 12.5 14.5 :2 12.6 |
+\\ro :8 (0.6{pm} 2.5{pm}){ch "E5"} (0.6{pm} 2.5{pm}) (0.6 2.5) (0.6 2.5) (3.6{sl} 5.5{sl}){ch "G5"} (5.6 7.5){ch "A5"} (x.6 x.5) (x.6 x.5) |
+\\rc 2 (7.6 9.5){ch "B5"} (7.6 9.5) (5.5{pm} 7.4{pm}){ch "D5"} (5.5{pm} 7.4{pm}) (3.6 5.5){ch "G5"} (3.6 5.5) (5.6 7.5){ch "A5"} r |
+:16 12.1{h lf 2} 15.1{lf 5} 12.2{lf 2} 15.2{lf 5} 12.3{lf 2} 14.3{lf 4} 12.4{lf 2} 14.4{lf 4} :8 14.3{sl lf 4} 16.3{lf 5} 14.4{lf 4} 12.4{lf 2} |
+:4 14.5{b (0 4) lf 4} :8 12.5{lf 2} 14.5{sl lf 4} :2 17.5{v lf 4} |
+:2 12.2{tp 16 lf 2} :4 (5.6{lf 2} 7.5{lf 4} 7.4{lf 5}){ch "A5"} (5.6 7.5 7.4) |
 \\track "Bass"
 \\staff {tabs}
 \\tuning (G2 D2 A1 E1)
@@ -130,33 +145,52 @@ const DEMO = `
 \\rc 2 7.4 7.4 5.3 5.3 3.4 3.4 5.4 r |
 :4 0.4 0.4 3.4 5.4 |
 :2 0.4 0.4 |
+:2 0.4 :4 0.3 0.3 |
 `;
 
 // --- Settings: look, colours and fonts mix freely; everything is remembered per browser
-const settings = { ...DEFAULT_STYLE, offset: 0, mute: false };
-try { Object.assign(settings, JSON.parse(localStorage.getItem('fretfall') ?? '{}')); } catch {}
-for (const [key, options] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS]]) if (!options[settings[key]]) settings[key] = DEFAULT_STYLE[key];
+const FRAMES = { box: { label: 'Box' }, gradient: { label: 'Gradient' } };
+const VIEW_DEFAULTS = 3; // bumped whenever the view sliders' defaults or scale change
+const settings = { ...DEFAULT_STYLE, frames: 'box', offset: 0, mute: false, guides: true, viewAngle: 30, noteSpeed: 1, drawDistance: 1, viewDefaults: VIEW_DEFAULTS };
+try {
+  const saved = JSON.parse(localStorage.getItem('fretfall') ?? '{}');
+  if (saved.viewDefaults !== VIEW_DEFAULTS) { // saved under older defaults: the view starts from the current ones
+    for (const key of ['viewAngle', 'noteSpeed', 'drawDistance', 'viewDefaults']) delete saved[key];
+  }
+  Object.assign(settings, saved);
+} catch {}
+for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['frames', FRAMES, 'box']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
 const save = () => { try { localStorage.setItem('fretfall', JSON.stringify(settings)); } catch {} };
 let theme;
 
 function applyTheme() {
-  theme = makeTheme(settings);
+  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance };
   $('fonts').href = theme.href;
   const vars = { bg: theme.bg, ink: theme.ink, text: theme.text, muted: theme.muted, accent: theme.accent, chip: theme.chip, 'chip-border': theme.chipBorder, done: theme.phraseDone, todo: theme.phraseTodo, ui: theme.ui, num: theme.num, lyric: theme.lyric, 'lyric-style': theme.lyricStyle };
   for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(`--${k}`, v);
   for (const seg of document.querySelectorAll('[data-setting]')) for (const b of seg.children) b.setAttribute('aria-pressed', String(b.value === settings[seg.dataset.setting]));
 }
 for (const seg of document.querySelectorAll('[data-setting]')) {
-  const options = { look: LOOKS, colors: COLORS, fonts: FONTS }[seg.dataset.setting];
+  const options = { look: LOOKS, colors: COLORS, fonts: FONTS, frames: FRAMES }[seg.dataset.setting];
   for (const [value, { label }] of Object.entries(options)) {
     const b = Object.assign(document.createElement('button'), { value, textContent: label });
     b.onclick = () => { settings[seg.dataset.setting] = value; save(); applyTheme(); };
     seg.append(b);
   }
 }
+// The view sliders change the highway straight away, without reloading the theme's fonts
+const VIEW = { viewAngle: (v) => `${v}°`, noteSpeed: (v) => `${Math.round(v * 100)}%`, drawDistance: (v) => `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead` };
+const showView = () => { for (const [key, show] of Object.entries(VIEW)) $(`${key}Out`).value = show(settings[key]); };
+for (const key in VIEW) {
+  $(key).value = settings[key];
+  $(key).oninput = (e) => { theme[key] = settings[key] = +e.target.value; showView(); save(); };
+}
+showView();
 $('offset').value = settings.offset;
 $('offsetOut').value = `${settings.offset} ms`;
 $('offset').oninput = (e) => { settings.offset = +e.target.value; $('offsetOut').value = `${settings.offset} ms`; save(); };
+$('guides').checked = settings.guides;
+$('guides').onchange = (e) => { settings.guides = e.target.checked; save(); applyTheme(); };
 $('mute').checked = settings.mute;
 $('mute').onchange = (e) => { settings.mute = e.target.checked; save(); if (arr?.track) api.changeTrackMute([arr.track], settings.mute); };
 const toggleSettings = (open = $('settings').hidden) => { $('settings').hidden = !open; $('settingsButton').setAttribute('aria-expanded', String(open)); };
@@ -175,16 +209,17 @@ function status(text, sticky = false) {
 // --- Players: a packed song plays its real audio, Guitar Pro files play through alphaTab's synth
 let song = null, arr = null, player = null, speed = 1, loop = null;
 
-function audioPlayer(ogg) {
-  const el = new Audio(URL.createObjectURL(new Blob([ogg], { type: 'audio/ogg' })));
+// src: a blob of the song's audio. sync maps it onto the chart: audio time = offset + ratio * chart time
+function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
+  const el = new Audio(URL.createObjectURL(src));
   el.preservesPitch = true;
   el.onplay = el.onpause = updatePlayButton;
   return {
-    get time() { return el.currentTime; },
+    get time() { return (el.currentTime - offset) / ratio; },
     get playing() { return !el.paused; },
     play: () => el.play(),
     pause: () => el.pause(),
-    seek: (t) => { el.currentTime = Math.max(0, t); },
+    seek: (t) => { el.currentTime = Math.max(0, offset + ratio * t); },
     setSpeed: (v) => { el.playbackRate = v; },
     stop: () => { el.pause(); URL.revokeObjectURL(el.src); },
   };
@@ -227,8 +262,7 @@ function songFromScore(score, cache) {
   const tempo = tempoMap(cache.masterBars.flatMap((mb) => mb.tempoChanges), score.tempo);
   const sec = (tick) => tickToMs(tempo, tick) / 1000;
   const arrangements = score.tracks.filter((tr) => tr.staves[0].isStringed && !tr.staves[0].isPercussion).map((track) => {
-    const staff = track.staves[0], notes = [], chords = [], anchors = [], phrases = [], beats = [], sections = [], lastOnString = {};
-    let anchor = { fret: 1, width: 4 };
+    const staff = track.staves[0], notes = [], chords = [], anchors = [], phrases = [], beats = [], sections = [], handShapes = [], lastOnString = {};
     for (const mb of cache.masterBars) {
       const master = mb.masterBar, start = sec(mb.start), end = sec(mb.end), perBeat = (mb.end - mb.start) / master.timeSignatureNumerator;
       for (let i = 0; i < master.timeSignatureNumerator; i++) beats.push({ time: sec(mb.start + i * perBeat), measure: i ? -1 : master.index });
@@ -236,31 +270,42 @@ function songFromScore(score, cache) {
       const inBar = [];
       for (const voice of staff.bars[master.index].voices) for (const beat of voice.beats) {
         const t0 = sec(mb.start + beat.playbackStart), t1 = sec(mb.start + beat.playbackStart + beat.playbackDuration);
-        const chord = beat.notes.length > 1 ? chords.push({ time: t0, name: beat.chord?.name ?? '', notes: [], highDensity: false, palmMute: false }) - 1 : null;
+        let chord = null;
+        if (beat.notes.length > 1) { // the same chord back to back is one held shape; its repeats show as outlines
+          const frets = Array(staff.tuning.length).fill(-1), fingers = [...frets];
+          for (const x of beat.notes) [frets[x.string - 1], fingers[x.string - 1]] = [x.fret, Math.max(-1, x.leftHandFinger)];
+          const held = handShapes.at(-1), repeat = !!held && held.frets.join() === frets.join() && Math.abs(held.endTime - t0) < 0.01;
+          chord = chords.push({ time: t0, name: beat.chord?.name ?? '', notes: [], frets, fingers, highDensity: repeat, palmMute: beat.notes.every((x) => x.isPalmMute), fretHandMute: beat.notes.every((x) => x.isDead) }) - 1;
+          if (repeat) held.endTime = t1;
+          else handShapes.push({ startTime: t0, endTime: t1, name: chords[chord].name, frets, fingers });
+        }
         for (const nt of beat.notes) {
           const tied = nt.isTieDestination && lastOnString[nt.string];
           if (tied) { tied.sustain = t1 - tied.time; continue; }
           const origin = nt.hammerPullOrigin;
           const note = {
-            time: t0, sustain: t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord, midi: nt.realValue,
+            time: t0, sustain: nt.slideTarget || t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord, midi: nt.realValue,
             hammerOn: !!origin && nt.fret > origin.fret, pullOff: !!origin && nt.fret < origin.fret,
             slideTo: nt.slideTarget ? nt.slideTarget.fret : null, slideUnpitchTo: null,
-            bend: nt.hasBend ? (nt.maxBendPoint?.value ?? 0) / 4 : 0, harmonic: nt.isHarmonic, palmMute: nt.isPalmMute, mute: nt.isDead, tap: beat.tap,
+            bend: nt.hasBend ? (nt.maxBendPoint?.value ?? 0) / 4 : 0, harmonic: nt.isHarmonic, palmMute: nt.isPalmMute, mute: nt.isDead, tap: beat.tap, vibrato: nt.vibrato > 0,
+            tremolo: beat.isTremolo, finger: nt.leftHandFinger >= 0 ? nt.leftHandFinger : null,
           };
           notes.push((lastOnString[nt.string] = note));
           inBar.push(note);
         }
       }
-      const frets = inBar.map((x) => x.fret).filter((f) => f > 0);
-      if (frets.length) anchor = { fret: Math.min(...frets), width: Math.max(4, Math.max(...frets) - Math.min(...frets) + 1) };
-      anchors.push({ time: start, endTime: end, ...anchor });
       phrases.push({ time: start, endTime: end, name: '', maxDifficulty: inBar.length });
     }
     notes.sort((a, b) => a.time - b.time || a.string - b.string);
     notes.forEach((x, i) => x.chord !== null && chords[x.chord].notes.push(i));
-    return { name: track.name || 'Track', strings: staff.tuning.length, tuning: [], notes, chords, anchors, phrases, sections, beats, track };
+    const suggested = suggestPositions(notes); // Guitar Pro files rarely say where the hand goes or which finger presses
+    anchors.push(...suggested.anchors);
+    for (const x of notes) x.finger ??= suggested.fingers.get(x) ?? null;
+    for (const c of chords) for (const j of c.notes) if (c.fingers[notes[j].string] < 0 && notes[j].finger !== null) c.fingers[notes[j].string] = notes[j].finger;
+    const name = (track.name || `Track ${track.index + 1}`).replace(/\s+-\s+.*$/, ''); // "Farin Gitarre - Electric Guitar (clean)" → "Farin Gitarre"
+    return { name, program: track.playbackInfo.program, strings: staff.tuning.length, open: [...staff.tuning].reverse(), notes, chords, anchors, phrases, sections, beats, handShapes, track };
   });
-  return { title: score.title, artist: score.artist, length: sec(cache.masterBars.at(-1)?.end ?? 0), arrangements, lyrics: [], tempo };
+  return { title: score.title, artist: score.artist, bpm: score.tempo, length: sec(cache.masterBars.at(-1)?.end ?? 0), arrangements, lyrics: [], tempo };
 }
 
 // Chart lyrics: "-" joins a syllable to the next, "+" ends a line. Many charts skip the "+",
@@ -280,17 +325,29 @@ function lyricLines(lyrics) {
 }
 
 function setSong(next) {
+  for (const a of next.arrangements) markRepeats(a.notes, a.chords);
   song = { ...next, lines: lyricLines(next.lyrics) };
   loop = null;
   $('title').textContent = song.title || 'Untitled';
   $('artist').textContent = song.artist || '';
   document.title = `${song.title || 'Untitled'} – Fretfall`;
-  $('arrangements').replaceChildren(...song.arrangements.map((a, i) => {
-    const b = Object.assign(document.createElement('button'), { textContent: a.name });
-    b.onclick = () => selectArrangement(i);
-    return b;
-  }));
-  if (song.arrangements.length) selectArrangement(0);
+  const parts = song.arrangements;
+  if (parts.length > 4) { // too many parts for buttons (Guitar Pro files often carry vocals, horns, …)
+    const select = Object.assign(document.createElement('select'), { ariaLabel: 'Part' });
+    select.append(...parts.map((a, i) => new Option(a.name, i)));
+    select.onchange = () => selectArrangement(+select.value);
+    $('arrangements').replaceChildren(select);
+  } else {
+    $('arrangements').replaceChildren(...parts.map((a, i) => {
+      const b = Object.assign(document.createElement('button'), { textContent: a.name });
+      b.onclick = () => selectArrangement(i);
+      return b;
+    }));
+  }
+  // Start on the busiest guitar part: Guitar Pro files often put a vocal or horn line first (MIDI programs 24-31 are guitars)
+  const guitars = parts.filter((a) => a.program === undefined || (a.program >= 24 && a.program <= 31));
+  const first = guitars.length ? parts.indexOf(guitars.reduce((best, a) => (a.notes.length > best.notes.length ? a : best))) : 0;
+  if (parts.length) selectArrangement(parts[0].program === undefined ? 0 : first);
   else { arr = null; status('No guitar or bass parts in this file'); }
 }
 
@@ -300,7 +357,12 @@ function selectArrangement(i) {
   arr = song.arrangements[i];
   if (arr.track) api.changeTrackMute([arr.track], settings.mute);
   for (const n of arr.notes) n.hit = n.missed = false;
-  [...$('arrangements').children].forEach((b, j) => b.setAttribute('aria-pressed', String(i === j)));
+  for (const key in cam) delete cam[key];
+  const picker = $('arrangements');
+  if (picker.firstElementChild?.tagName === 'SELECT') picker.firstElementChild.value = i;
+  else [...picker.children].forEach((b, j) => b.setAttribute('aria-pressed', String(i === j)));
+  const facts = [['Tuning', arr.open?.length ? tuningName(arr.open) : null], ['Tempo', song.bpm ? `${Math.round(song.bpm)} bpm` : null]].filter(([, v]) => v);
+  $('info').replaceChildren(...facts.flatMap(([k, v], j) => [`${j ? '   ·   ' : ''}${k} `, Object.assign(document.createElement('b'), { textContent: v })]));
 
   const total = {}, seen = {};
   const names = arr.sections.map((s) => s.name.replace(/[_-]+/g, ' ').toUpperCase());
@@ -320,6 +382,11 @@ function selectArrangement(i) {
     return b;
   });
   $('phrases').replaceChildren(...bars);
+  // Under it, how busy each stretch of the song is: brighter = more notes per second
+  const busy = arr.phrases.map((p) => arr.notes.filter((n) => n.time >= p.time && n.time < p.endTime).length / Math.max(0.5, p.endTime - p.time));
+  const busiest = Math.max(1e-6, ...busy), at = (sec) => `${Math.min(100, Math.max(0, (sec / song.length) * 100)).toFixed(2)}%`;
+  $('progress').style.background = `linear-gradient(90deg, ${arr.phrases.map((p, j) =>
+    `color-mix(in srgb, var(--accent) ${Math.round(8 + 62 * (busy[j] / busiest))}%, var(--todo)) ${at(p.time)} ${at(p.endTime)}`).join(', ')})`;
   ui = {};
 }
 
@@ -329,11 +396,20 @@ function markLoop() {
 }
 
 // --- Opening files
+const AUDIO = /\.(mp3|m4a|aac|ogg|oga|wav|flac)$/i;
+let songReady = Promise.resolve(), resolveSong = () => {};
+
+async function openFiles(files) { // a tab and its recording can come together: the tab first
+  for (const file of [...files].sort((a, b) => AUDIO.test(a.name) - AUDIO.test(b.name))) await openFile(file);
+}
+
 async function openFile(file) {
+  if (AUDIO.test(file.name)) return addRecording(file);
   const bytes = await file.arrayBuffer();
   if (!/\.pak$/i.test(file.name)) {
     usePlayer(synthPlayer);
     builtCache = api.tickCache; // rebuild once alphaTab has the new score
+    songReady = new Promise((resolve) => (resolveSong = resolve));
     return api.load(new Uint8Array(bytes));
   }
   status('Opening song… converting the audio takes a few seconds', true);
@@ -342,24 +418,55 @@ async function openFile(file) {
     const ww = await import(WW2OGG);
     const next = await loadSong(bytes, { wemToOgg: (wem) => ww.convertWwiseRiffToOgg(wem, { codebooks: ww.getPackedCodebooks('aoTuV_603') }).ogg });
     if (!next.audio) throw new Error('no audio in this file');
-    for (const a of next.arrangements) for (const n of a.notes) n.midi = (OPEN_STRINGS[a.strings]?.[n.string] ?? 40) + (a.tuning[n.string] ?? 0) + n.fret;
-    usePlayer(audioPlayer(next.audio));
+    for (const a of next.arrangements) {
+      a.open = Array.from({ length: a.strings }, (_, s) => (OPEN_STRINGS[a.strings]?.[s] ?? 40) + (a.tuning[s] ?? 0));
+      if (!a.anchors.length) a.anchors = suggestPositions(a.notes).anchors;
+      let hand = 0;
+      for (const n of a.notes) {
+        n.midi = a.open[n.string] + n.fret;
+        while (a.anchors[hand + 1]?.time <= n.time) hand++;
+        const template = n.chord === null ? -1 : a.chords[n.chord].fingers[n.string] ?? -1;
+        if (n.fret > 0) n.finger ??= template >= 0 ? template : a.anchors[hand] ? fingerFor(n.fret, a.anchors[hand].fret) : null;
+      }
+    }
+    usePlayer(audioPlayer(new Blob([next.audio], { type: 'audio/ogg' })));
     setSong(next);
     status(null);
   } catch (e) {
     status(`Could not open ${file.name}: ${e.message}`);
   }
 }
+// The band's recording instead of the synth: find where the tab's notes land in it, then play it
+async function addRecording(file) {
+  await songReady;
+  if (!song) return status('Open the tab first, then its recording');
+  status('Lining the recording up with the tab…', true);
+  await paint();
+  try {
+    const decoded = await new OfflineAudioContext(1, 1, 11025).decodeAudioData(await file.arrayBuffer()); // 11 kHz is plenty to find attacks
+    const mono = new Float32Array(decoded.length);
+    for (let c = 0; c < decoded.numberOfChannels; c++) decoded.getChannelData(c).forEach((v, i) => (mono[i] += v / decoded.numberOfChannels));
+    const onsets = [...new Set(song.arrangements.flatMap((a) => a.notes.map((n) => Math.round(n.time * 100) / 100)))].sort((a, b) => a - b);
+    const sync = align(onsetEnvelope(mono, decoded.sampleRate), onsets);
+    usePlayer(audioPlayer(file, sync));
+    status(sync.confidence >= 2
+      ? `Playing the recording: the tab starts ${sync.offset.toFixed(1)} s in`
+      : 'Could not line the recording up with the tab. Nudge it with Audio delay in settings.');
+  } catch (e) {
+    status(`Could not use ${file.name}: ${e.message}`);
+  }
+}
+
 $('open').onclick = () => $('file').click();
-$('file').onchange = (e) => { if (e.target.files[0]) openFile(e.target.files[0]); e.target.value = ''; };
+$('file').onchange = (e) => { openFiles(e.target.files); e.target.value = ''; };
 let dragDepth = 0;
 addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; $('drop').hidden = false; });
 addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('drop').hidden = true; } });
 addEventListener('dragover', (e) => e.preventDefault());
-addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); });
+addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; openFiles(e.dataTransfer.files); });
 
 // --- Transport
-const togglePlay = () => { if (player) player.playing ? player.pause() : Promise.resolve(player.play()).catch((e) => status(e.message)); };
+const togglePlay = () => { if (player) player.playing ? player.pause() : Promise.resolve(player.play()).catch((e) => e.name !== 'AbortError' && status(e.message)); }; // AbortError: a newer song took over
 function setSpeed(v) {
   speed = Math.min(1.5, Math.max(0.25, Math.round(v * 20) / 20));
   player?.setSpeed(speed);
@@ -424,7 +531,7 @@ function score(t) {
 }
 
 // --- Frame loop
-const canvas = $('highway'), cam = { fret: 1, width: 4, at: 0 };
+const canvas = $('highway'), cam = {};
 const songTime = () => (player ? player.time - settings.offset / 1000 : 0);
 
 function fillLine(el, line, sung) {
@@ -474,6 +581,7 @@ function frame() {
     const next = songFromScore(api.score, api.tickCache);
     synth.tempo = next.tempo;
     setSong(next);
+    resolveSong();
   }
   const t = songTime();
   if (loop && player?.playing && t >= loop.end) player.seek(Math.max(0, loop.start - 1)); // one second of run-up
