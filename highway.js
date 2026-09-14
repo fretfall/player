@@ -20,42 +20,79 @@ const FRAME_AHEAD = 3, MIN_SPAN = 8;
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
 
-// Headstocks in front of the nut, after the classic types rather than any maker's outline. Measured in half neck widths
-// from the middle of the nut: u runs away from the nut, v across toward the bass strings (±1: the neck's edges). The
-// outline runs from the nut's bass corner round the tip to its treble corner (a point given twice is a corner). Tuner
-// posts run from `from` to `to` at `v`, lowest string nearest the nut: all on the bass side, or split, the treble strings
-// mirrored on the other side. Their keys stick out past the edge at `key`; a classical headstock has slots
+// Headstocks in front of the nut, after the classic types rather than any maker's outline (drawn up in design/headstocks).
+// Measured in half neck widths from the middle of the nut: u runs away from the nut, v across toward the bass strings
+// (±1: the neck's edges). An outline or cover is a smooth closed curve through its points (a point given twice is a
+// corner). Posts run from `from` to `to`, lowest string nearest the nut: all on the bass side, or split, the treble strings
+// mirrored on the other side; on a classical head they are the rollers in its slots. Each post has a key on the edge
+// beside it: machine heads, blade keys, tulips or pearl buttons. A headless neck ends its strings in clamps instead
+const mirror = (half) => [...half, half.at(-1), ...half.slice(0, -1).reverse().map(([u, v]) => [u, -v])]; // a corner at the tip
 export const HEADSTOCKS = {
   inline: {
     label: 'Six in line',
-    outline: [[0, 1], [0.5, 1.12], [1.4, 1.22], [2.4, 1.3], [3.05, 1.36], [3.45, 1.22], [3.62, 0.82], [3.5, 0.38], [3.2, 0.16], [2.7, 0.12], [2, -0.05], [1.3, -0.38], [0.7, -0.78], [0.25, -1.02], [0, -1]],
-    tuners: { from: 0.75, to: 3.05, v: 0.9, key: 1.28 },
+    outline: [[0, 1], [0.35, 1], [0.9, 1.2], [1.6, 1.4], [2.6, 1.5], [3.6, 1.56], [4.4, 1.6], [4.95, 1.47], [5.2, 1.1], [5.2, 0.56], [5, 0.22], [4.6, 0.03], [4.1, 0.02], [3.3, -0.1], [2.4, -0.3], [1.5, -0.6], [0.8, -0.94], [0.35, -1], [0, -1]],
+    posts: { from: [1.25, 0.78], to: [4.45, 1.08] },
+    keys: 'machine',
+    trussNut: [0.22, 0], // where the truss rod adjusts
+    tree: 2.6, // a string tree over the top two strings, this far out
   },
   split: {
     label: 'Three a side',
-    outline: [[0, 1], [0.5, 1.18], [1.4, 1.33], [2.35, 1.42], [2.8, 1.4], [3.02, 1.15], [3.12, 0.66], [2.9, 0.16], [2.8, 0], [2.8, 0], [2.9, -0.16], [3.12, -0.66], [3.02, -1.15], [2.8, -1.4], [2.35, -1.42], [1.4, -1.33], [0.5, -1.18], [0, -1]],
-    tuners: { from: 0.8, to: 2.35, v: 0.98, key: 1.36, split: true },
+    outline: mirror([[0, 1], [0.3, 1], [0.9, 1.14], [1.8, 1.28], [2.8, 1.39], [3.7, 1.47], [4.3, 1.49], [4.56, 1.35], [4.72, 0.9], [4.62, 0.38], [4.34, 0]]),
+    posts: { from: [1.55, 0.78], to: [3.75, 1], split: true },
+    keys: 'tulip',
+    cover: [[0.3, 0], [0.34, 0.14], [0.66, 0.21], [1, 0.32], [1.24, 0.22], [1.28, 0], [1.24, -0.22], [1, -0.32], [0.66, -0.21], [0.34, -0.14], [0.3, 0]], // a bell truss rod cover
+    screws: [[0.48, 0], [1.06, 0]],
   },
   pointed: {
     label: 'Pointed',
-    outline: [[0, 1], [0.6, 1.12], [1.6, 1.22], [2.6, 1.3], [3.2, 1.33], [3.55, 1.22], [3.8, 0.85], [4.3, -0.5], [4.3, -0.5], [3.4, -0.02], [2.6, 0.12], [1.7, -0.1], [0.9, -0.6], [0.35, -0.95], [0, -1]],
-    tuners: { from: 0.75, to: 3.05, v: 0.92, key: 1.28 },
+    outline: [[0, 1], [0.35, 1], [1, 1.15], [2, 1.28], [3, 1.4], [4, 1.5], [4.55, 1.55], [4.86, 1.36], [5.75, -0.55], [5.75, -0.55], [4.6, -0.12], [3.6, 0.02], [2.6, -0.08], [1.6, -0.4], [0.8, -0.86], [0.35, -1], [0, -1]],
+    posts: { from: [1.4, 0.72], to: [4.45, 1.03] },
+    keys: 'blade',
+    cover: [[0.52, 0.2], [0.52, 0.2], [0.98, 0.2], [1.26, 0], [1.26, 0], [0.98, -0.2], [0.52, -0.2], [0.52, -0.2], [0.52, 0.2]], // a shield
+    screws: [[0.7, 0]],
+    lockingNut: true, // clamping the strings in pairs, in place of the nut
   },
   classical: {
     label: 'Classical',
-    outline: [[0, 1.02], [1.2, 1.12], [2.5, 1.2], [2.72, 1.24], [2.95, 1], [2.86, 0.55], [3.08, 0], [2.86, -0.55], [2.95, -1], [2.72, -1.24], [2.5, -1.2], [1.2, -1.12], [0, -1.02]],
-    slots: [0.55, 2.3, 0.3, 0.68], // u from, to, v from, to (and mirrored)
-    tuners: { from: 0.8, to: 2.05, v: 0.49, key: 1.14, split: true },
+    outline: mirror([[0, 1.02], [0.3, 1.03], [1.5, 1.13], [3, 1.23], [3.72, 1.27], [3.92, 1.1], [3.88, 0.62], [4.18, 0.34], [4.36, 0]]),
+    slots: [0.95, 3.35, 0.28, 0.8], // u from, to, v from, to, round-ended (and mirrored)
+    posts: { from: [1.45, 0.54], to: [2.85, 0.54], split: true },
+    keys: 'pearl',
   },
-  none: { label: 'None' },
+  headless: {
+    label: 'Headless',
+    outline: [[0.2, 0], [0.2, 0.9], [0.25, 1.03], [0.36, 1.06], [0.79, 1.06], [0.9, 1.03], [0.95, 0.9], [0.95, -0.9], [0.9, -1.03], [0.79, -1.06], [0.36, -1.06], [0.25, -1.03], [0.2, -0.9], [0.2, 0]],
+    clamps: 0.62,
+  },
 };
-export const tunerPosts = ({ tuners: { from, to, v, split } }, n) => { // [u, v] of each string's post, lowest string first
-  const side = split ? Math.ceil(n / 2) : n, at = (i) => from + ((to - from) * i) / Math.max(1, side - 1);
-  return Array.from({ length: n }, (_, s) => (s < side ? [at(s), v] : [at(n - 1 - s), -v]));
-};
-export const slotOutline = ([u0, u1, v0, v1]) => { // a slot with rounded ends
-  const vm = (v0 + v1) / 2;
-  return spline([[u0 + 0.12, v1], [u1 - 0.12, v1], [u1, vm], [u1 - 0.12, v0], [u0 + 0.12, v0], [u0, vm], [u0 + 0.12, v1]], 4);
+// A headstock's parts for strings at the given heights (half neck widths, lowest string first): its outline, where each
+// string ends (a post, roller or clamp), and the key beside each post, at the outline's edge on its side
+export function headstockParts(head, strings) {
+  const n = strings.length, outline = spline(head.outline, 10);
+  let ends = strings.map((v) => [head.clamps, v]);
+  if (head.posts) {
+    const { from, to, split } = head.posts, side = split ? Math.ceil(n / 2) : n;
+    const at = (i) => from.map((a, c) => a + ((to[c] - a) * i) / Math.max(1, side - 1));
+    ends = strings.map((_, s) => (s < side ? at(s) : ((p) => [p[0], -p[1]])(at(n - 1 - s))));
+  }
+  const edge = (u, side) => { // the outline's outermost crossing at u on that side
+    let best = null;
+    for (let i = 1; i < outline.length; i++) {
+      const [u0, v0] = outline[i - 1], [u1, v1] = outline[i];
+      if ((u0 - u) * (u1 - u) > 0 || u0 === u1) continue;
+      const v = v0 + ((v1 - v0) * (u - u0)) / (u1 - u0);
+      if (Math.sign(v) === side && (best === null || Math.abs(v) > Math.abs(best))) best = v;
+    }
+    return best ?? side;
+  };
+  const keys = head.keys ? ends.map(([u, v]) => ({ u, side: Math.sign(v) || 1, edge: edge(u, Math.sign(v) || 1) })) : [];
+  return { outline, ends, keys };
+}
+export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
+  const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
+  const corner = (cu, cv, from) => Array.from({ length: 5 }, (_, j) => [cu + Math.cos(from + (j * Math.PI) / 8) * r, cv + Math.sin(from + (j * Math.PI) / 8) * r]);
+  return [...corner(ub - r, vb - r, 0), ...corner(ua + r, vb - r, Math.PI / 2), ...corner(ua + r, va + r, Math.PI), ...corner(ub - r, va + r, 1.5 * Math.PI)];
 };
 // Points along a smooth curve through the given ones (Catmull-Rom), `steps` of them to each; a point given twice is a
 // corner the curve comes into and leaves straight
@@ -422,37 +459,86 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.fill();
   }
 
-  // The headstock in front of the nut, in the board's colours. Kept to its shape whatever the fret width; the strings run
-  // on over it to their posts (see stringPath), and the tuners go on top of them further down
-  const head = HEADSTOCKS[t.headstock] ?? HEADSTOCKS.none, half = (boardHi - boardLo) / 2, flip = t.stringOrder === 'high' ? -1 : 1;
+  // The headstock in front of the nut, in the theme's colours (see HEADSTOCKS). Kept to its shape whatever the fret width;
+  // the strings run on over it to where they end (see stringPath), and what they wind onto goes over them further down
+  const head = HEADSTOCKS[t.headstock], half = (boardHi - boardLo) / 2, flip = t.stringOrder === 'high' ? -1 : 1;
   const onHead = ([u, v]) => [(-u * half) / stretch, stack / 2 + v * half * flip, 0];
-  const posts = head.tuners ? tunerPosts(head, n).map(onHead) : null;
-  const oval = ([x, y], ru, rv) => { // radii in half neck widths, in the board's plane
-    const [px, py] = P(x, y, 0), [ex] = P(x + (ru * half) / stretch, y, 0), [, ey] = P(x, y + rv * half, 0);
+  const headV = (s) => ((ys(s) - stack / 2) * flip) / half; // a string's height, in the headstock's terms
+  const parts = head && headstockParts(head, Array.from({ length: n }, (_, s) => headV(s)));
+  const ends = parts?.ends.map(onHead);
+  const paint = (fill, stroke, width = 1) => { // fill and outline the current path
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = width; g.stroke(); }
+  };
+  const oval = (uv, ru, rv) => { // an oval on the headstock, radii in half neck widths
+    const [x, y] = onHead(uv), [px, py] = P(x, y, 0), [ex] = P(x + (ru * half) / stretch, y, 0), [, ey] = P(x, y + rv * half, 0);
     g.beginPath();
     g.ellipse(px, py, Math.abs(ex - px), Math.abs(ey - py), 0, 0, Math.PI * 2);
   };
-  if (head.outline) {
-    for (const [u, v] of head.tuners ? tunerPosts(head, n) : []) { // tuning keys, sticking out from under the edge
-      oval(onHead([u, Math.sign(v) * head.tuners.key]), 0.1, 0.17);
-      g.fillStyle = alpha(t.text, 0.2);
-      g.fill();
-      g.strokeStyle = alpha(t.anchorLane, 0.5);
-      g.lineWidth = 1;
-      g.stroke();
+  const box = (u0, u1, v0, v1, round) => path(rounded(u0, u1, v0, v1, round).map(onHead)); // a small part on the headstock, leaning with the board
+  if (parts) {
+    for (const { u, side, edge } of parts.keys) { // keys, sticking out from under the plate's edge
+      const span = (a, b) => [edge + side * a, edge + side * b];
+      if (head.keys === 'machine' || head.keys === 'blade') {
+        const blade = head.keys === 'blade', w = blade ? 0.09 : 0.11; // long across the neck: the view flattens them
+        box(u - w - 0.04, u + w + 0.04, ...span(-0.12, 0.08), 0.03);
+        paint(alpha(t.text, 0.12), alpha(t.anchorLane, 0.35));
+        box(u - 0.03, u + 0.03, ...span(0.06, 0.22), 0);
+        paint(alpha(t.text, 0.28));
+        box(u - w, u + w, ...span(0.2, blade ? 0.62 : 0.68), blade ? 0.04 : 0.1);
+        paint(alpha(t.text, 0.18), alpha(t.anchorLane, 0.55));
+      } else if (head.keys === 'tulip') {
+        box(u - 0.035, u + 0.035, ...span(-0.05, 0.22), 0);
+        paint(alpha(t.text, 0.28));
+        oval([u, edge + side * 0.18], 0.08, 0.04);
+        paint(alpha(t.text, 0.3));
+        oval([u, edge + side * 0.4], 0.14, 0.2);
+        paint(alpha(t.text, 0.18), alpha(t.anchorLane, 0.55));
+      } else { // pearl buttons
+        box(u - 0.03, u + 0.03, ...span(-0.05, 0.2), 0);
+        paint(alpha(t.text, 0.28));
+        oval([u, edge + side * 0.34], 0.12, 0.16);
+        paint(alpha(t.nut, 0.55), alpha(t.text, 0.35));
+      }
     }
-    path(spline(head.outline).map(onHead));
-    g.fillStyle = t.board;
-    g.fill();
+    for (const side of head.keys === 'pearl' ? [1, -1] : []) { // a classical head's tuner plates, just showing past its edges
+      const row = parts.keys.filter((key) => key.side === side);
+      if (!row.length) continue;
+      const us = row.map((key) => key.u), e = Math.max(...row.map((key) => key.edge * side));
+      box(Math.min(...us) - 0.4, Math.max(...us) + 0.4, side * (e - 0.1), side * (e + 0.07), 0.05);
+      paint(alpha(t.text, 0.16), alpha(t.anchorLane, 0.35));
+    }
+    // The plate: its finish darkening toward the treble side, a bevel inside the lit edge
+    path(parts.outline.map(onHead));
+    const [, bassY] = P(...onHead([0, 1.6])), [, trebleY] = P(...onHead([0, -1.2])), finish = g.createLinearGradient(0, bassY, 0, trebleY);
+    finish.addColorStop(0, t.floor0);
+    finish.addColorStop(1, t.ink);
+    paint(finish);
+    g.save();
+    g.clip();
+    paint(null, alpha(t.text, 0.07), 0.3 * half * k0);
+    g.restore();
     glow(t.glow, t.anchorLane, 8);
-    g.strokeStyle = alpha(t.anchorLane, 0.55);
-    g.lineWidth = Math.max(1.5, 0.03 * k0);
-    g.stroke();
+    paint(null, alpha(t.anchorLane, 0.6), Math.max(1.5, 0.03 * k0));
     glow(false);
-    g.fillStyle = alpha(t.ink, 0.85);
     for (const side of head.slots ? [1, -1] : []) {
-      path(slotOutline(head.slots).map(([u, v]) => onHead([u, v * side])));
-      g.fill();
+      const [u0, u1, v0, v1] = head.slots;
+      box(u0, u1, v0 * side, v1 * side, (v1 - v0) / 2);
+      paint(alpha(t.ink, 0.92), alpha(t.text, 0.12));
+    }
+    if (head.cover) { // the truss rod cover and its screws
+      path(spline(head.cover).map(onHead));
+      paint(alpha(t.text, 0.09), alpha(t.text, 0.4));
+      for (const screw of head.screws) {
+        oval(screw, 0.04, 0.04);
+        paint(alpha(t.nut, 0.85));
+      }
+    }
+    if (head.trussNut) { // or where the truss rod adjusts, a recess at the heel
+      oval(head.trussNut, 0.12, 0.12);
+      paint(alpha(t.ink, 0.8), alpha(t.text, 0.28));
+      oval(head.trussNut, 0.055, 0.055);
+      paint(alpha(t.ink, 0.95));
     }
   }
 
@@ -491,8 +577,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (dt > 0 || -dt > held || note.fret === 0 || !(bendPeak(note) > 0)) continue;
     bending.set(note.string, { note, x: note.fret - 0.5, dy: noteLift(note) });
   }
-  const stringPath = (s, lift = 0) => { // along the string at the board from its tuner post, bent where it is being bent
-    const b = bending.get(s), y0 = ys(s) + lift, start = [posts ? [posts[s][0], posts[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
+  const stringPath = (s, lift = 0) => { // along the string at the board from where it ends on the headstock, bent where it is being bent
+    const b = bending.get(s), y0 = ys(s) + lift, start = [ends ? [ends[s][0], ends[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
     if (!b) return path([...start, [LAST_FRET + 0.6, y0, 0]], false);
     const bump = (fx) => [fx, y0 + b.dy * smooth(Math.max(0, 1 - Math.abs(fx - b.x) / BEND_SPREAD)), 0];
     path([...start, ...Array.from({ length: 25 }, (_, j) => bump(b.x - BEND_SPREAD + (j * BEND_SPREAD) / 12)).filter(([fx]) => fx > 0), [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
@@ -507,16 +593,19 @@ export function drawHighway(canvas, arr, now, t, cam) {
   g.strokeStyle = metal;
   g.lineWidth = Math.max(1.5, 0.05 * k0);
   for (let w = 1; w <= LAST_FRET; w++) line3([w, boardLo - 0.04, 0], [w, boardHi + 0.04, 0]);
-  g.strokeStyle = t.nut;
-  g.lineWidth = Math.max(3, 0.12 * k0);
-  line3([0, boardLo - 0.06, 0], [0, boardHi + 0.06, 0]);
+  if (!head?.lockingNut) {
+    g.strokeStyle = t.nut;
+    g.lineWidth = Math.max(3, 0.12 * k0);
+    line3([0, boardLo - 0.06, 0], [0, boardHi + 0.06, 0]);
+  }
   glow(t.glow, t.anchorPost, 12);
   g.strokeStyle = t.anchorPost;
   g.lineWidth = Math.max(3, 0.07 * k0);
   for (const x of [cam.left, cam.right]) line3([x, boardLo - 0.14, 0], [x, boardHi + 0.14, 0]);
   glow(false);
+  const stringWidth = (s) => t.strW * (0.7 + 0.14 * (n - 1 - s)); // wound strings are thicker
   for (let s = 0; s < n; s++) {
-    const width = t.strW * (0.7 + 0.14 * (n - 1 - s)); // wound strings are thicker
+    const width = stringWidth(s);
     glow(t.glow, color(s), 3);
     g.strokeStyle = alpha(color(s), 0.9);
     g.lineWidth = width;
@@ -528,13 +617,46 @@ export function drawHighway(canvas, arr, now, t, cam) {
     stringPath(s, 0.012);
     g.stroke();
   }
-  for (const post of posts ?? []) { // the tuner posts, over the string ends
-    oval(post, 0.09, 0.09);
-    g.fillStyle = t.nut;
-    g.fill();
-    oval(post, 0.035, 0.035);
-    g.fillStyle = alpha(t.ink, 0.8);
-    g.fill();
+  if (parts) { // over the string ends: what they wind onto, a string tree, a locking nut
+    parts.ends.forEach(([u, v], s) => {
+      if (head.slots) { // a roller across the slot, the string wound round it
+        box(u - 0.07, u + 0.07, v - 0.26, v + 0.26, 0.05);
+        paint(alpha(t.nut, 0.85));
+        box(u - 0.08, u + 0.08, v - 0.035, v + 0.035, 0.03);
+        paint(color(s));
+      } else if (head.clamps) {
+        box(u - 0.1, u + 0.1, v - 0.1, v + 0.1, 0.04);
+        paint(alpha(t.text, 0.22), alpha(t.text, 0.45));
+        oval([u, v], 0.05, 0.05);
+        paint(t.nut);
+      } else { // a post in its bushing, the string wound round the side it comes from
+        oval([u, v], 0.17, 0.17);
+        paint(alpha(t.ink, 0.5), alpha(t.nut, 0.4));
+        oval([u, v], 0.085, 0.085);
+        paint(t.nut);
+        oval([u, v], 0.03, 0.03);
+        paint(alpha(t.ink, 0.85));
+        const [px, py, k] = P(...ends[s]), [nutX, nutY] = P(0, ys(s), 0), toNut = Math.atan2(nutY - py, nutX - px);
+        g.beginPath();
+        g.arc(px, py, 0.1 * half * k, toNut - 1.3, toNut + 1.3);
+        paint(null, color(s), stringWidth(s));
+      }
+    });
+    if (head.tree) { // pressing the top two strings down on their way to their posts
+      const vs = [n - 2, n - 1].map((s) => { const [pu, pv] = parts.ends[s]; return headV(s) + ((pv - headV(s)) * head.tree) / pu; });
+      box(head.tree - 0.05, head.tree + 0.05, Math.min(...vs) - 0.08, Math.max(...vs) + 0.08, 0.04);
+      paint(alpha(t.nut, 0.7), alpha(t.ink, 0.6));
+    }
+    if (head.lockingNut) { // a metal block over the nut, clamping the strings in pairs
+      path([[-0.06, 1.07], [0.36, 1.07], [0.36, -1.07], [-0.06, -1.07]].map(onHead));
+      paint(alpha(t.text, 0.14), alpha(t.text, 0.4));
+      for (const v of [0.56, 0, -0.56]) {
+        box(0, 0.3, v - 0.21, v + 0.21, 0.05);
+        paint(alpha(t.text, 0.28), alpha(t.text, 0.45));
+        oval([0.15, v], 0.06, 0.06);
+        paint(t.nut);
+      }
+    }
   }
 
   // Sounding notes light their whole string, with a flash where they landed

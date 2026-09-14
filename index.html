@@ -1508,8 +1508,8 @@
                 drawHighway,
                 lookAhead,
                 HEADSTOCKS,
-                tunerPosts,
-                slotOutline,
+                headstockParts,
+                rounded,
                 spline,
             } from "./highway.js";
             import { onsetEnvelope, align } from "./sync.js";
@@ -1774,33 +1774,35 @@
                             );
                     }
             }
-            // A headstock's card draws it as on the fretboard: its outline, slots and tuners, the strings running from their
-            // posts over the nut and on along the neck to the right
+            // A headstock's card draws it as on the fretboard: its keys and outline, slots and truss rod cover, the strings
+            // running from where they end over the nut and on along the neck to the right
             const headstockCard = (id) => {
                 const head = HEADSTOCKS[id],
-                    posts = head.tuners ? tunerPosts(head, 6) : [];
-                const x = (u) => (92 - u * 13).toFixed(1),
-                    y = (v) => (26 - v * 13).toFixed(1),
+                    strings = Array.from({ length: 6 }, (_, s) => 0.83 * (1 - (2 * s) / 5)),
+                    { outline, ends, keys } = headstockParts(head, strings);
+                const x = (u) => (96 - u * 12).toFixed(1),
+                    y = (v) => (28 - v * 12).toFixed(1),
                     d = (points) =>
                         `M${points.map(([u, v]) => `${x(u)} ${y(v)}`).join("L")}`;
-                return `<svg class="headstock" viewBox="32 4 88 44" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
-                    ...posts.map(
-                        ([u, v]) =>
-                            `<ellipse cx="${x(u)}" cy="${y(Math.sign(v) * head.tuners.key)}" rx="1.6" ry="2.6" fill-opacity=".35" stroke="none"/>`,
+                return `<svg class="headstock" viewBox="24 0 98 56" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
+                    ...keys.map(
+                        ({ u, side, edge }) =>
+                            `<ellipse cx="${x(u)}" cy="${y(edge + side * 0.36)}" rx="1.5" ry="2.6" fill-opacity=".35" stroke="none"/>`,
                     ),
-                    head.outline &&
-                        `<path d="${d(spline(head.outline))}Z" fill-opacity=".1" stroke-width="1.2"/>`,
+                    `<path d="${d(outline)}Z" fill-opacity=".1" stroke-width="1.2"/>`,
                     ...(head.slots ? [1, -1] : []).map(
                         (side) =>
-                            `<path d="${d(slotOutline(head.slots).map(([u, v]) => [u, v * side]))}Z" fill-opacity=".4" stroke="none"/>`,
+                            `<path d="${d(rounded(head.slots[0], head.slots[1], head.slots[2] * side, head.slots[3] * side, (head.slots[3] - head.slots[2]) / 2))}Z" fill-opacity=".4" stroke="none"/>`,
                     ),
+                    head.cover &&
+                        `<path d="${d(spline(head.cover))}Z" fill="none" stroke-width=".6"/>`,
                     `<path d="${d([[0, 1], [-2.1, 1]])} ${d([[0, -1], [-2.1, -1]])}" fill="none" stroke-width="1.2"/>`,
                     `<path d="${d([[0, 1.05], [0, -1.05]])}" stroke-width="2.4"/>`,
-                    ...Array.from({ length: 6 }, (_, s) => {
-                        const v = 0.8 * (1 - (2 * s) / 5);
-                        return `<path d="${d([posts[s] ?? [0.3, v], [0, v], [-2.1, v]])}" fill="none" stroke-width=".7"/>`;
-                    }),
-                    ...posts.map(
+                    ...strings.map(
+                        (v, s) =>
+                            `<path d="${d([ends[s], [0, v], [-2.1, v]])}" fill="none" stroke-width=".7"/>`,
+                    ),
+                    ...ends.map(
                         ([u, v]) =>
                             `<circle cx="${x(u)}" cy="${y(v)}" r="1.1" stroke="none"/>`,
                     ),
