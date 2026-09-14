@@ -59,6 +59,14 @@ export const FONTS = {
   },
 };
 
-export const DEFAULT_STYLE = { look: 'stage', colors: 'stage', fonts: 'workbench' };
+// String colour presets, lowest string first. Default keeps the colour theme's own; the rest replace it
+export const STRINGS = {
+  default: { label: 'Default' },
+  neon: { label: 'Neon', str: ['#e5393e', '#22c3d1', '#34c05a', '#f08a24', '#e2398f', '#cdb82e', '#8f6bff', '#26c6da'] },
+  safe: { label: 'Colour-blind', str: ['#d55e00', '#f0e442', '#56b4e9', '#e69f00', '#009e73', '#cc79a7', '#0072b2', '#ffffff'] }, // Okabe-Ito
+  mono: { label: 'Mono', str: ['#ffffff', '#d6dce6', '#adb6c6', '#8792a7', '#66728a', '#4b566e', '#3a4459', '#2c3446'] }, // bright to dark, low string to high
+};
 
-export const theme = (style) => ({ ...LOOKS[style.look], ...COLORS[style.colors], ...FONTS[style.fonts] });
+export const DEFAULT_STYLE = { look: 'stage', colors: 'stage', fonts: 'workbench', strings: 'default' };
+
+export const theme = (style) => ({ ...LOOKS[style.look], ...COLORS[style.colors], ...FONTS[style.fonts], ...(STRINGS[style.strings]?.str && { str: STRINGS[style.strings].str }) });

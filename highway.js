@@ -110,7 +110,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const anchors = arr.anchors.length ? arr.anchors : WHOLE_SONG;
   const here = moveCamera(cam, anchors, now, performance.now());
   const n = arr.strings, gap = Math.min(0.5, (5 * GAP) / Math.max(1, n - 1)), stack = gap * (n - 1);
-  const ys = (s) => (n - 1 - s) * gap; // lowest string on top, like looking down at the guitar
+  const ys = (s) => (t.stringOrder === 'high' ? s : n - 1 - s) * gap; // lowest string on top, like looking down at the guitar, or highest on top, like tab
   const SPEED = NOTE_SPEED * (t.noteSpeed ?? 1), LOOK = lookAhead(t);
   const boardLo = -0.22, boardHi = stack + 0.22, floor = boardLo - 0.06, far = LOOK * SPEED;
   const Z = (dt) => Math.max(0, dt) * SPEED; // played notes stay on the board while they fade: the camera is right behind it
@@ -477,17 +477,19 @@ export function drawHighway(canvas, arr, now, t, cam) {
         const bx = chord.barre.fret - 0.5;
         g.strokeStyle = 'rgba(255, 255, 255, 0.7)';
         g.lineWidth = Math.max(3, 0.1 * P(bx, stack / 2, z)[2]);
-        line3([bx, ys(chord.barre.from) + gap * 0.4, z], [bx, ys(chord.barre.to) - gap * 0.4, z]);
+        const [y0, y1] = [ys(chord.barre.from), ys(chord.barre.to)].sort((p, q) => p - q);
+        line3([bx, y0 - gap * 0.4, z], [bx, y1 + gap * 0.4, z]);
         label(chord.barre.half ? '½B' : 'B', bx, boardHi + 0.12, z, 0.22, t.text);
       }
-      if (chord.strum || chord.roll) { // strum or roll beside the frame: down runs from the low strings, on top, to the high ones
-        const ax = l - 0.25, down = (chord.strum ?? chord.roll) === 'down', [from, to] = down ? [boardHi - 0.1, floor + 0.15] : [floor + 0.15, boardHi - 0.1];
+      if (chord.strum || chord.roll) { // strum or roll beside the frame: down runs from the low strings to the high ones
+        const ax = l - 0.25, lowSide = ys(0) > ys(n - 1) ? boardHi - 0.1 : floor + 0.15, highSide = lowSide > stack / 2 ? floor + 0.15 : boardHi - 0.1;
+        const [from, to] = (chord.strum ?? chord.roll) === 'down' ? [lowSide, highSide] : [highSide, lowSide];
         g.strokeStyle = t.text;
         g.lineWidth = 2;
         if (chord.roll) path(Array.from({ length: 17 }, (_, j) => [ax + Math.sin((j / 16) * Math.PI * 6) * 0.06, from + ((to - from) * j) / 16, z]), false); // rolled: a wavy arrow
         else path([[ax, from, z], [ax, to, z]], false);
         g.stroke();
-        const head = down ? 0.14 : -0.14;
+        const head = to < from ? 0.14 : -0.14;
         line3([ax - 0.08, to + head, z], [ax, to, z]);
         line3([ax + 0.08, to + head, z], [ax, to, z]);
       }
@@ -702,7 +704,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     barred.add(chord);
     g.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     g.lineWidth = Math.max(4, 0.12 * k0);
-    line3([chord.barre.fret - 0.5, ys(chord.barre.from) + gap * 0.45, 0], [chord.barre.fret - 0.5, ys(chord.barre.to) - gap * 0.45, 0]);
+    const [y0, y1] = [ys(chord.barre.from), ys(chord.barre.to)].sort((p, q) => p - q);
+    line3([chord.barre.fret - 0.5, y0 - gap * 0.45, 0], [chord.barre.fret - 0.5, y1 + gap * 0.45, 0]);
   }
 
   // Where to press, on top of everything on the board: targets fill in as notes approach, finger number and all,

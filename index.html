@@ -49,15 +49,52 @@
   #score b { display: block; font: 600 40px/1 var(--num); }
   #score span { font-size: 13px; color: var(--muted); }
   #status { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); max-width: min(560px, 90vw); padding: 10px 16px; border-radius: 10px; background: var(--chip); border: 1px solid var(--chip-border); backdrop-filter: blur(10px); text-align: center; }
-  #settings { position: fixed; right: 32px; top: 66px; z-index: 2; width: 320px; display: grid; gap: 14px; padding: 16px; border-radius: 12px; background: var(--ink); border: 1px solid var(--chip-border); box-shadow: 0 20px 50px rgba(0, 0, 0, .5); }
-  .field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-  .field .seg { overflow: visible; }
-  .field .seg button { flex: 1; }
-  .check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+  #settings { position: fixed; right: 32px; top: 66px; z-index: 2; width: min(352px, calc(100vw - 32px)); max-height: calc(100vh - 82px); display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--ink) 94%, transparent); backdrop-filter: blur(18px); border: 1px solid var(--chip-border); box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 10px 18px; }
+  .sheet-head h2 { margin: 0; font: 600 15px var(--ui); }
+  .close { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+  .close:hover { background: var(--chip); color: var(--text); }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin: 0 14px; padding: 3px; border-radius: 9px; background: var(--chip); border: 1px solid var(--chip-border); }
+  .tabs button { padding: 6px 0; border: 0; border-radius: 6px; background: none; font: 500 13px var(--ui); color: var(--muted); cursor: pointer; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button[aria-selected="true"] { background: var(--text); color: var(--ink); font-weight: 600; }
+  .pane { display: grid; align-content: start; gap: 18px; padding: 18px 18px 20px; overflow: hidden auto; }
+  .pane h3 { margin: 0 0 -6px; font: 600 11px var(--num); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .pane h3 ~ h3 { padding-top: 16px; border-top: 1px solid var(--chip-border); }
+  .setting { display: grid; gap: 8px; }
+  .setting-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 500; }
+  .setting-head output { font: 600 12px var(--num); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .setting .seg { overflow: visible; }
+  .setting .seg button { flex: 1; }
+  .scale { display: flex; justify-content: space-between; margin-top: -4px; font-size: 11px; color: var(--muted); }
+  .hint { margin: -2px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .text-button { justify-self: start; padding: 4px 0; border: 0; background: none; font: 500 12px var(--ui); color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .text-button:hover { color: var(--text); }
+  #settings input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: none; cursor: pointer; }
+  #settings input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--fill, 50%), var(--chip-border) var(--fill, 50%)); }
+  #settings input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+  #settings input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--chip-border); }
+  #settings input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+  #settings input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); }
+  .toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .toggle small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--muted); }
+  .toggle input { -webkit-appearance: none; appearance: none; flex: none; position: relative; width: 36px; height: 20px; margin: 0; border-radius: 10px; background: var(--chip-border); cursor: pointer; transition: background .15s; }
+  .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); transition: transform .15s; }
+  .toggle input:checked { background: var(--accent); }
+  .toggle input:checked::after { transform: translateX(16px); background: var(--ink); }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cards button { display: grid; gap: 8px; justify-items: start; padding: 10px; border-radius: 9px; border: 1px solid var(--chip-border); background: var(--chip); font: 500 12px var(--ui); color: var(--muted); text-align: left; cursor: pointer; }
+  .cards button:hover { color: var(--text); }
+  .cards button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
+  .dots { display: flex; gap: 4px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+  .order { font: 600 12px var(--num); letter-spacing: .12em; color: var(--text); }
   #drop { position: fixed; inset: 12px; z-index: 3; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgba(0, 0, 0, .45); font: 600 20px var(--num); }
   #tab { position: fixed; left: -10000px; top: 0; width: 1000px; }
   @media (max-width: 1200px) { .wordmark, .song span { display: none; } .song b { max-width: 18vw; } }
   @media (max-width: 900px) { .time { display: none; } }
+  @media (max-width: 520px) { #settings { right: 16px; } }
 </style>
 </head>
 <body>
@@ -88,17 +125,80 @@
 <div id="lyrics"><div id="section"></div><div id="line"></div><div id="next"></div></div>
 <div id="info"></div>
 <div id="score" hidden><b id="accuracy">–</b><span id="heard">accuracy</span></div>
-<div id="settings" hidden>
-  <div class="field">Look<div class="seg" data-setting="look"></div></div>
-  <div class="field">Colours<div class="seg" data-setting="colors"></div></div>
-  <div class="field">Fonts<div class="seg" data-setting="fonts"></div></div>
-  <div class="field">Chord frames<div class="seg" data-setting="frames"></div></div>
-  <label class="field" title="Lower for a flatter view along the highway, higher to look down on it">View angle <output id="viewAngleOut"></output><input id="viewAngle" type="range" min="20" max="65" step="1"></label>
-  <label class="field" title="Higher spreads the notes further apart and brings them in faster. The song keeps its tempo.">Note speed <output id="noteSpeedOut"></output><input id="noteSpeed" type="range" min="0.25" max="2" step="0.05"></label>
-  <label class="field" title="How far down the highway notes are drawn">Drawing distance <output id="drawDistanceOut"></output><input id="drawDistance" type="range" min="0.2" max="2" step="0.05"></label>
-  <label class="field" title="Raise it if notes reach the strings before you hear them">Audio delay <output id="offsetOut"></output><input id="offset" type="range" min="-1000" max="1000" step="10"></label>
-  <label class="check"><input id="guides" type="checkbox"> Hand position guides on the highway</label>
-  <label class="check"><input id="mute" type="checkbox"> Mute my part (Guitar Pro files)</label>
+<div id="settings" role="dialog" aria-labelledby="settingsTitle" hidden>
+  <div class="sheet-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <button class="close" id="settingsClose" aria-label="Close settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Settings sections">
+    <button role="tab" id="tab-highway" aria-controls="pane-highway" data-tab="highway">Highway</button>
+    <button role="tab" id="tab-strings" aria-controls="pane-strings" data-tab="strings">Strings</button>
+    <button role="tab" id="tab-style" aria-controls="pane-style" data-tab="style">Style</button>
+    <button role="tab" id="tab-audio" aria-controls="pane-audio" data-tab="audio">Audio</button>
+  </div>
+
+  <section class="pane" id="pane-highway" role="tabpanel" aria-labelledby="tab-highway">
+    <h3>View</h3>
+    <div class="setting">
+      <div class="setting-head"><label for="viewAngle">View angle</label><output id="viewAngleOut" for="viewAngle"></output></div>
+      <input id="viewAngle" type="range" min="20" max="65" step="1">
+      <div class="scale" aria-hidden="true"><span>Flat</span><span>Top-down</span></div>
+    </div>
+    <div class="setting">
+      <div class="setting-head"><label for="noteSpeed">Note speed</label><output id="noteSpeedOut" for="noteSpeed"></output></div>
+      <input id="noteSpeed" type="range" min="0.25" max="2" step="0.05">
+      <div class="scale" aria-hidden="true"><span>Close together</span><span>Far apart</span></div>
+    </div>
+    <div class="setting">
+      <div class="setting-head"><label for="drawDistance">Drawing distance</label><output id="drawDistanceOut" for="drawDistance"></output></div>
+      <input id="drawDistance" type="range" min="0.2" max="2" step="0.05">
+      <div class="scale" aria-hidden="true"><span>Near</span><span>Far</span></div>
+    </div>
+    <button class="text-button" id="resetView">Reset view</button>
+    <h3>On the highway</h3>
+    <div class="setting">
+      <div class="setting-head"><span id="framesLabel">Chord frames</span></div>
+      <div class="seg" data-setting="frames" role="group" aria-labelledby="framesLabel"></div>
+    </div>
+    <label class="toggle"><span>Hand position guides<small>A band down the highway where your hand goes</small></span><input id="guides" type="checkbox" role="switch"></label>
+  </section>
+
+  <section class="pane" id="pane-strings" role="tabpanel" aria-labelledby="tab-strings" hidden>
+    <div class="setting">
+      <div class="setting-head"><span id="stringOrderLabel">String order</span></div>
+      <div class="cards" data-setting="stringOrder" role="group" aria-labelledby="stringOrderLabel"></div>
+    </div>
+    <div class="setting">
+      <div class="setting-head"><span id="stringsLabel">String colours</span></div>
+      <div class="cards" data-setting="strings" role="group" aria-labelledby="stringsLabel"></div>
+    </div>
+  </section>
+
+  <section class="pane" id="pane-style" role="tabpanel" aria-labelledby="tab-style" hidden>
+    <div class="setting">
+      <div class="setting-head"><span id="lookLabel">Look</span></div>
+      <div class="seg" data-setting="look" role="group" aria-labelledby="lookLabel"></div>
+    </div>
+    <div class="setting">
+      <div class="setting-head"><span id="colorsLabel">Colours</span></div>
+      <div class="cards three" data-setting="colors" role="group" aria-labelledby="colorsLabel"></div>
+    </div>
+    <div class="setting">
+      <div class="setting-head"><span id="fontsLabel">Fonts</span></div>
+      <div class="seg" data-setting="fonts" role="group" aria-labelledby="fontsLabel"></div>
+    </div>
+  </section>
+
+  <section class="pane" id="pane-audio" role="tabpanel" aria-labelledby="tab-audio" hidden>
+    <div class="setting">
+      <div class="setting-head"><label for="offset">Audio delay</label><output id="offsetOut" for="offset"></output></div>
+      <input id="offset" type="range" min="-1000" max="1000" step="10">
+      <div class="scale" aria-hidden="true"><span>Notes earlier</span><span>Notes later</span></div>
+      <p class="hint">Move it right if notes reach the strings before you hear them.</p>
+    </div>
+    <button class="text-button" id="resetOffset">Reset delay</button>
+    <label class="toggle"><span>Mute my part<small>Guitar Pro files: hear the other tracks without yours</small></span><input id="mute" type="checkbox" role="switch"></label>
+  </section>
 </div>
 <div id="status" role="status" hidden></div>
 <div id="drop" hidden>Drop a .pak, a Guitar Pro file, or a tab with its recording</div>
@@ -110,7 +210,7 @@
 import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats, annotate } from './music.js';
 import { suggestPositions, fingerFor } from './fingering.js';
 import { loadSong } from './the reference game.js';
-import { LOOKS, COLORS, FONTS, DEFAULT_STYLE, theme as makeTheme } from './themes.js';
+import { LOOKS, COLORS, FONTS, STRINGS, DEFAULT_STYLE, theme as makeTheme } from './themes.js';
 import { drawHighway, lookAhead } from './highway.js';
 import { onsetEnvelope, align } from './sync.js';
 
@@ -235,8 +335,10 @@ const DEMO = `
 
 // --- Settings: look, colours and fonts mix freely; everything is remembered per browser
 const FRAMES = { box: { label: 'Box' }, gradient: { label: 'Gradient' } };
+const STRING_ORDERS = { low: { label: 'Low E on top' }, high: { label: 'High e on top' } }; // looking down at the guitar, or as in tab
 const VIEW_DEFAULTS = 3; // bumped whenever the view sliders' defaults or scale change
-const settings = { ...DEFAULT_STYLE, frames: 'box', offset: 0, mute: false, guides: true, viewAngle: 30, noteSpeed: 1, drawDistance: 1, viewDefaults: VIEW_DEFAULTS };
+const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1 };
+const settings = { ...DEFAULT_STYLE, frames: 'box', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
 try {
   const saved = JSON.parse(localStorage.getItem('fretfall') ?? '{}');
   if (saved.viewDefaults !== VIEW_DEFAULTS) { // saved under older defaults: the view starts from the current ones
@@ -244,42 +346,94 @@ try {
   }
   Object.assign(settings, saved);
 } catch {}
-for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['frames', FRAMES, 'box']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
+for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['strings', STRINGS], ['frames', FRAMES, 'box'], ['stringOrder', STRING_ORDERS, 'low']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
 const save = () => { try { localStorage.setItem('fretfall', JSON.stringify(settings)); } catch {} };
 let theme;
 
 function applyTheme() {
-  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance };
+  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance };
   $('fonts').href = theme.href;
   const vars = { bg: theme.bg, ink: theme.ink, text: theme.text, muted: theme.muted, accent: theme.accent, chip: theme.chip, 'chip-border': theme.chipBorder, done: theme.phraseDone, todo: theme.phraseTodo, ui: theme.ui, num: theme.num, lyric: theme.lyric, 'lyric-style': theme.lyricStyle };
   for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(`--${k}`, v);
-  for (const seg of document.querySelectorAll('[data-setting]')) for (const b of seg.children) b.setAttribute('aria-pressed', String(b.value === settings[seg.dataset.setting]));
+  for (const seg of document.querySelectorAll('[data-setting]')) for (const b of seg.children) {
+    b.setAttribute('aria-pressed', String(b.value === settings[seg.dataset.setting]));
+    if (b.dots) b.dots.replaceChildren(...dotsFor(seg.dataset.setting, b.value).map((c) => Object.assign(document.createElement('i'), { style: `background: ${c}` })));
+  }
 }
+// Cards preview their option: a preset's six string colours, a colour theme's floor, lanes, accent and text, or the
+// strings in order from the top
+const dotsFor = (setting, value) => {
+  if (setting === 'strings') return (STRINGS[value].str ?? COLORS[settings.colors].str).slice(0, 6);
+  const c = COLORS[value];
+  return [c.floor0, c.lane, c.accent, c.text];
+};
 for (const seg of document.querySelectorAll('[data-setting]')) {
-  const options = { look: LOOKS, colors: COLORS, fonts: FONTS, frames: FRAMES }[seg.dataset.setting];
+  const setting = seg.dataset.setting, options = { look: LOOKS, colors: COLORS, fonts: FONTS, strings: STRINGS, frames: FRAMES, stringOrder: STRING_ORDERS }[setting];
   for (const [value, { label }] of Object.entries(options)) {
     const b = Object.assign(document.createElement('button'), { value, textContent: label });
-    b.onclick = () => { settings[seg.dataset.setting] = value; save(); applyTheme(); };
+    if (setting === 'stringOrder') b.prepend(Object.assign(document.createElement('span'), { className: 'order', textContent: value === 'low' ? 'E A D G B e' : 'e B G D A E' }));
+    else if (seg.classList.contains('cards')) b.prepend((b.dots = Object.assign(document.createElement('span'), { className: 'dots', ariaHidden: 'true' })));
+    b.onclick = () => { settings[setting] = value; save(); applyTheme(); };
     seg.append(b);
   }
 }
+const fill = (range) => range.style.setProperty('--fill', `${((range.value - range.min) / (range.max - range.min)) * 100}%`); // the slider's track, lit up to the thumb
 // The view sliders change the highway straight away, without reloading the theme's fonts
 const VIEW = { viewAngle: (v) => `${v}°`, noteSpeed: (v) => `${Math.round(v * 100)}%`, drawDistance: (v) => `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead` };
 const showView = () => { for (const [key, show] of Object.entries(VIEW)) $(`${key}Out`).value = show(settings[key]); };
+const setView = (values) => {
+  for (const [key, value] of Object.entries(values)) {
+    theme && (theme[key] = value);
+    settings[key] = $(key).value = value;
+    fill($(key));
+  }
+  showView();
+  save();
+};
 for (const key in VIEW) {
   $(key).value = settings[key];
-  $(key).oninput = (e) => { theme[key] = settings[key] = +e.target.value; showView(); save(); };
+  fill($(key));
+  $(key).oninput = (e) => setView({ [key]: +e.target.value });
 }
 showView();
-$('offset').value = settings.offset;
-$('offsetOut').value = `${settings.offset} ms`;
-$('offset').oninput = (e) => { settings.offset = +e.target.value; $('offsetOut').value = `${settings.offset} ms`; save(); };
+$('resetView').onclick = () => setView(VIEW_START);
+const setOffset = (ms) => {
+  settings.offset = $('offset').value = ms;
+  $('offsetOut').value = `${ms > 0 ? '+' : ''}${ms} ms`;
+  fill($('offset'));
+  save();
+};
+setOffset(settings.offset);
+$('offset').oninput = (e) => setOffset(+e.target.value);
+$('resetOffset').onclick = () => setOffset(0);
 $('guides').checked = settings.guides;
 $('guides').onchange = (e) => { settings.guides = e.target.checked; save(); applyTheme(); };
 $('mute').checked = settings.mute;
 $('mute').onchange = (e) => { settings.mute = e.target.checked; save(); if (arr?.track) api.changeTrackMute([arr.track], settings.mute); };
+const showPanel = (name) => {
+  for (const tab of document.querySelectorAll('[data-tab]')) {
+    const on = tab.dataset.tab === name;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    $(`pane-${tab.dataset.tab}`).hidden = !on;
+  }
+  settings.panel = name;
+  save();
+};
+for (const tab of document.querySelectorAll('[data-tab]')) {
+  tab.onclick = () => showPanel(tab.dataset.tab);
+  tab.onkeydown = (e) => { // arrow keys move between tabs
+    const tabs = [...document.querySelectorAll('[data-tab]')], step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+    showPanel(next.dataset.tab);
+    next.focus();
+  };
+}
+showPanel(document.querySelector(`[data-tab="${settings.panel}"]`) ? settings.panel : 'highway');
 const toggleSettings = (open = $('settings').hidden) => { $('settings').hidden = !open; $('settingsButton').setAttribute('aria-expanded', String(open)); };
 $('settingsButton').onclick = () => toggleSettings();
+$('settingsClose').onclick = () => { toggleSettings(false); $('settingsButton').focus(); };
 addEventListener('pointerdown', (e) => { if (!$('settings').hidden && !e.target.closest('#settings, #settingsButton')) toggleSettings(false); });
 applyTheme();
 
@@ -653,8 +807,8 @@ $('slower').onclick = () => setSpeed(speed - 0.1);
 $('faster').onclick = () => setSpeed(speed + 0.1);
 $('loop').onclick = toggleLoop;
 addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT') return;
   if (e.key === 'Escape') toggleSettings(false);
+  if (e.target.tagName === 'INPUT' || e.target.closest?.('#settings')) return; // space and arrows belong to the settings controls there
   const action = { ' ': togglePlay, l: toggleLoop, ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
   if (!action) return;
   e.preventDefault();
