@@ -230,7 +230,7 @@
       <p class="hint">Move it right if notes reach the strings before you hear them.</p>
     </div>
     <button class="text-button" id="resetOffset">Reset delay</button>
-    <label class="toggle"><span>Mute my part<small>Guitar Pro files: hear the other tracks without yours</small></span><input id="mute" type="checkbox" role="switch"></label>
+    <label class="toggle"><span>Mute my part<small>Guitar Pro files played by the synth: hear the other tracks without yours</small></span><input id="mute" type="checkbox" role="switch"></label>
   </section>
 </div>
 <div id="legend" class="sheet" role="dialog" aria-labelledby="legendTitle" hidden>
@@ -638,7 +638,8 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
 const api = new alphaTab.AlphaTabApi($('tab'), {
   core: { fontDirectory: CDN + 'font/' },
   display: { staveProfile: 'Tab' },
-  player: { playerMode: 'EnabledSynthesizer', soundFont: CDN + 'soundfont/sonivox.sf2', enableCursor: false, enableUserInteraction: false },
+  // Automatic: a Guitar Pro file's own recording (its backing track) when it has one, the synth otherwise
+  player: { playerMode: 'EnabledAutomatic', soundFont: CDN + 'soundfont/sonivox.sf2', enableCursor: false, enableUserInteraction: false },
 });
 // paused: the tick the player was paused at. alphaTab 1.8 rewinds to the start on pause, so the position it reports
 // then is ignored and play resumes from here.
@@ -1080,6 +1081,7 @@ function frame() {
     synth.tempo = next.tempo;
     setSong(next);
     resolveSong();
+    if (api.score.backingTrack?.rawAudioFile) status('Playing the recording that comes with this file');
   }
   const t = songTime();
   if (loop && player?.playing && t >= loop.end) player.seek(Math.max(0, loop.start - 1)); // one second of run-up
