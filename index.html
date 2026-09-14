@@ -13,7 +13,7 @@
   body { margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font: 14px/1.4 var(--ui); accent-color: var(--accent); }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   button { font: inherit; color: inherit; }
-  .bar { position: fixed; left: 32px; right: 32px; top: 18px; height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .bar { position: fixed; z-index: 3; left: 32px; right: 32px; top: 18px; height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
   .group { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .wordmark { font: 700 15px var(--num); letter-spacing: .22em; }
   .song { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
@@ -108,12 +108,14 @@
   .l0 { stroke: var(--s0); } .l1 { stroke: var(--s1); } .l2 { stroke: var(--s2); } .l3 { stroke: var(--s3); } .l4 { stroke: var(--s4); } .lm { stroke: var(--muted); }
   .ft { fill: var(--text); } .lt { stroke: var(--text); } .fi { fill: var(--ink); } .fa { fill: var(--accent); } .fl { fill: var(--lane); } .ll { stroke: var(--lane); } .lw { stroke: #fff; } .fw { fill: #fff; }
   .volume { position: relative; }
-  .volume .icon[aria-pressed="true"] { background: var(--chip); border-color: var(--chip-border); color: var(--muted); }
-  .volume-drop { position: absolute; z-index: 3; top: 100%; left: 50%; padding-top: 8px; transform: translate(-50%, -4px); opacity: 0; visibility: hidden; transition: opacity .15s, transform .15s, visibility .15s; }
-  .volume:hover .volume-drop, .volume:focus-within .volume-drop { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
-  .volume-drop div { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--ink); border: 1px solid var(--chip-border); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
-  .volume-drop input { width: 120px; }
-  .volume-drop output { min-width: 34px; font: 600 12px var(--num); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .volume .icon[aria-expanded="true"] { border-color: var(--accent); }
+  .volume .icon.muted { color: var(--muted); }
+  .volume-panel { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 10px; background: var(--ink); border: 1px solid var(--chip-border); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
+  .volume-panel input { width: 150px; }
+  .volume-panel output { min-width: 36px; font: 600 12px var(--num); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .volume-mute { flex: none; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--text); cursor: pointer; }
+  .volume-mute:hover { background: var(--chip); }
+  .volume-mute[aria-pressed="true"] { color: var(--muted); }
   #drop { position: fixed; inset: 12px; z-index: 3; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgba(0, 0, 0, .45); font: 600 20px var(--num); }
   #tab { position: fixed; left: -10000px; top: 0; width: 1000px; }
   @media (max-width: 1200px) { .wordmark, .song span { display: none; } .song b { max-width: 18vw; } }
@@ -137,8 +139,12 @@
       <button id="faster" aria-label="Faster"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 5v10M5 10h10"/></svg></button>
     </div>
     <div class="volume">
-      <button class="icon" id="volumeButton" aria-pressed="false" title="Mute (M). Hover for the volume."></button>
-      <div class="volume-drop"><div><input id="volume" type="range" min="0" max="1" step="0.02" aria-label="Volume"><output id="volumeOut" for="volume"></output></div></div>
+      <button class="icon" id="volumeButton" aria-expanded="false" aria-controls="volumePanel" aria-label="Volume" title="Volume (M mutes)"></button>
+      <div class="volume-panel" id="volumePanel" hidden>
+        <button class="volume-mute" id="volumeMute" aria-pressed="false"></button>
+        <input id="volume" type="range" min="0" max="1" step="0.02" aria-label="Volume">
+        <output id="volumeOut" for="volume"></output>
+      </div>
     </div>
     <button class="icon" id="loop" aria-pressed="false" title="Loop this phrase (L). Shift-click the phrase bar to extend."><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3.5l2.5 2.5-2.5 2.5"/><path d="M4 10V9a3 3 0 0 1 3-3h9"/><path d="M6.5 16.5L4 14l2.5-2.5"/><path d="M16 10v1a3 3 0 0 1-3 3H4"/></svg></button>
     <button class="icon" id="listen" aria-pressed="false" title="Listen to your guitar and score hits (use headphones)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="6" height="10" rx="3"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></button>
@@ -456,21 +462,27 @@ setOffset(settings.offset);
 $('offset').oninput = (e) => setOffset(+e.target.value);
 $('resetOffset').onclick = () => setOffset(0);
 
-// Volume: the speaker mutes and unmutes; the slider beside it slides out on hover or focus
+// Volume: the speaker opens a slider under it, with a speaker of its own that mutes (as does M)
 const SPEAKER = (waves) => `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h3L10.5 4v12l-4-3.5h-3z"/>${waves}</svg>`;
 function setVolume(volume = settings.volume, muted = settings.volumeMuted) {
   Object.assign(settings, { volume, volumeMuted: muted || volume === 0 });
   $('volume').value = loudness();
   $('volumeOut').value = `${Math.round(loudness() * 100)}%`;
   fill($('volume'));
-  $('volumeButton').innerHTML = SPEAKER(settings.volumeMuted ? '<path d="M13.5 8l4 4M17.5 8l-4 4"/>' : volume < 0.5 ? '<path d="M13.5 8a3 3 0 0 1 0 4"/>' : '<path d="M13.5 8a3 3 0 0 1 0 4M15.5 5.5a6.5 6.5 0 0 1 0 9"/>');
-  $('volumeButton').setAttribute('aria-pressed', String(settings.volumeMuted));
-  $('volumeButton').setAttribute('aria-label', settings.volumeMuted ? 'Unmute' : 'Mute');
+  $('volumeButton').innerHTML = $('volumeMute').innerHTML = SPEAKER(settings.volumeMuted ? '<path d="M13.5 8l4 4M17.5 8l-4 4"/>' : volume < 0.5 ? '<path d="M13.5 8a3 3 0 0 1 0 4"/>' : '<path d="M13.5 8a3 3 0 0 1 0 4M15.5 5.5a6.5 6.5 0 0 1 0 9"/>');
+  $('volumeButton').classList.toggle('muted', settings.volumeMuted);
+  $('volumeMute').setAttribute('aria-pressed', String(settings.volumeMuted));
+  $('volumeMute').setAttribute('aria-label', settings.volumeMuted ? 'Unmute' : 'Mute');
   player?.setVolume(loudness());
   save();
 }
+const toggleVolume = (open = $('volumePanel').hidden) => {
+  $('volumePanel').hidden = !open;
+  $('volumeButton').setAttribute('aria-expanded', String(open));
+};
 $('volume').oninput = (e) => setVolume(+e.target.value, false);
-$('volumeButton').onclick = () => setVolume(settings.volume || 0.8, !settings.volumeMuted);
+$('volumeButton').onclick = () => toggleVolume();
+$('volumeMute').onclick = () => setVolume(settings.volume || 0.8, !settings.volumeMuted);
 $('guides').checked = settings.guides;
 $('guides').onchange = (e) => { settings.guides = e.target.checked; save(); applyTheme(); };
 $('mute').checked = settings.mute;
@@ -510,7 +522,10 @@ for (const [sheet, button] of Object.entries(SHEETS)) {
   $(button).onclick = () => toggleSheet(sheet);
   $(`${sheet}Close`).onclick = () => { toggleSheet(sheet, false); $(button).focus(); };
 }
-addEventListener('pointerdown', (e) => { if (!e.target.closest('.sheet, #settingsButton, #legendButton')) toggleSheet('settings', false); });
+addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('.sheet, #settingsButton, #legendButton')) toggleSheet('settings', false);
+  if (!e.target.closest('.volume')) toggleVolume(false);
+});
 
 // --- Notation legend: what each mark on the highway means, drawn in the current theme's colours
 const svg = (inner) => `<svg viewBox="0 0 56 32" aria-hidden="true">${inner}</svg>`;
@@ -986,9 +1001,12 @@ $('slower').onclick = () => setSpeed(speed - 0.1);
 $('faster').onclick = () => setSpeed(speed + 0.1);
 $('loop').onclick = toggleLoop;
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') toggleSheet('settings', false);
+  if (e.key === 'Escape') {
+    toggleSheet('settings', false);
+    toggleVolume(false);
+  }
   if (e.target.tagName === 'INPUT' || e.target.closest?.('.sheet')) return; // space and arrows belong to the controls there
-  const action = { ' ': togglePlay, l: toggleLoop, m: () => $('volumeButton').click(), '?': () => toggleSheet('legend'), ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
+  const action = { ' ': togglePlay, l: toggleLoop, m: () => $('volumeMute').click(), '?': () => toggleSheet('legend'), ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
   if (!action) return;
   e.preventDefault();
   action();
