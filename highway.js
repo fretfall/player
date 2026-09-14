@@ -577,8 +577,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (dt > 0 || -dt > held || note.fret === 0 || !(bendPeak(note) > 0)) continue;
     bending.set(note.string, { note, x: note.fret - 0.5, dy: noteLift(note) });
   }
-  const stringPath = (s, lift = 0) => { // along the string at the board from where it ends on the headstock, bent where it is being bent
-    const b = bending.get(s), y0 = ys(s) + lift, start = [ends ? [ends[s][0], ends[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
+  const stringPath = (s, lift = 0, sounding = false) => { // along the string at the board from where it ends on the headstock (or, sounding, from the nut: nothing past it rings), bent where it is being bent
+    const b = bending.get(s), y0 = ys(s) + lift, start = sounding ? [[0, y0, 0]] : [ends ? [ends[s][0], ends[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
     if (!b) return path([...start, [LAST_FRET + 0.6, y0, 0]], false);
     const bump = (fx) => [fx, y0 + b.dy * smooth(Math.max(0, 1 - Math.abs(fx - b.x) / BEND_SPREAD)), 0];
     path([...start, ...Array.from({ length: 25 }, (_, j) => bump(b.x - BEND_SPREAD + (j * BEND_SPREAD) / 12)).filter(([fx]) => fx > 0), [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
@@ -659,7 +659,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
   }
 
-  // Sounding notes light their whole string, with a flash where they landed
+  // Sounding notes light their string from the nut on, with a flash where they landed
   for (const note of visible) {
     const dt = note.time - now;
     if (dt > 0 || -dt > Math.max(note.sustain, 0.15) || note.mute) continue;
@@ -667,7 +667,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     glow(true, c, 10);
     g.strokeStyle = c;
     g.lineWidth = t.strW + 3;
-    stringPath(note.string);
+    stringPath(note.string, 0, true);
     g.stroke();
     glow(false);
     if (-dt < 0.2) {
