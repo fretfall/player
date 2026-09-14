@@ -1513,6 +1513,13 @@
                 spline,
             } from "./highway.js";
             import { onsetEnvelope, align } from "./sync.js";
+            import {
+                startProfiler,
+                startFrame,
+                lap,
+                endFrame,
+                benchTime,
+            } from "./perf.js";
 
             const $ = (id) => document.getElementById(id);
             const CDN =
@@ -3679,6 +3686,7 @@
 
             function frame() {
                 requestAnimationFrame(frame);
+                startFrame();
                 if (
                     player === synthPlayer &&
                     api.tickCache &&
@@ -3697,13 +3705,19 @@
                 const t = songTime();
                 if (loop && player?.playing && t >= loop.end)
                     player.seek(Math.max(0, loop.start - 1)); // one second of run-up
-                drawHighway(canvas, arr, t, theme, cam);
-                if (song && arr) updateOverlay(t);
+                lap("song");
+                const shown = benchTime() ?? t;
+                drawHighway(canvas, arr, shown, theme, cam);
+                if (song && arr) updateOverlay(shown);
+                lap("overlay");
+                endFrame();
             }
 
             usePlayer(synthPlayer);
             setVolume();
             api.tex(DEMO);
+            if (new URLSearchParams(location.search).has("perf"))
+                startProfiler(canvas, () => song?.length ?? 0); // see perf.js
             requestAnimationFrame(frame);
         </script>
     </body>

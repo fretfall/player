@@ -14,9 +14,9 @@ const shows = (v, lo, hi) => v.left <= lo && v.right >= hi;
 
 // A big move: frets 1-4, then frets 10-13 from 10 s
 const jump = run([{ time: 0, endTime: 10, fret: 1, width: 4 }, { time: 10, endTime: 20, fret: 10, width: 4 }], 16, [5, 9.5, 14]);
-assert.ok(shows(jump.seen[5], 0, 4) && jump.seen[5].span < 10, 'settled close on the first position');
+assert.ok(shows(jump.seen[5], 0, 4) && jump.seen[5].span < 13, 'settled close on the first position');
 assert.ok(shows(jump.seen[9.5], 0, 13), 'zoomed out to show both positions before the move');
-assert.ok(shows(jump.seen[14], 9, 13) && jump.seen[14].span < 10, 'zoomed back in on the new position');
+assert.ok(shows(jump.seen[14], 9, 13) && jump.seen[14].span < 13, 'zoomed back in on the new position');
 
 // A hand rocking one fret back and forth every second should not move the camera each time
 const rocking = Array.from({ length: 20 }, (_, i) => ({ time: i, endTime: i + 1, fret: 5 + (i % 2), width: 4 }));

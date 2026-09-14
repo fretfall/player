@@ -2,6 +2,8 @@
 // so the strings there read as a fretboard and notes rise out of the distance. World units are fret widths;
 // time runs along z. Drawn in a virtual space 900px tall, scaled to the canvas height.
 
+import { lap } from './perf.js';
+
 const VH = 900, HIGHWAY = 84, NOTE_SPEED = 28; // fret widths of highway ahead of the strike line; fret widths a note travels per second
 
 // Seconds of notes in view for the drawing distance and note speed settings: faster notes are further apart and in
@@ -16,7 +18,7 @@ const BEND_LIFT = 1, BEND_RISE = 1.6; // string gaps a bent string rises on the 
 const BEND_EASE = 2; // fret widths before the board over which the trail's rise settles to the string's
 const RAIL = 0.19; // half the width of a bent note's trail
 const BEND_SPREAD = 2.5; // fret widths either side of a bent note that its string curves up over
-const FRAME_AHEAD = 3, MIN_SPAN = 8;
+const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead; frets in view at the closest zoom, less the fret of slack
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
 
@@ -307,6 +309,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   };
   const [fx, fy, k0] = P(...focus);
   [shiftX, shiftY] = [W / 2 - fx, VH * 0.81 - fy]; // the board low on screen, the highway's far end still under the header
+  lap('setup');
 
   const glow = (on, c, blur = 10) => {
     g.shadowBlur = on ? blur * B : 0;
@@ -441,6 +444,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
   }
   g.globalAlpha = 1;
+  lap('floor');
 
   // The fingerboard at the strike line. Everything on the board comes after it, and the notes come after the
   // strings, so nothing hides them
@@ -541,6 +545,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       paint(alpha(t.ink, 0.95));
     }
   }
+  lap('headstock');
 
   const visible = [];
   for (const note of arr.notes) {
@@ -697,6 +702,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.stroke();
   }
   glow(false);
+  lap('strings');
 
   // Under every frame and gem: a white line on the floor under each note, marking its beat (chords get theirs under the
   // frame), and a stem from each fretted note down to it
@@ -861,6 +867,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.setLineDash([]);
     }
   }
+  lap('trails');
 
   // Notes, far to near: gems riding at their string's height
   const boxed = new Set();
@@ -1153,6 +1160,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     g.globalAlpha = 1;
   }
+  lap('notes');
 
   // A barre being played: its bar across the strings on the board
   const barred = new Set();
@@ -1207,6 +1215,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     g.globalAlpha = 1;
   }
+  lap('targets');
 
   // Fret numbers under the board: the hand position in the accent colour, the inlay frets bold
   for (let f = 1; f <= LAST_FRET; f++) {
@@ -1228,4 +1237,5 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.fillText(named.name, Math.min(rx, W - 24 - g.measureText(named.name).width), ly); // kept on screen at the top of the neck
     g.globalAlpha = 1;
   }
+  lap('labels');
 }
