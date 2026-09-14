@@ -8,6 +8,7 @@ const VH = 900, HIGHWAY = 84, NOTE_SPEED = 28; // fret widths of highway ahead o
 // view for less time, a longer drawing distance shows more of them
 export const lookAhead = (view) => (HIGHWAY * (view.drawDistance ?? 1)) / (NOTE_SPEED * (view.noteSpeed ?? 1));
 const GAP = 0.34, LAST_FRET = 24, PRESS_AHEAD = 1.2; // string spacing; how early a note's spot on the board lights up
+const FRET_WIDTH = 1.25, BOARD_HEIGHT = 1.25; // the neck at 100% on the fret width and fretboard height sliders
 // Fret widths from the board where arriving notes and frames light up: a distance, not a time, so everything lights
 // at the same place on the highway whatever the note speed
 const NEAR = 5;
@@ -192,7 +193,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   const anchors = arr.anchors.length ? arr.anchors : WHOLE_SONG;
   const here = moveCamera(cam, anchors, now, performance.now());
-  const n = arr.strings, gap = Math.min(0.5, (5 * GAP) / Math.max(1, n - 1)), stack = gap * (n - 1);
+  const n = arr.strings, spacing = Math.min(0.5, (5 * GAP) / Math.max(1, n - 1)), gap = spacing * BOARD_HEIGHT * (t.boardHeight ?? 1), stack = gap * (n - 1); // the height setting spreads the strings, and their notes grow with them
   const ys = (s) => (t.stringOrder === 'high' ? s : n - 1 - s) * gap; // lowest string on top, like looking down at the guitar, or highest on top, like tab
   const SPEED = NOTE_SPEED * (t.noteSpeed ?? 1), LOOK = lookAhead(t);
   const boardLo = -0.22, boardHi = stack + 0.22, floor = boardLo - 0.06, far = LOOK * SPEED;
@@ -202,14 +203,15 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // Camera just behind and above the strike line, looking far down the highway, as in Tabizera: notes come up
   // out of the distance and the lanes run to a vanishing point under the header. The view angle swings it around
   // the strike line, lower for a flatter view, higher to look down on the highway (45°: behind and above equally).
-  // The lens is shifted so the strings sit in the same place on screen however far the camera zooms out
-  const span = cam.span, focus = [cam.center, stack / 2, 0], angle = ((t.viewAngle ?? 30) * Math.PI) / 180, reach = 0.6 * Math.SQRT2 * span;
+  // The lens is shifted so the strings sit in the same place on screen however far the camera zooms out, aimed at the
+  // middle of a board of standard height: a taller board grows upwards and the fret numbers under it stay put
+  const span = cam.span, focus = [cam.center, (spacing * (n - 1)) / 2, 0], angle = ((t.viewAngle ?? 30) * Math.PI) / 180, reach = 0.6 * Math.SQRT2 * span;
   const eye = [focus[0], stack + reach * Math.sin(angle), -reach * Math.cos(angle)];
   const fwd = unit(sub([focus[0], 0, 2.2 * span], eye)), right = unit(cross([0, 1, 0], fwd)), up = cross(fwd, right);
   const budget = Math.min(W * 0.88, VH * 1.05), focal = (budget * dot(sub(focus, eye), fwd)) / span; // wide screens show more neck, not bigger frets
   // The fret width setting stretches the neck sideways around the camera: wider frets, strings and depth as they are. The
   // camera never looks sideways, so this only moves things across the screen. Capped so the framed hand positions fit
-  const stretch = Math.min(t.fretWidth ?? 1, (W * span) / (budget * Math.max(1, span - 2.5)));
+  const stretch = Math.min(FRET_WIDTH * (t.fretWidth ?? 1), (W * span) / (budget * Math.max(1, span - 2.5)));
   let shiftX = 0, shiftY = 0;
   const P = (x, y, z) => { // → [screen x, screen y, pixels per world unit there (across the neck, times stretch)]
     const d = [(x - eye[0]) * stretch, y - eye[1], z - eye[2]], k = focal / Math.max(0.05, dot(d, fwd));
@@ -376,6 +378,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
 
   const chordOf = (note) => (note.chord === null || note.chord === undefined ? null : arr.chords[note.chord]);
+  const frameOnly = (note) => t.repeatMarks === 'frame' && (note.repeat || chordOf(note)?.highDensity); // a repeated chord shown by its frame alone
   const spot = (note) => { // x along the neck (an open string spans the hand position), y at its string's height
     const a = anchorAt(anchors, note.time), open = note.fret === 0;
     return { a, open, x: open ? a.fret - 1 + a.width / 2 : note.fret - 0.5, y: ys(note.string) };
@@ -485,7 +488,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = 2;
       line3([x - hw, floor, z], [x + hw, floor, z]);
     }
-    if (open) continue;
+    if (open || frameOnly(note)) continue;
     g.strokeStyle = alpha(note.missed ? '#5a606b' : color(note.string), note.repeat || chord?.highDensity ? 0.35 : 0.75); // fainter under a repeat
     g.lineWidth = 1.5;
     line3([x, Math.min(y, boardY(note)) - 0.42 * gap, z], [x, floor, z]);
@@ -544,7 +547,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
     const tail = slide === null ? note.sustain : Math.max(note.sustain, 0.25);
     const moves = slide !== null || note.bend || note.bendCurve || note.whammy;
-    if (tail <= 0.2 || dt + tail <= 0 || (chord && !moves)) continue; // chords sustain without trails: their frames already show the beats
+    if (tail <= 0.2 || dt + tail <= 0 || (chord && !moves) || frameOnly(note)) continue; // chords sustain without trails: their frames already show the beats
     // A trail ends where the next note in its way starts: the next chord, the next note on its string (a slide runs into
     // the note it slides to), or a later note lying across it. Cut there in time, so the trail keeps its shape as it comes
     let next = null;
@@ -656,7 +659,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       // Repeats of the chord before get the same frame, empty and faint until it comes close: then strum again
       const [l, r] = frameAt(chord.notes.map((j) => arr.notes[j].fret), note.time), shown = g.globalAlpha;
       const near = z < NEAR;
-      const weight = near ? 0.65 : chord.highDensity ? 0.18 : 0.5;
+      const weight = near ? 0.65 : chord.highDensity && t.repeatMarks !== 'frame' ? 0.18 : 0.5; // a frame on its own keeps its full weight
       path([[l, floor, z], [r, floor, z], [r, boardHi, z], [l, boardHi, z]]);
       if (t.frames === 'gradient') { // a panel glowing up from the floor, fading out above the top string
         const [, bottom] = P(l, floor, z), [, top] = P(l, boardHi, z), panel = g.createLinearGradient(0, bottom, 0, top);
@@ -681,6 +684,19 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = 2;
       line3([l, floor, z], [r, floor, z]);
       if (chord.highDensity && (chord.palmMute || chord.fretHandMute)) xMark((l + r) / 2, floor + gap * 0.4, z, 0.14, gap * 0.3);
+      if (chord.accent) { // played harder: the frame's top corners shine white
+        const arm = Math.min(0.6, (r - l) * 0.22), drop = (boardHi - floor) * 0.35;
+        g.strokeStyle = '#ffffff';
+        g.lineWidth = (near ? 3.5 : 2.5) * (chord.accent === 'heavy' ? 1.4 : 1);
+        g.lineCap = 'square';
+        glow(t.glow, '#ffffff', near ? 12 : 6);
+        path([[l, boardHi - drop, z], [l, boardHi, z], [l + arm, boardHi, z]], false);
+        g.stroke();
+        path([[r - arm, boardHi, z], [r, boardHi, z], [r, boardHi - drop, z]], false);
+        g.stroke();
+        glow(false);
+        g.lineCap = 'round';
+      }
       if (chord.barre) { // one finger across several strings: a bar over them at its fret
         const bx = chord.barre.fret - 0.5;
         g.strokeStyle = 'rgba(255, 255, 255, 0.7)';
@@ -706,7 +722,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
 
     const [cx, cy, k] = P(x, y, z);
-    if (cx < -200 || cx > W + 200) {
+    if (cx < -200 || cx > W + 200 || frameOnly(note)) {
       g.globalAlpha = 1;
       continue;
     }
@@ -867,7 +883,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.fill();
       above -= 0.16 * k;
     }
-    if (note.accent) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3);
+    if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3); // an accented chord's frame shows it
     const words = [
       note.hammerOn ? 'H' : note.pullOff ? 'P' : '',
       note.tapLeft ? 'm.g.' : note.tap ? (note.tapLeft === false ? 'm.d.' : 'T') : '', // Guitar Pro says which hand taps

@@ -194,6 +194,11 @@
       <input id="fretWidth" type="range" min="0.5" max="2" step="0.05">
       <div class="scale" aria-hidden="true"><span>More of the neck</span><span>Bigger frets</span></div>
     </div>
+    <div class="setting" title="How far apart the strings are. The notes grow with them, and the fret numbers stay where they are">
+      <div class="setting-head"><label for="boardHeight">Fretboard height</label><output id="boardHeightOut" for="boardHeight"></output></div>
+      <input id="boardHeight" type="range" min="0.5" max="2" step="0.05">
+      <div class="scale" aria-hidden="true"><span>Strings closer</span><span>Strings apart</span></div>
+    </div>
     <button class="text-button" id="resetView">Reset view</button>
     <h3>On the highway</h3>
     <div class="setting">
@@ -201,7 +206,7 @@
       <div class="seg" data-setting="frames" role="group" aria-labelledby="framesLabel"></div>
     </div>
     <div class="setting">
-      <div class="setting-head"><span id="repeatMarksLabel">Marks on repeated chords</span></div>
+      <div class="setting-head"><span id="repeatMarksLabel">Repeated chords</span></div>
       <div class="seg" data-setting="repeatMarks" role="group" aria-labelledby="repeatMarksLabel"></div>
     </div>
     <label class="toggle"><span>Hand position guides<small>A band down the highway where your hand goes</small></span><input id="guides" type="checkbox" role="switch"></label>
@@ -289,8 +294,8 @@ const DEMO = `
 \\track "Guitar"
 \\staff {tabs}
 \\instrument distortionguitar
-\\section "Chugs" \\ro :8 (0.6{pm} 2.5{pm}){ch "E5"} (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (3.6{sl} 5.5{sl}){ch "G5"} (5.6 7.5){ch "A5"} (x.6 x.5) (x.6 x.5) |
-\\rc 2 :8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} (7.6 9.5){ch "B5"} (7.6 9.5) (5.5{pm} 7.4{pm}){ch "D5"} (5.5{pm} 7.4{pm}) |
+\\section "Chugs" \\ro :8 (0.6{pm} 2.5{pm}){ch "E5"} (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (3.6{sl} 5.5{sl}){ch "G5"} (5.6{ac} 7.5{ac}){ch "A5"} (x.6 x.5) (x.6 x.5) |
+\\rc 2 :8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} (7.6{hac} 9.5{hac}){ch "B5"} (7.6 9.5) (5.5{pm} 7.4{pm}){ch "D5"} (5.5{pm} 7.4{pm}) |
 :16 0.6{pm} 0.6{pm} :8 0.6{pm} :16 0.6{pm} 0.6{pm} :8 0.6{pm} :4 (5.6 7.5 7.4){ch "A5"} (5.6 7.5 7.4) |
 :8 (x.6 x.5 x.4) (x.6 x.5 x.4) :4 (3.6 5.5 5.4){ch "G5"} :2 (5.6 7.5 7.4){ch "A5"} |
 \\section "Riff" :16 5.6{h lf 2} 7.6{lf 4} 5.5{h lf 2} 7.5{lf 4} 7.4{h lf 4} 5.4{lf 2} 7.4{h lf 4} 5.4{lf 2} :8 7.3{sl lf 4} 9.3{lf 5} 7.4{lf 3} 5.4{lf 2} |
@@ -330,8 +335,8 @@ const DEMO = `
 \\ks g \\tf triplet8th \\jump segno \\section "Swing" \\ro :8 3.6 5.6 3.6 5.6 7.6 5.6 3.6 5.6 |
 \\ae 1 \\rc 2 :4 (3.6 5.5 5.4){ch "G5"} (5.6 7.5 7.4){ch "A5"} :2 (7.6 9.5 9.4){ch "B5"} |
 \\ae 2 \\tf none \\ks c \\jump coda :4 (8.6 10.5 10.4){ch "C5"} (10.6 12.5 12.4){ch "D5"} :2 (0.6 2.5 2.4){ch "E5"} |
-\\section "Outro" :8 0.6{pm} x.6 0.6{pm} x.6 (0.6 2.5 2.4){ch "E5"} (x.6 x.5 x.4) (3.6 5.5){ch "G5"} (x.6 x.5) |
-:8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} :4 (5.6 7.5){ch "A5"} (7.6 9.5){ch "B5"} |
+\\section "Outro" :8 0.6{pm} x.6 0.6{pm} x.6 (0.6{ac} 2.5{ac} 2.4{ac}){ch "E5"} (x.6 x.5 x.4) (3.6 5.5){ch "G5"} (x.6 x.5) |
+:8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} :4 (5.6{ac} 7.5{ac}){ch "A5"} (7.6{hac} 9.5{hac}){ch "B5"} |
 :1 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E"} |
 :2 (-.6 -.5 -.4 -.3 -.2 -.1) r |
 \\track "Bass"
@@ -387,10 +392,10 @@ const DEMO = `
 
 // --- Settings: look, colours and fonts mix freely; everything is remembered per browser
 const FRAMES = { gradient: { label: 'Gradient' }, box: { label: 'Box' } };
-const REPEAT_MARKS = { grey: { label: 'Greyed out' }, hide: { label: 'Hidden' } };
+const REPEAT_MARKS = { grey: { label: 'Greyed marks' }, hide: { label: 'No marks' }, frame: { label: 'Frame only' } };
 const STRING_ORDERS = { low: { label: 'Low E on top' }, high: { label: 'High e on top' } }; // looking down at the guitar, or as in tab
-const VIEW_DEFAULTS = 3; // bumped whenever the view sliders' defaults or scale change
-const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1, fretWidth: 1 };
+const VIEW_DEFAULTS = 4; // bumped whenever the view sliders' defaults or scale change
+const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1, fretWidth: 1, boardHeight: 1 };
 const settings = { ...DEFAULT_STYLE, volume: 0.8, volumeMuted: false, frames: 'gradient', repeatMarks: 'grey', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
 try {
   const saved = JSON.parse(localStorage.getItem('fretfall') ?? '{}');
@@ -405,7 +410,7 @@ const loudness = () => (settings.volumeMuted ? 0 : settings.volume);
 let theme;
 
 function applyTheme() {
-  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, repeatMarks: settings.repeatMarks, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance, fretWidth: settings.fretWidth };
+  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, repeatMarks: settings.repeatMarks, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance, fretWidth: settings.fretWidth, boardHeight: settings.boardHeight };
   $('fonts').href = theme.href;
   const vars = { bg: theme.bg, ink: theme.ink, text: theme.text, muted: theme.muted, accent: theme.accent, chip: theme.chip, 'chip-border': theme.chipBorder, done: theme.phraseDone, todo: theme.phraseTodo, ui: theme.ui, num: theme.num, lyric: theme.lyric, 'lyric-style': theme.lyricStyle };
   Object.assign(vars, { lane: theme.anchorLane }, Object.fromEntries(theme.str.map((c, i) => [`s${i}`, c]))); // the legend draws with these
@@ -434,7 +439,7 @@ for (const seg of document.querySelectorAll('[data-setting]')) {
 }
 const fill = (range) => range.style.setProperty('--fill', `${((range.value - range.min) / (range.max - range.min)) * 100}%`); // the slider's track, lit up to the thumb
 // The view sliders change the highway straight away, without reloading the theme's fonts
-const VIEW = { viewAngle: (v) => `${v}°`, noteSpeed: (v) => `${Math.round(v * 100)}%`, drawDistance: (v) => `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead`, fretWidth: (v) => `${Math.round(v * 100)}%` };
+const VIEW = { viewAngle: (v) => `${v}°`, noteSpeed: (v) => `${Math.round(v * 100)}%`, drawDistance: (v) => `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead`, fretWidth: (v) => `${Math.round(v * 100)}%`, boardHeight: (v) => `${Math.round(v * 100)}%` };
 const showView = () => { for (const [key, show] of Object.entries(VIEW)) $(`${key}Out`).value = show(settings[key]); };
 const setView = (values) => {
   for (const [key, value] of Object.entries(values)) {
@@ -537,8 +542,9 @@ const LEGEND = [
     ['Note', 'Play this string at this fret when its white line on the floor reaches the fretboard. The number on it is the finger to use (T = thumb).', svg(`${gem(16, 8, 24, 12, 1, '1')}<path d="M16 27h24" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Fret number', 'The fret to play, on the floor under the note.', svg(`${gem(20, 3, 16, 7)}<path d="M28 10v8" class="l1" stroke-width="1.5"/><text x="28" y="25" class="f1" font-size="11">7</text>`)],
     ['Open string', 'Play the string without fretting it. The bar spans your hand position; held, it becomes a lane that wide.', svg(`<rect x="6" y="11" width="44" height="5" class="f3"/><path d="M6 25h44" class="lw" stroke-width="2" opacity=".6"/>`)],
-    ['Played again', 'The same chord as just before: strum it again on this beat. Its marks show greyed out, or not at all (Settings). Single notes always show in full.', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
+    ['Played again', 'The same chord as just before: strum it again on this beat. Its marks show greyed out or not at all, or it shows as its frame alone (Settings). Single notes always show in full.', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
     ['Chord', 'Play these notes together. The white line marks the beat; the chord name shows when it changes. Held or played again, its edges run on as rails until the shape changes.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
+    ['Accented chord', 'Strum it harder: the top corners of its frame shine white, bolder for a heavy accent.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".3"/><path d="M6 12V4h12M38 4h12v8" class="lw" stroke-width="3" fill="none" stroke-linecap="square"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Chord name', 'The chord you are playing, big, to the right of your hand. It shows up a second before the chord.', svg(word('G5', 16))],
     ['Barre', 'Lay one finger across several strings at this fret. ½B is a half barre.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/><path d="M24 8v16" class="lt" stroke-width="4" opacity=".8"/><text x="36" y="10" class="ft" font-size="9">B</text>`)],
     ['Hand position', 'Where your index finger sits. A new band with a number means move your hand there.', svg(`<rect x="16" y="2" width="34" height="28" class="fl" opacity=".2"/><path d="M16 2v28M50 2v28" class="ll" stroke-width="1.5"/><text x="9" y="17" class="fl" font-size="10">5</text>`)],
@@ -777,6 +783,7 @@ function songFromScore(score, cache) {
           const barred = beat.barreShape ? beat.notes.filter((x) => x.fret === beat.barreFret).map((x) => x.string - 1) : [];
           chord = chords.push({
             time: t0, name: beat.chord?.name ?? '', notes: [], frets, fingers, highDensity: repeat, palmMute: beat.notes.every((x) => x.isPalmMute), fretHandMute: beat.notes.every((x) => x.isDead),
+            accent: ACCENTS[Math.max(...beat.notes.map((x) => (x.accentuated === GP.AccentuationType.Tenuto ? 0 : x.accentuated)))], // pressed harder: accented or heavy
             strum: [null, 'up', 'down', null, null][beat.brushType] ?? [null, 'up', 'down'][beat.pickStroke] ?? null, roll: [null, null, null, 'up', 'down'][beat.brushType] ?? null,
             barre: barred.length ? { fret: beat.barreFret, from: Math.min(...barred), to: Math.max(...barred), half: beat.barreShape === GP.BarreShape.Half } : undefined,
           }) - 1;
