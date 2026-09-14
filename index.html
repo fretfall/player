@@ -187,16 +187,14 @@
                 right: 32px;
                 top: 74px;
                 height: 54px;
-                display: flex;
-                align-items: flex-end;
-                gap: 3px;
                 cursor: pointer;
                 touch-action: none;
                 -webkit-user-select: none;
                 user-select: none;
             }
             #phrases div {
-                flex-basis: 0;
+                position: absolute; /* placed by time, as on the progress line under it */
+                bottom: 0;
                 min-width: 2px;
                 border-radius: 2px;
                 background: var(--todo);
@@ -3200,9 +3198,14 @@
                     1,
                     ...arr.phrases.map((p) => p.maxDifficulty),
                 );
+                // Where a moment sits along the phrase bars and the progress line: both run from 0:00 to the end, so a
+                // recording's lead-in before the first phrase is empty space
+                const at = (sec) =>
+                    `${Math.min(100, Math.max(0, (sec / song.length) * 100)).toFixed(2)}%`;
                 bars = arr.phrases.map((p) => {
                     const b = document.createElement("div");
-                    b.style.flexGrow = Math.max(0.01, p.endTime - p.time);
+                    b.style.left = at(p.time);
+                    b.style.width = `calc(${at(p.endTime)} - ${at(p.time)} - 3px)`; // 3px apart
                     b.style.height = `${Math.max(8, (p.maxDifficulty / hardest) * 100)}%`;
                     return b;
                 });
@@ -3215,9 +3218,7 @@
                             (n) => n.time >= p.time && n.time < p.endTime,
                         ).length / Math.max(0.5, p.endTime - p.time),
                 );
-                const busiest = Math.max(1e-6, ...busy),
-                    at = (sec) =>
-                        `${Math.min(100, Math.max(0, (sec / song.length) * 100)).toFixed(2)}%`;
+                const busiest = Math.max(1e-6, ...busy);
                 $("progress").style.background =
                     `linear-gradient(90deg, ${arr.phrases
                         .map(
