@@ -206,10 +206,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const span = cam.span, focus = [cam.center, stack / 2, 0], angle = ((t.viewAngle ?? 30) * Math.PI) / 180, reach = 0.6 * Math.SQRT2 * span;
   const eye = [focus[0], stack + reach * Math.sin(angle), -reach * Math.cos(angle)];
   const fwd = unit(sub([focus[0], 0, 2.2 * span], eye)), right = unit(cross([0, 1, 0], fwd)), up = cross(fwd, right);
-  const focal = (Math.min(W * 0.88, VH * 1.05) * dot(sub(focus, eye), fwd)) / span; // wide screens show more neck, not bigger frets
+  const budget = Math.min(W * 0.88, VH * 1.05), focal = (budget * dot(sub(focus, eye), fwd)) / span; // wide screens show more neck, not bigger frets
+  // The fret width setting stretches the neck sideways around the camera: wider frets, strings and depth as they are. The
+  // camera never looks sideways, so this only moves things across the screen. Capped so the framed hand positions fit
+  const stretch = Math.min(t.fretWidth ?? 1, (W * span) / (budget * Math.max(1, span - 2.5)));
   let shiftX = 0, shiftY = 0;
-  const P = (x, y, z) => { // → [screen x, screen y, pixels per world unit there]
-    const d = [x - eye[0], y - eye[1], z - eye[2]], k = focal / Math.max(0.05, dot(d, fwd));
+  const P = (x, y, z) => { // → [screen x, screen y, pixels per world unit there (across the neck, times stretch)]
+    const d = [(x - eye[0]) * stretch, y - eye[1], z - eye[2]], k = focal / Math.max(0.05, dot(d, fwd));
     return [W / 2 + dot(d, right) * k + shiftX, VH / 2 - dot(d, up) * k + shiftY, k];
   };
   const [fx, fy, k0] = P(...focus);
@@ -317,7 +320,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   };
   for (const m of arr.markers ?? []) if (m.time >= now && m.time <= now + LOOK && !moment(m.time).texts.includes(m.text)) moment(m.time).texts.push(m.text);
   for (const h of arr.hairpins ?? []) if (h.time >= now && h.time <= now + LOOK) moment(h.time).pins.push(h.kind);
-  const markLine = cam.center - cam.span / 2 - 0.5;
+  const markLine = cam.center - (cam.span / 2 + 0.5) / stretch; // the same place on screen at any fret width
   for (const { dt, texts, pins } of moments.values()) { // right-aligned against the line at the depth of their bar, in perspective
     const [px, py, k] = P(markLine, floor, Z(dt)), scale = Math.sqrt(k * k0), size = 0.3 * scale, text = texts.join('  ·  '), space = 0.25 * scale;
     g.font = `700 ${size}px ${t.num}`;
@@ -815,7 +818,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (note.grace) { // grace note: small, with a slash
       g.strokeStyle = ink;
       g.lineWidth = Math.max(1, 0.03 * k);
-      line2(g, cx - hw * k * 1.2, cy + hh * k * 1.4, cx + hw * k * 1.2, cy - hh * k * 1.4);
+      line2(g, cx - hw * k * stretch * 1.2, cy + hh * k * 1.4, cx + hw * k * stretch * 1.2, cy - hh * k * 1.4);
     }
     if (note.showString) { // the string's number in a circle, to the left of the note
       const [lx] = P(x - hw, y, z), r = 0.12 * k, sx = lx - r - 0.06 * k;
@@ -843,7 +846,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const peak = bendPeak(note);
     if (peak > 0) { // bend: chevrons in the note's colour right on top of it, up (and down again for a release)
       const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < peak;
-      const count = Math.min(3, Math.max(1, Math.round(peak * 2))), w = hw * k * 0.6, h = w * 0.5, step = h * 1.25, edge = alpha(t.ink, 0.9);
+      const count = Math.min(3, Math.max(1, Math.round(peak * 2))), w = hw * k * stretch * 0.6, h = hw * k * 0.3, step = h * 1.25, edge = alpha(t.ink, 0.9);
       let top = cy - hh * k - 0.04 * k;
       const stack = (dir) => {
         for (let j = 0; j < count; j++) chevron(g, cx, top - j * step - (dir > 0 ? 0 : h), w, h, dir, repeated ? ink : c, edge);
@@ -956,7 +959,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (!open && finger !== null) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, pressed ? t.ink : t.text, 800);
     if (!open && bendPeak(note) > 0) { // a bend: a chevron on top of its target, down for a pre-bend let down
       const [px, py] = P(x, y + hh, 0), letDown = note.bendCurve?.[0]?.[1] > 0 && note.bendCurve.at(-1)[1] < bendPeak(note);
-      chevron(g, px, py - (letDown ? 0.14 : 0.05) * k0, 0.17 * k0, 0.085 * k0, letDown ? 1 : -1, '#ffffff', alpha(t.ink, 0.9));
+      chevron(g, px, py - (letDown ? 0.14 : 0.05) * k0, 0.17 * k0 * stretch, 0.085 * k0, letDown ? 1 : -1, '#ffffff', alpha(t.ink, 0.9));
     }
     g.globalAlpha = 1;
   }

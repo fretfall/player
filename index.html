@@ -183,6 +183,11 @@
       <input id="drawDistance" type="range" min="0.2" max="2" step="0.05">
       <div class="scale" aria-hidden="true"><span>Near</span><span>Far</span></div>
     </div>
+    <div class="setting" title="How wide each fret is on screen. The strings keep their spacing, and your hand position always stays in view">
+      <div class="setting-head"><label for="fretWidth">Fret width</label><output id="fretWidthOut" for="fretWidth"></output></div>
+      <input id="fretWidth" type="range" min="0.5" max="2" step="0.05">
+      <div class="scale" aria-hidden="true"><span>More of the neck</span><span>Bigger frets</span></div>
+    </div>
     <button class="text-button" id="resetView">Reset view</button>
     <h3>On the highway</h3>
     <div class="setting">
@@ -379,12 +384,12 @@ const FRAMES = { gradient: { label: 'Gradient' }, box: { label: 'Box' } };
 const REPEAT_MARKS = { grey: { label: 'Greyed out' }, hide: { label: 'Hidden' } };
 const STRING_ORDERS = { low: { label: 'Low E on top' }, high: { label: 'High e on top' } }; // looking down at the guitar, or as in tab
 const VIEW_DEFAULTS = 3; // bumped whenever the view sliders' defaults or scale change
-const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1 };
+const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1, fretWidth: 1 };
 const settings = { ...DEFAULT_STYLE, volume: 0.8, volumeMuted: false, frames: 'gradient', repeatMarks: 'grey', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
 try {
   const saved = JSON.parse(localStorage.getItem('fretfall') ?? '{}');
   if (saved.viewDefaults !== VIEW_DEFAULTS) { // saved under older defaults: the view starts from the current ones
-    for (const key of ['viewAngle', 'noteSpeed', 'drawDistance', 'viewDefaults']) delete saved[key];
+    for (const key of [...Object.keys(VIEW_START), 'viewDefaults']) delete saved[key];
   }
   Object.assign(settings, saved);
 } catch {}
@@ -394,7 +399,7 @@ const loudness = () => (settings.volumeMuted ? 0 : settings.volume);
 let theme;
 
 function applyTheme() {
-  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, repeatMarks: settings.repeatMarks, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance };
+  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, repeatMarks: settings.repeatMarks, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance, fretWidth: settings.fretWidth };
   $('fonts').href = theme.href;
   const vars = { bg: theme.bg, ink: theme.ink, text: theme.text, muted: theme.muted, accent: theme.accent, chip: theme.chip, 'chip-border': theme.chipBorder, done: theme.phraseDone, todo: theme.phraseTodo, ui: theme.ui, num: theme.num, lyric: theme.lyric, 'lyric-style': theme.lyricStyle };
   Object.assign(vars, { lane: theme.anchorLane }, Object.fromEntries(theme.str.map((c, i) => [`s${i}`, c]))); // the legend draws with these
@@ -423,7 +428,7 @@ for (const seg of document.querySelectorAll('[data-setting]')) {
 }
 const fill = (range) => range.style.setProperty('--fill', `${((range.value - range.min) / (range.max - range.min)) * 100}%`); // the slider's track, lit up to the thumb
 // The view sliders change the highway straight away, without reloading the theme's fonts
-const VIEW = { viewAngle: (v) => `${v}°`, noteSpeed: (v) => `${Math.round(v * 100)}%`, drawDistance: (v) => `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead` };
+const VIEW = { viewAngle: (v) => `${v}°`, noteSpeed: (v) => `${Math.round(v * 100)}%`, drawDistance: (v) => `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead`, fretWidth: (v) => `${Math.round(v * 100)}%` };
 const showView = () => { for (const [key, show] of Object.entries(VIEW)) $(`${key}Out`).value = show(settings[key]); };
 const setView = (values) => {
   for (const [key, value] of Object.entries(values)) {
