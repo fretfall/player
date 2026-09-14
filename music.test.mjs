@@ -22,16 +22,17 @@ assert.equal(noteName(40), 'E2');
 assert.deepEqual([[40, 45, 50, 55, 59, 64], [38, 45, 50, 55, 59, 64], [39, 44, 49, 54, 58, 63], [26, 33, 38, 43], [38, 45, 50, 55, 57, 62]].map(tuningName),
   ['E Standard', 'Drop D', 'E♭ Standard', 'Drop D', 'D A D G A D']);
 
-// Repeats: the same note or chord again soon after is a beat; a change, a new technique or a long rest shows it in full
+// Repeats: the same chord again soon after is a beat; a change, a new technique or a long rest shows it in full, and single
+// notes always show in full
 const n = (time, string, fret, extra = {}) => ({ time, string, fret, chord: null, mute: false, palmMute: false, harmonic: false, slideTo: null, bend: 0, hammerOn: false, pullOff: false, tap: false, ...extra });
 const notes = [n(0, 0, 1), n(0.2, 0, 1), n(0.4, 0, 1, { palmMute: true }), n(0.6, 0, 3), n(0.8, 1, 3, { chord: 0 }), n(0.8, 2, 4, { chord: 0 }), n(1, 1, 3, { chord: 1 }), n(1, 2, 4, { chord: 1 }), n(3, 1, 3, { chord: 2 }), n(3, 2, 4, { chord: 2 })];
 const chords = [{}, {}, {}];
 markRepeats(notes, chords);
-assert.deepEqual(notes.map((x) => x.repeat), [false, true, false, false, false, false, true, true, false, false]);
+assert.deepEqual(notes.map((x) => x.repeat), [false, false, false, false, false, false, true, true, false, false]);
 assert.deepEqual(chords.map((c) => !!c.highDensity), [false, true, false]);
-const ornamented = [n(0, 2, 5), n(0.5, 2, 5, { ornament: 'turn' }), n(1, 2, 5, { ornament: 'turn', pick: 'up' })];
-markRepeats(ornamented, []);
-assert.deepEqual(ornamented.map((x) => x.repeat), [false, false, true]); // new notation shows in full; a pick direction alone doesn't
+const ornamented = [n(0, 2, 5, { chord: 0 }), n(0, 3, 7, { chord: 0 }), n(0.5, 2, 5, { chord: 1, ornament: 'turn' }), n(0.5, 3, 7, { chord: 1 }), n(1, 2, 5, { chord: 2, ornament: 'turn', pick: 'up' }), n(1, 3, 7, { chord: 2 })];
+markRepeats(ornamented, [{}, {}, {}]);
+assert.deepEqual(ornamented.map((x) => x.repeat), [false, false, false, false, true, true]); // new notation shows in full; a pick direction alone doesn't
 
 // Annotations: slur back to the hammered-from note, a tie, let ring to the next note on the string, dynamics on change, barres
 const an = [

@@ -190,7 +190,7 @@
       <div class="seg" data-setting="frames" role="group" aria-labelledby="framesLabel"></div>
     </div>
     <div class="setting">
-      <div class="setting-head"><span id="repeatMarksLabel">Marks on repeated notes</span></div>
+      <div class="setting-head"><span id="repeatMarksLabel">Marks on repeated chords</span></div>
       <div class="seg" data-setting="repeatMarks" role="group" aria-labelledby="repeatMarksLabel"></div>
     </div>
     <label class="toggle"><span>Hand position guides<small>A band down the highway where your hand goes</small></span><input id="guides" type="checkbox" role="switch"></label>
@@ -516,8 +516,8 @@ const LEGEND = [
   ['Notes and chords', [
     ['Note', 'Play this string at this fret when its white line on the floor reaches the fretboard. The number on it is the finger to use (T = thumb).', svg(`${gem(16, 8, 24, 12, 1, '1')}<path d="M16 27h24" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Fret number', 'The fret to play, on the floor under the note.', svg(`${gem(20, 3, 16, 7)}<path d="M28 10v8" class="l1" stroke-width="1.5"/><text x="28" y="25" class="f1" font-size="11">7</text>`)],
-    ['Open string', 'Play the string without fretting it. The bar spans your hand position; held, it becomes a lane that wide.', svg(`<rect x="6" y="10" width="44" height="12" class="f3" opacity=".15"/><rect x="6" y="8" width="44" height="4" class="f3"/><path d="M7 10v14M49 10v14" class="l3" stroke-width="2.5"/><path d="M6 25h44" class="lw" stroke-width="2" opacity=".6"/>`)],
-    ['Played again', 'The same note or chord as just before: play it again on this beat. Its marks show greyed out, or not at all (Settings).', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
+    ['Open string', 'Play the string without fretting it. The bar spans your hand position; held, it becomes a lane that wide.', svg(`<rect x="6" y="11" width="44" height="5" class="f3"/><path d="M6 25h44" class="lw" stroke-width="2" opacity=".6"/>`)],
+    ['Played again', 'The same chord as just before: strum it again on this beat. Its marks show greyed out, or not at all (Settings). Single notes always show in full.', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
     ['Chord', 'Play these notes together. The white line marks the beat; the chord name shows when it changes. Held or played again, its edges run on as rails until the shape changes.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Chord name', 'The chord you are playing, big, to the right of your hand. It shows up a second before the chord.', svg(word('G5', 16))],
     ['Barre', 'Lay one finger across several strings at this fret. ½B is a half barre.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/><path d="M24 8v16" class="lt" stroke-width="4" opacity=".8"/><text x="36" y="10" class="ft" font-size="9">B</text>`)],
@@ -569,7 +569,7 @@ const LEGEND = [
     ['Staccato', 'Short: stop the note right after you play it.', svg(`${gem(16, 17, 24, 11)}<circle cx="28" cy="9" r="2.2" class="ft"/>`)],
     ['Ghost note', 'Barely audible: felt more than heard.', svg(word('(7)', 14, 'f1'))],
     ['Dynamics', 'How loud, from very soft (pp) to very loud (ff). Shown where it changes.', svg(word('mf', 15, 'ft', 'font-style="italic"'))],
-    ['Crescendo and diminuendo', 'Get louder along an opening wedge, softer along a closing one.', svg(`<path d="M8 16L48 8M8 16l40 8" class="lt" stroke-width="1.6"/>`)],
+    ['Crescendo and diminuendo', 'Get louder along an opening wedge, softer along a closing one. It shows left of the neck where it starts, beside the bar markings.', svg(`<path d="M8 16L48 8M8 16l40 8" class="lt" stroke-width="1.6"/>`)],
     ['Swell and fade', 'Fade the note in with the volume knob, or fade it out.', svg(word('swell', 12))],
     ['Wah', 'Wah pedal open (o) or closed (+).', svg(word('o  +', 14))],
     ['Fermata', 'Hold the note longer than written.', svg(`<path d="M16 22a12 12 0 0 1 24 0" class="lt" stroke-width="1.8"/><circle cx="28" cy="19" r="2.2" class="ft"/>`)],

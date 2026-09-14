@@ -79,10 +79,10 @@ export function tuningName(open) {
 export const noteName = (midi) =>
   ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][midi % 12] + (Math.floor(midi / 12) - 1);
 
-// Marks what only repeats the notes just played: the same strings, frets and notation again within `gap` seconds.
-// The highway draws those as beats instead of full notes: single notes get `repeat`, chords become `highDensity`
-// (the format's own flag for a repeated chord). Timing, links and pick direction don't count: alternate picking is
-// still the same note again.
+// Marks chords that only repeat the chord just played: the same strings, frets and notation again within `gap` seconds.
+// The highway draws those as beats instead of full chords: their notes get `repeat`, the chord becomes `highDensity`
+// (the format's own flag for a repeated chord). Single notes are never marked: each one is still a note to play. Timing,
+// links and pick direction don't count: alternate picking is still the same chord again.
 const UNMARKED = new Set(['time', 'sustain', 'chord', 'midi', 'hit', 'missed', 'repeat', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
 const fingering = (n) => JSON.stringify(Object.entries(n).filter(([k, v]) => !UNMARKED.has(k) && v !== null && v !== undefined && v !== false && v !== 0).sort());
 export function markRepeats(notes, chords, gap = 1) {
@@ -90,9 +90,9 @@ export function markRepeats(notes, chords, gap = 1) {
   for (let i = 0, j; i < notes.length; i = j) {
     for (j = i + 1; j < notes.length && notes[j].time - notes[i].time < 0.005; j++);
     const group = notes.slice(i, j), shape = group.map(fingering).sort().join('|');
-    const repeat = !!before && before.shape === shape && group[0].time - before.time <= gap;
+    const chord = group[0].chord ?? null, repeat = chord !== null && !!before && before.shape === shape && group[0].time - before.time <= gap;
     for (const n of group) n.repeat = repeat;
-    if (repeat && group[0].chord !== null) chords[group[0].chord].highDensity = true;
+    if (repeat) chords[chord].highDensity = true;
     before = { shape, time: group[0].time };
   }
 }

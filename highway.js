@@ -307,38 +307,45 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (i && a.time > now + 0.3) label(String(a.fret), l - 0.2, floor, z0, 0.3, t.anchorLane, 700, 'right');
   });
 
-  // Bar markings on the floor at the left of the view, where they happen (meter, key, tempo, feel, repeats, endings,
-  // jumps, ottava, free text like "pizz."), and crescendo and diminuendo hairpins beside them
-  const moments = new Map();
-  for (const m of arr.markers ?? []) { // everything at the same moment goes on one line, so nothing overlaps
-    const dt = m.time - now;
-    if (dt < 0 || dt > LOOK) continue;
-    const key = Math.round(m.time * 100);
-    if (!moments.has(key)) moments.set(key, { dt, texts: [] });
-    if (!moments.get(key).texts.includes(m.text)) moments.get(key).texts.push(m.text);
-  }
-  const markRight = W * 0.4; // bar markings and hairpins keep to one column left of the highway, wherever the hand is
-  for (const { dt, texts } of moments.values()) { // right-aligned in that column, at the depth of their bar
-    const [, py, k] = P(0, floor, Z(dt)), size = 0.3 * Math.sqrt(k * k0), text = texts.join('  ·  ');
+  // Bar markings on the floor where they happen (meter, key, tempo, feel, repeats, endings, jumps, ottava, free text like
+  // "pizz."), and crescendo and diminuendo hairpins beside them. They keep to a line along the highway, just left of the
+  // framed neck: it moves with the camera, so on screen it stays in place wherever the hand is
+  const moments = new Map(), moment = (time) => { // everything at the same moment goes on one line, so nothing overlaps
+    const key = Math.round(time * 100);
+    if (!moments.has(key)) moments.set(key, { dt: time - now, texts: [], pins: [] });
+    return moments.get(key);
+  };
+  for (const m of arr.markers ?? []) if (m.time >= now && m.time <= now + LOOK && !moment(m.time).texts.includes(m.text)) moment(m.time).texts.push(m.text);
+  for (const h of arr.hairpins ?? []) if (h.time >= now && h.time <= now + LOOK) moment(h.time).pins.push(h.kind);
+  const markLine = cam.center - cam.span / 2 - 0.5;
+  for (const { dt, texts, pins } of moments.values()) { // right-aligned against the line at the depth of their bar, in perspective
+    const [px, py, k] = P(markLine, floor, Z(dt)), scale = Math.sqrt(k * k0), size = 0.3 * scale, text = texts.join('  ·  '), space = 0.25 * scale;
     g.font = `700 ${size}px ${t.num}`;
+    const textWidth = text ? g.measureText(text).width : 0, width = textWidth + pins.length * (0.9 * scale + space);
+    let right = Math.max(px - 0.3 * scale, 16 + width); // a little padding from the line, kept on screen
     g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
-    const right = Math.max(markRight, 24 + g.measureText(text).width); // kept on screen
-    g.textAlign = 'right';
     g.lineWidth = size * 0.2;
     g.strokeStyle = alpha(t.ink, 0.9);
-    g.strokeText(text, right, py);
-    g.fillStyle = t.accent;
-    g.fillText(text, right, py);
-  }
-  g.strokeStyle = t.text;
-  g.lineWidth = 2;
-  for (const h of arr.hairpins ?? []) {
-    if (h.endTime < now || h.time > now + LOOK) continue;
-    const from = (h.time - now) * SPEED, to = (h.endTime - now) * SPEED, z0 = Math.max(0, from), z1 = Math.min(far, to);
-    const open = (zz) => (h.kind === 'cresc' ? (zz - from) / (to - from || 1) : 1 - (zz - from) / (to - from || 1)) * 0.2; // half the opening
-    const [, y0, s0] = P(0, floor, z0), [, y1, s1] = P(0, floor, z1), hx = markRight - 0.6 * Math.sqrt(s0 * k0);
-    g.globalAlpha = 0.8;
-    for (const side of [-1, 1]) line2(g, hx + side * open(z0) * Math.sqrt(s0 * k0), y0, hx + side * open(z1) * Math.sqrt(s1 * k0), y1);
+    if (text) {
+      g.textAlign = 'right';
+      g.strokeText(text, right, py);
+      g.fillStyle = t.accent;
+      g.fillText(text, right, py);
+      right -= textWidth + space;
+    }
+    for (const kind of pins) { // a hairpin, as in notation, where it starts: opening for a crescendo, closing for a diminuendo
+      const left = right - 0.9 * scale, open = 0.14 * scale, [tip, mouth] = kind === 'cresc' ? [left, right] : [right, left];
+      for (const [color, lineWidth] of [[alpha(t.ink, 0.9), Math.max(3.5, 0.12 * scale)], [t.text, Math.max(1.5, 0.05 * scale)]]) {
+        g.strokeStyle = color;
+        g.lineWidth = lineWidth;
+        g.beginPath();
+        g.moveTo(mouth, py - open);
+        g.lineTo(tip, py);
+        g.lineTo(mouth, py + open);
+        g.stroke();
+      }
+      right = left - space;
+    }
   }
   g.globalAlpha = 1;
 
@@ -547,9 +554,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
         break;
       }
     }
-    const d0 = Math.max(dt, 0), d1 = Math.min(dt + tail, LOOK, next ? next.time - now : Infinity);
+    const d0 = Math.max(dt, 0), bent = note.bend || note.bendCurve || note.whammy;
+    let d1 = Math.min(dt + tail, LOOK, next ? next.time - now : Infinity);
     if (d1 <= d0) continue;
-    const steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
     const along = (d) => {
       const sec = d - dt, p = Math.min(1, Math.max(0, sec / tail)), zz = Z(d), glide = p * p * (3 - 2 * p);
       const railed = note.bend || note.bendCurve || note.whammy; // a rail stays straight: its vibrato shows in the mark above the note
@@ -560,6 +567,16 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const rise = BEND_LIFT + (BEND_RISE - BEND_LIFT) * smooth(Math.min(1, zz / BEND_EASE));
       return [x + (slide === null ? 0 : (slide - 0.5 - x) * glide) + wave + jitter, y + (liftAt(note, sec) * rise) / BEND_LIFT, zz];
     };
+    if (bent && next) { // raised, the trail would show past the next note: end it where it reaches that note's bottom edge on screen
+      const at = spot(next), bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, Z(next.time - now))[1] + 3, screenY = (d) => P(...along(d))[1];
+      if (screenY(d1) < bottom) {
+        let lo = d0, hi = d1;
+        for (let j = 0; j < 24; j++) [lo, hi] = screenY((lo + hi) / 2) < bottom ? [lo, (lo + hi) / 2] : [(lo + hi) / 2, hi];
+        d1 = lo;
+      }
+      if (d1 <= d0 + 0.001) continue;
+    }
+    const steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
     const spine = Array.from({ length: steps + 1 }, (_, j) => along(d0 + ((d1 - d0) * j) / steps));
     if (open && !chord) { // an open string sounds as a lane as wide as the hand position, edged in its colour
       g.fillStyle = fade(c, note.letRing ? 0.14 : 0.26, 0.03);
@@ -598,7 +615,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.fill();
       glow(false);
     }
-    const bent = note.bend || note.bendCurve || note.whammy;
     if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
       g.strokeStyle = fade(note.letRing ? c : '#ffffff', 0.7, 0.1);
       g.lineWidth = note.letRing ? 2 : 1.5;
@@ -692,13 +708,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       continue;
     }
     const repeated = note.repeat || chord?.highDensity, fill = note.hit ? '#ffffff' : c;
-    const legs = (color, width) => { // an open string's bar stands on the floor at both ends of the hand position
-      g.strokeStyle = color;
-      g.lineWidth = width;
-      line3([x - hw, floor, z], [x - hw, y, z]);
-      line3([x + hw, floor, z], [x + hw, y, z]);
-    };
-    if (repeated) { // the same note or chord again: just outlines on its beat, lit as they arrive
+    if (repeated) { // the same chord again: just outlines on its beat, lit as they arrive
       const near = z < NEAR;
       g.globalAlpha *= near ? 0.9 : 0.4;
       g.strokeStyle = c;
@@ -706,7 +716,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       glow(t.glow && near, c, 8);
       gem(x, y, z, hw, hh);
       g.stroke();
-      if (open && !chord) legs(c, 1.5);
       glow(false);
       if ((muted || palm) && t.repeatMarks !== 'hide') { // its mute, greyed out
         g.strokeStyle = t.muted;
@@ -721,12 +730,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
       if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 
-      if (open && !chord) { // a faint wall under the bar, between its legs (chords keep their frame instead)
-        g.fillStyle = alpha(fill, 0.12);
-        path([[x - hw, floor, z], [x + hw, floor, z], [x + hw, y, z], [x - hw, y, z]]);
-        g.fill();
-        legs(fill, 3);
-      }
       if (note.ghost) g.globalAlpha = faded * 0.5;
       if (muted || palm) { // mutes an X, in a hollow gem for a palm mute (open strings keep their bar)
         glow(t.glow && z < NEAR, fill, 8);
