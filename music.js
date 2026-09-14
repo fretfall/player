@@ -31,40 +31,6 @@ export function msToTick(map, ms) {
   return seg.tick + ((ms - seg.ms) * seg.tempo * TICKS_PER_QUARTER) / 60000;
 }
 
-// YIN pitch detection → fractional MIDI note, or null for silence/noise.
-// Covers bass low B (31 Hz) through guitar fret 24. Monophonic: on chords it usually finds the root.
-export function detectPitch(samples, sampleRate) {
-  const x = new Float32Array(samples.length >> 1); // halve the rate, 4× less work and plenty for < 1.4 kHz
-  let power = 0;
-  for (let i = 0; i < x.length; i++) {
-    x[i] = (samples[2 * i] + samples[2 * i + 1]) / 2;
-    power += x[i] * x[i];
-  }
-  if (power / x.length < 1e-4) return null; // quieter than RMS 0.01
-
-  const sr = sampleRate / 2;
-  const maxLag = Math.min(Math.ceil(sr / 30), x.length >> 1);
-  const window = x.length - maxLag;
-  const cmnd = new Float32Array(maxLag + 2).fill(1);
-  let sum = 0;
-  for (let lag = 1; lag <= maxLag; lag++) {
-    let d = 0;
-    for (let i = 0; i < window; i++) {
-      const v = x[i] - x[i + lag];
-      d += v * v;
-    }
-    sum += d;
-    cmnd[lag] = sum ? (d * lag) / sum : 1;
-    const t = lag - 1; // first local minimum under the threshold is the period
-    if (t > 1 && cmnd[t] < 0.15 && cmnd[t] <= cmnd[lag]) {
-      const a = cmnd[t - 1], b = cmnd[t], c = cmnd[lag];
-      const period = t + (a - c) / (2 * (a - 2 * b + c) || 1);
-      return 69 + 12 * Math.log2(sr / period / 440);
-    }
-  }
-  return null;
-}
-
 const FLATS = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 const STANDARD = { 4: [28, 33, 38, 43], 5: [23, 28, 33, 38, 43], 6: [40, 45, 50, 55, 59, 64], 7: [35, 40, 45, 50, 55, 59, 64] };
 
@@ -76,14 +42,11 @@ export function tuningName(open) {
   return open.map((m) => FLATS[m % 12]).join(' ');
 }
 
-export const noteName = (midi) =>
-  ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][midi % 12] + (Math.floor(midi / 12) - 1);
-
 // Marks chords that only repeat the chord just played: the same strings, frets and notation again within `gap` seconds.
 // The highway draws those as beats instead of full chords: their notes get `repeat`, the chord becomes `highDensity`
 // (the format's own flag for a repeated chord). Single notes are never marked: each one is still a note to play. Timing,
 // links and pick direction don't count: alternate picking is still the same chord again.
-const UNMARKED = new Set(['time', 'sustain', 'chord', 'midi', 'hit', 'missed', 'repeat', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
+const UNMARKED = new Set(['time', 'sustain', 'chord', 'repeat', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
 const fingering = (n) => JSON.stringify(Object.entries(n).filter(([k, v]) => !UNMARKED.has(k) && v !== null && v !== undefined && v !== false && v !== 0).sort());
 export function markRepeats(notes, chords, gap = 1) {
   let before = null;

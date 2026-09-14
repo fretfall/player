@@ -45,9 +45,6 @@
   #next { min-height: 1.15em; font-size: clamp(16px, 1.7vw, 24px); line-height: 1.15; color: var(--muted); opacity: .6; }
   #info { position: fixed; left: 40px; bottom: 14px; font-size: 13px; color: var(--muted); pointer-events: none; }
   #info b { color: var(--text); font-weight: 600; }
-  #score { position: fixed; right: 40px; top: 164px; text-align: right; }
-  #score b { display: block; font: 600 40px/1 var(--num); }
-  #score span { font-size: 13px; color: var(--muted); }
   #status { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); max-width: min(560px, 90vw); padding: 10px 16px; border-radius: 10px; background: var(--chip); border: 1px solid var(--chip-border); backdrop-filter: blur(10px); text-align: center; }
   .sheet { position: fixed; right: 32px; top: 66px; z-index: 2; width: min(352px, calc(100vw - 32px)); max-height: calc(100vh - 82px); display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--ink) 94%, transparent); backdrop-filter: blur(18px); border: 1px solid var(--chip-border); box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
   .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 10px 18px; }
@@ -147,7 +144,6 @@
       </div>
     </div>
     <button class="icon" id="loop" aria-pressed="false" title="Loop this phrase (L). Shift-click the phrase bar to extend."><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3.5l2.5 2.5-2.5 2.5"/><path d="M4 10V9a3 3 0 0 1 3-3h9"/><path d="M6.5 16.5L4 14l2.5-2.5"/><path d="M16 10v1a3 3 0 0 1-3 3H4"/></svg></button>
-    <button class="icon" id="listen" aria-pressed="false" title="Listen to your guitar and score hits (use headphones)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="6" height="10" rx="3"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></button>
     <button class="icon" id="play" title="Play / pause (Space)"></button>
     <div class="divider"></div>
     <button class="icon" id="open" title="Open a .pak, a Guitar Pro file, or a tab with its recording (or drop them anywhere)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"/></svg></button>
@@ -159,7 +155,6 @@
 <div id="progress"><div></div></div>
 <div id="lyrics"><div id="section"></div><div id="line"></div><div id="next"></div></div>
 <div id="info"></div>
-<div id="score" hidden><b id="accuracy">–</b><span id="heard">accuracy</span></div>
 <div id="settings" class="sheet" role="dialog" aria-labelledby="settingsTitle" hidden>
   <div class="sheet-head">
     <h2 id="settingsTitle">Settings</h2>
@@ -264,7 +259,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
 <script type="module">
-import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats, annotate } from './music.js';
+import { tempoMap, tickToMs, msToTick, tuningName, markRepeats, annotate } from './music.js';
 import { suggestPositions, fingerFor } from './fingering.js';
 import { loadSong } from './the reference game.js';
 import { LOOKS, COLORS, FONTS, STRINGS, DEFAULT_STYLE, theme as makeTheme } from './themes.js';
@@ -392,19 +387,20 @@ const DEMO = `
 
 // --- Settings: look, colours and fonts mix freely; everything is remembered per browser
 const FRAMES = { gradient: { label: 'Gradient' }, box: { label: 'Box' } };
-const REPEAT_MARKS = { grey: { label: 'Greyed marks' }, hide: { label: 'No marks' }, frame: { label: 'Frame only' } };
+const REPEAT_MARKS = { frame: { label: 'Frame only' }, grey: { label: 'Greyed marks' }, hide: { label: 'No marks' } };
 const STRING_ORDERS = { low: { label: 'Low E on top' }, high: { label: 'High e on top' } }; // looking down at the guitar, or as in tab
-const VIEW_DEFAULTS = 4; // bumped whenever the view sliders' defaults or scale change
+const VIEW_DEFAULTS = 5; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords
 const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1, fretWidth: 1, boardHeight: 1 };
-const settings = { ...DEFAULT_STYLE, volume: 0.8, volumeMuted: false, frames: 'gradient', repeatMarks: 'grey', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
+const settings = { ...DEFAULT_STYLE, volume: 0.8, volumeMuted: false, frames: 'gradient', repeatMarks: 'frame', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
 try {
   const saved = JSON.parse(localStorage.getItem('fretfall') ?? '{}');
-  if (saved.viewDefaults !== VIEW_DEFAULTS) { // saved under older defaults: the view starts from the current ones
-    for (const key of [...Object.keys(VIEW_START), 'viewDefaults']) delete saved[key];
-  }
+  const version = saved.viewDefaults ?? 0; // saved under older defaults: whatever changed since starts from its new default
+  if (version < 4) for (const key of Object.keys(VIEW_START)) delete saved[key];
+  if (version < 5) delete saved.repeatMarks;
+  delete saved.viewDefaults;
   Object.assign(settings, saved);
 } catch {}
-for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['strings', STRINGS], ['frames', FRAMES, 'gradient'], ['repeatMarks', REPEAT_MARKS, 'grey'], ['stringOrder', STRING_ORDERS, 'low']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
+for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['strings', STRINGS], ['frames', FRAMES, 'gradient'], ['repeatMarks', REPEAT_MARKS, 'frame'], ['stringOrder', STRING_ORDERS, 'low']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
 const save = () => { try { localStorage.setItem('fretfall', JSON.stringify(settings)); } catch {} };
 const loudness = () => (settings.volumeMuted ? 0 : settings.volume);
 let theme;
@@ -542,7 +538,7 @@ const LEGEND = [
     ['Note', 'Play this string at this fret when its white line on the floor reaches the fretboard. The number on it is the finger to use (T = thumb).', svg(`${gem(16, 8, 24, 12, 1, '1')}<path d="M16 27h24" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Fret number', 'The fret to play, on the floor under the note.', svg(`${gem(20, 3, 16, 7)}<path d="M28 10v8" class="l1" stroke-width="1.5"/><text x="28" y="25" class="f1" font-size="11">7</text>`)],
     ['Open string', 'Play the string without fretting it. The bar spans your hand position; held, it becomes a lane that wide.', svg(`<rect x="6" y="11" width="44" height="5" class="f3"/><path d="M6 25h44" class="lw" stroke-width="2" opacity=".6"/>`)],
-    ['Played again', 'The same chord as just before: strum it again on this beat. Its marks show greyed out or not at all, or it shows as its frame alone (Settings). Single notes always show in full.', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
+    ['Played again', 'The same chord as just before: strum it again on this beat. It shows as its frame alone, or as outlines with its marks greyed out or hidden (Settings). Single notes always show in full.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/><path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Chord', 'Play these notes together. The white line marks the beat; the chord name shows when it changes. Held or played again, its edges run on as rails until the shape changes.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Accented chord', 'Strum it harder: the top corners of its frame shine white, bolder for a heavy accent.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".3"/><path d="M6 12V4h12M38 4h12v8" class="lw" stroke-width="3" fill="none" stroke-linecap="square"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Chord name', 'The chord you are playing, big, to the right of your hand. It shows up a second before the chord.', svg(word('G5', 16))],
@@ -795,7 +791,7 @@ function songFromScore(score, cache) {
           if (tied) { tied.sustain = t1 - tied.time; continue; }
           const origin = nt.hammerPullOrigin, harmonic = HARMONICS[nt.harmonicType];
           const note = {
-            time: t0, sustain: nt.slideTarget || nt.hasBend || t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord, midi: nt.realValue,
+            time: t0, sustain: nt.slideTarget || nt.hasBend || t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord,
             hammerOn: !!origin && nt.fret > origin.fret, pullOff: !!origin && nt.fret < origin.fret,
             slideTo: nt.slideTarget ? nt.slideTarget.fret : null, slideUnpitchTo: null,
             slideIn: [null, 'below', 'above'][nt.slideInType] ?? null, slideOut: [null, null, null, 'up', 'down', 'down', 'up'][nt.slideOutType] ?? null,
@@ -881,7 +877,6 @@ function selectArrangement(i) {
   if (arr?.track) api.changeTrackMute([arr.track], false);
   arr = song.arrangements[i];
   if (arr.track) api.changeTrackMute([arr.track], settings.mute);
-  for (const n of arr.notes) n.hit = n.missed = false;
   for (const key in cam) delete cam[key];
   const picker = $('arrangements');
   if (picker.firstElementChild?.tagName === 'SELECT') picker.firstElementChild.value = i;
@@ -949,7 +944,6 @@ async function openFile(file) {
       if (!a.anchors.length) a.anchors = suggestPositions(a.notes).anchors;
       let hand = 0;
       for (const n of a.notes) {
-        n.midi = a.open[n.string] + n.fret;
         while (a.anchors[hand + 1]?.time <= n.time) hand++;
         const template = n.chord === null ? -1 : a.chords[n.chord].fingers[n.string] ?? -1;
         if (n.fret > 0) n.finger ??= template >= 0 ? template : a.anchors[hand] ? fingerFor(n.fret, a.anchors[hand].fret) : null;
@@ -1019,46 +1013,6 @@ addEventListener('keydown', (e) => {
   action();
 });
 
-// --- Listening: pitch from mic/interface, scored against the notes at the strike line
-let mic = null, heard = null, lastTime = 0;
-$('listen').onclick = async () => {
-  if (mic) {
-    mic.stream.getTracks().forEach((tr) => tr.stop());
-    mic.ctx.close();
-    mic = heard = null;
-  } else {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-      const ctx = new AudioContext(), analyser = ctx.createAnalyser();
-      analyser.fftSize = 4096;
-      ctx.createMediaStreamSource(stream).connect(analyser);
-      mic = { stream, ctx, analyser, buf: new Float32Array(analyser.fftSize) };
-    } catch (e) {
-      status(`No microphone: ${e.message}`);
-    }
-  }
-  $('listen').setAttribute('aria-pressed', String(!!mic));
-  $('score').hidden = !mic;
-};
-
-function score(t) {
-  if (!arr) return;
-  if (t < lastTime - 0.25) for (const n of arr.notes) if (n.time + n.sustain > t) n.hit = n.missed = false; // rewound or looped: fresh attempt
-  lastTime = t;
-  if (!mic || !player?.playing) return;
-  mic.analyser.getFloatTimeDomainData(mic.buf);
-  const pitch = detectPitch(mic.buf, mic.ctx.sampleRate);
-  heard = pitch === null ? null : Math.round(pitch);
-  for (const n of arr.notes) {
-    if (n.time > t + 0.12) break;
-    if (n.hit || n.missed || n.mute) continue;
-    const deadline = n.time + Math.max(n.sustain, 0.25);
-    if (t > deadline) n.missed = t - deadline < 0.5; // only notes that just went by, not the whole past
-    else if (heard !== null && t >= n.time - 0.12 && (heard - n.midi) % 12 === 0) // octave errors forgiven
-      (n.chord === null ? [n] : arr.chords[n.chord].notes.map((j) => arr.notes[j])).forEach((m) => (m.hit = true));
-  }
-}
-
 // --- Frame loop
 const canvas = $('highway'), cam = {};
 const songTime = () => (player ? player.time - settings.offset / 1000 : 0);
@@ -1095,12 +1049,6 @@ function updateOverlay(t) {
     fillLine($('line'), current, sung);
     fillLine($('next'), upcoming, 0);
   }
-
-  if (mic) {
-    const hits = arr.notes.filter((n) => n.hit).length, misses = arr.notes.filter((n) => n.missed).length;
-    $('accuracy').textContent = hits + misses ? `${Math.round((hits / (hits + misses)) * 100)}%` : '–';
-    $('heard').textContent = heard === null ? 'accuracy' : `accuracy · hearing ${noteName(heard)}`;
-  }
 }
 
 function frame() {
@@ -1115,7 +1063,6 @@ function frame() {
   }
   const t = songTime();
   if (loop && player?.playing && t >= loop.end) player.seek(Math.max(0, loop.start - 1)); // one second of run-up
-  score(t);
   drawHighway(canvas, arr, t, theme, cam);
   if (song && arr) updateOverlay(t);
 }
