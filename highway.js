@@ -363,7 +363,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
   path([[cam.left, boardLo, 0], [cam.right, boardLo, 0], [cam.right, boardHi, 0], [cam.left, boardHi, 0]]);
   g.fill();
   g.fillStyle = t.inlayDot;
-  for (const f of INLAYS) for (const y of f % 12 ? [stack / 2] : [stack * 0.25, stack * 0.75]) {
+  const between = (at) => (Math.max(0, Math.ceil(at) - 1) + 0.5) * gap; // halfway between the strings around `at`, counted in strings (on a string: the gap under it)
+  for (const f of INLAYS) for (const y of f % 12 ? [between((n - 1) / 2)] : [between((n - 1) / 4), stack - between((n - 1) / 4)]) { // one dot in the middle, a pair a gap off either side of it
     const [px, py, k] = P(f - 0.5, y, 0);
     g.beginPath();
     g.ellipse(px, py, 0.1 * k, 0.08 * k, 0, 0, Math.PI * 2);
