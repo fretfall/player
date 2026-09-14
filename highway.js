@@ -239,12 +239,25 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Bar markings on the floor at the left of the view, where they happen (meter, key, tempo, feel, repeats, endings,
   // jumps, ottava, free text like "pizz."), and crescendo and diminuendo hairpins beside them
-  const markX = cam.center - cam.span / 2 + 0.4;
-  for (const m of arr.markers ?? []) {
+  const markX = cam.center - cam.span / 2 + 0.4, moments = new Map();
+  for (const m of arr.markers ?? []) { // everything at the same moment goes on one line, so nothing overlaps
     const dt = m.time - now;
     if (dt < 0 || dt > LOOK) continue;
+    const key = Math.round(m.time * 100);
+    if (!moments.has(key)) moments.set(key, { dt, texts: [] });
+    if (!moments.get(key).texts.includes(m.text)) moments.get(key).texts.push(m.text);
+  }
+  for (const { dt, texts } of moments.values()) { // right-aligned beside the hand position, past its fret number
+    const z = Z(dt), [px, py, k] = P(anchorAt(anchors, now + dt).fret - 2.4, floor, z), size = 0.3 * Math.sqrt(k * k0), text = texts.join('  ·  ');
     g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
-    label(m.text, markX, floor, Z(dt), 0.3, t.accent, 700, 'left');
+    g.font = `700 ${size}px ${t.num}`;
+    const right = Math.max(px, 24 + g.measureText(text).width); // kept on screen
+    g.textAlign = 'right';
+    g.lineWidth = size * 0.2;
+    g.strokeStyle = alpha(t.ink, 0.9);
+    g.strokeText(text, right, py);
+    g.fillStyle = t.accent;
+    g.fillText(text, right, py);
   }
   g.strokeStyle = t.text;
   g.lineWidth = 2;
@@ -409,7 +422,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
 
     const tail = slide === null ? note.sustain : Math.max(note.sustain, 0.25);
-    if (tail <= 0.2 || dt + tail <= 0 || chord?.highDensity) continue;
+    const moves = slide !== null || note.bend || note.bendCurve || note.whammy;
+    if (tail <= 0.2 || dt + tail <= 0 || (chord && !moves)) continue; // chords sustain without trails: their frames already show the beats
     const d0 = Math.max(dt, 0), d1 = Math.min(dt + tail, LOOK), steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
     const along = (d) => {
       const p = Math.min(1, Math.max(0, (d - dt) / tail)), zz = Z(d), glide = p * p * (3 - 2 * p);
@@ -419,12 +433,17 @@ export function drawHighway(canvas, arr, now, t, cam) {
       return [x + (slide === null ? 0 : (slide - 0.5 - x) * glide) + wave + jitter + pitch * 0.6, y + pitch * gap * 0.4, zz];
     };
     const spine = Array.from({ length: steps + 1 }, (_, j) => along(d0 + ((d1 - d0) * j) / steps));
-    // Trails ride at string height, so the camera shows them past the floor line of the chord that follows; cut them
-    // off at the line of the next chord, or of the next note on the same string
+    // Trails ride at string height, so the camera shows them past the floor line of whatever follows; cut them off at
+    // the line of the next chord, the next note on the same string, or any later note lying across the trail
     let next = null;
     for (let j = i + 1; j < visible.length && visible[j].time <= note.time + tail + 0.02; j++) {
       const later = visible[j];
-      if (later.time > note.time + 0.005 && (later.chord !== null && later.chord !== undefined || later.string === note.string)) { next = later; break; }
+      if (later.time <= note.time + 0.005) continue;
+      const over = spot(later), reach = over.open ? (over.a.width - 0.2) / 2 + 0.1 : 0.45;
+      if (chordOf(later) || later.string === note.string || Math.abs(over.x - x) < reach) {
+        next = later;
+        break;
+      }
     }
     g.save();
     if (next) {
@@ -653,8 +672,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
 
     const ink = repeated ? t.muted : t.text; // marks on a repeated note are greyed out
-    g.globalAlpha = faded * (repeated ? 0.8 : 1);
-    if (note.ghost && 0.2 * k >= 4) { // ghost note: dimmed, in brackets
+    g.globalAlpha = faded * (repeated ? 0.8 : 1) * Math.min(1, Math.max(0, (1 - dt / LOOK) / 0.4)); // fading in from the far end
+    if (note.ghost) { // ghost note: dimmed, in brackets
       const [lx] = P(x - hw, y, z), [rx] = P(x + hw, y, z), r = hh * k * 1.5;
       g.strokeStyle = repeated ? ink : c;
       g.lineWidth = Math.max(1.2, 0.035 * k);
@@ -670,7 +689,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = Math.max(1, 0.03 * k);
       line2(g, cx - hw * k * 1.2, cy + hh * k * 1.4, cx + hw * k * 1.2, cy - hh * k * 1.4);
     }
-    if (note.showString && 0.16 * k >= 5) { // the string's number in a circle, to the left of the note
+    if (note.showString) { // the string's number in a circle, to the left of the note
       const [lx] = P(x - hw, y, z), r = 0.12 * k, sx = lx - r - 0.06 * k;
       g.strokeStyle = g.fillStyle = repeated ? ink : c;
       g.lineWidth = Math.max(1, 0.025 * k);
@@ -688,12 +707,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.lineWidth = Math.max(1.2, 0.04 * k);
     g.textAlign = 'center';
     const write = (word, size, style = '700') => {
-      if (size * k < 8) return; // too far away to read yet
+      if (size * k < 2) return; // below a pixel or two it is only noise
       g.font = `${style} ${size * k}px ${t.num}`;
       g.fillText(word, cx, above);
       above -= (size + 0.04) * k;
     };
-    if (note.staccato && 0.1 * k >= 3) { // staccato: a dot
+    if (note.staccato) { // staccato: a dot
       g.beginPath();
       g.arc(cx, above + 0.04 * k, Math.max(1.5, 0.045 * k), 0, Math.PI * 2);
       g.fill();
@@ -710,14 +729,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
     ];
     for (const word of words) if (word) write(word, word.length > 2 ? 0.22 : 0.28);
     if (note.rightFinger) write(note.rightFinger, 0.26, 'italic 700'); // picking-hand finger: p i m a c
-    if (note.vibrato && 0.2 * k >= 5) { // vibrato: a short wave, taller when wide
+    if (note.vibrato) { // vibrato: a short wave, taller when wide
       const w = 0.24 * k, amp = (note.vibratoWide ? 0.07 : 0.035) * k;
       g.beginPath();
       for (let j = 0; j <= 20; j++) g[j ? 'lineTo' : 'moveTo'](cx - w + (2 * w * j) / 20, above + Math.sin((j / 20) * Math.PI * 4) * amp);
       g.stroke();
       above -= (0.16 + (note.vibratoWide ? 0.06 : 0)) * k;
     }
-    if (note.pick && 0.2 * k >= 5) { // pick stroke: ⊓ down, V up
+    if (note.pick) { // pick stroke: ⊓ down, V up
       const w = 0.09 * k, h = 0.13 * k;
       g.beginPath();
       if (note.pick === 'down') [[-w, h / 2], [-w, -h / 2], [w, -h / 2], [w, h / 2]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, above + dy));
@@ -725,7 +744,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.stroke();
       above -= 0.22 * k;
     }
-    if (note.fermata && 0.2 * k >= 5) { // fermata: an arch over a dot
+    if (note.fermata) { // fermata: an arch over a dot
       g.beginPath();
       g.arc(cx, above + 0.06 * k, 0.14 * k, Math.PI, 0);
       g.stroke();
@@ -757,7 +776,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
         line2(g, rx - 0.06 * k, base - 0.08 * k, rx, base);
         line2(g, rx + 0.06 * k, base - 0.08 * k, rx, base);
       }
-      g.font = `600 ${Math.max(9, 0.22 * k)}px ${t.num}`;
+      g.font = `600 ${0.22 * k}px ${t.num}`;
       g.textAlign = 'left';
       g.fillText(`${pre ? 'pre ' : ''}${bendLabel(bendPeak)}`, cx + (release ? 0.24 : 0.12) * k, tip + 0.05 * k);
     }
