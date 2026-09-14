@@ -79,10 +79,12 @@ export function tuningName(open) {
 export const noteName = (midi) =>
   ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][midi % 12] + (Math.floor(midi / 12) - 1);
 
-// Marks what only repeats the notes just played: the same strings, frets and techniques again within `gap` seconds.
+// Marks what only repeats the notes just played: the same strings, frets and notation again within `gap` seconds.
 // The highway draws those as beats instead of full notes: single notes get `repeat`, chords become `highDensity`
-// (the format's own flag for a repeated chord).
-const fingering = (n) => [n.string, n.fret, n.mute, n.palmMute, n.harmonic, n.slideTo, n.bend, n.hammerOn, n.pullOff, n.tap].join(':');
+// (the format's own flag for a repeated chord). Timing, links and pick direction don't count: alternate picking is
+// still the same note again.
+const UNMARKED = new Set(['time', 'sustain', 'chord', 'midi', 'hit', 'missed', 'repeat', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
+const fingering = (n) => JSON.stringify(Object.entries(n).filter(([k, v]) => !UNMARKED.has(k) && v !== null && v !== undefined && v !== false && v !== 0).sort());
 export function markRepeats(notes, chords, gap = 1) {
   let before = null;
   for (let i = 0, j; i < notes.length; i = j) {
@@ -93,4 +95,36 @@ export function markRepeats(notes, chords, gap = 1) {
     if (repeat && group[0].chord !== null) chords[group[0].chord].highDensity = true;
     before = { shape, time: group[0].time };
   }
+}
+
+// Connections the highway draws between notes, for charts from any source: a slur back to the note a hammer-on or
+// pull-off comes from, a tie to the next note for linked notes, let-ring notes sounding until the string is played
+// again (4 s at most), a dynamic only where it changes (f is where a Guitar Pro file starts), and a barre where one
+// finger holds three or more strings at the same fret.
+export function annotate(notes, chords) {
+  const last = {};
+  let dynamic = 'f';
+  notes.forEach((n, i) => {
+    const before = last[n.string];
+    n.slurFrom = (n.hammerOn || n.pullOff) && before !== undefined && n.time - notes[before].time < 1.5 ? before : null;
+    if (before !== undefined) {
+      const p = notes[before];
+      if (p.letRing) p.sustain = Math.max(p.sustain, Math.min(n.time - p.time, 4));
+      if (p.linkNext) p.tieTo = i;
+    }
+    n.dynamicLabel = n.dynamic && n.dynamic !== dynamic ? n.dynamic : null;
+    if (n.dynamic) dynamic = n.dynamic;
+    last[n.string] = i;
+  });
+  for (const n of Object.values(last).map((i) => notes[i])) if (n.letRing) n.sustain = Math.max(n.sustain, 2);
+  for (const c of chords) c.barre ??= barreOf(c);
+}
+
+function barreOf({ frets = [], fingers = [] }) {
+  const held = {};
+  frets.forEach((fret, string) => {
+    if (fret > 0 && fingers[string] >= 1) (held[`${fingers[string]}:${fret}`] ??= []).push(string);
+  });
+  const [key, strings] = Object.entries(held).sort((a, b) => b[1].length - a[1].length)[0] ?? [];
+  return strings?.length >= 3 ? { fret: +key.split(':')[1], from: Math.min(...strings), to: Math.max(...strings) } : null;
 }

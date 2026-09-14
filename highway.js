@@ -31,6 +31,17 @@ const anchorAt = (anchors, time) => {
   return found;
 };
 
+// Steps at share p of a [share, steps] curve (a bend or the whammy bar over the note), straight between points
+const shapeAt = (points, p) => {
+  if (!points?.length) return 0;
+  const i = points.findIndex(([q]) => q >= p);
+  if (i <= 0) return points[i < 0 ? points.length - 1 : 0][1];
+  const [[q0, s0], [q1, s1]] = [points[i - 1], points[i]];
+  return s0 + (s1 - s0) * (q1 > q0 ? (p - q0) / (q1 - q0) : 1);
+};
+const pitchAt = (note, p) => (note.bendCurve ? shapeAt(note.bendCurve, p) : note.bend ? Math.min(1, p * 4) * note.bend : 0) + shapeAt(note.whammy, p);
+const TEXT_MARKS = { artificial: 'AH', pinch: 'PH', tap: 'TH', semi: 'SH', feedback: 'FH' };
+
 const bendLabel = (b) => (b < 0.5 ? '¼' : b === 0.5 ? '½' : b === 1 ? 'full' : b % 1 ? `${Math.floor(b)}½` : String(b));
 const ease = (from, to, ms, tau) => (from === undefined ? to : from + (to - from) * (1 - Math.exp(-ms / tau)));
 
@@ -213,6 +224,26 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (i && a.time > now + 0.3) label(String(a.fret), l - 0.2, floor, z0, 0.3, t.anchorLane, 700, 'right');
   });
 
+  // Bar markings on the floor at the left of the view, where they happen (meter, key, tempo, feel, repeats, endings,
+  // jumps, ottava, free text like "pizz."), and crescendo and diminuendo hairpins beside them
+  const markX = cam.center - cam.span / 2 + 0.4;
+  for (const m of arr.markers ?? []) {
+    const dt = m.time - now;
+    if (dt < 0 || dt > LOOK) continue;
+    g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
+    label(m.text, markX, floor, Z(dt), 0.3, t.accent, 700, 'left');
+  }
+  g.strokeStyle = t.text;
+  g.lineWidth = 2;
+  for (const h of arr.hairpins ?? []) {
+    if (h.endTime < now || h.time > now + LOOK) continue;
+    const from = (h.time - now) * SPEED, to = (h.endTime - now) * SPEED, z0 = Math.max(0, from), z1 = Math.min(far, to);
+    const spread = (zz) => (h.kind === 'cresc' ? (zz - from) / (to - from || 1) : 1 - (zz - from) / (to - from || 1)) * 0.2; // half the opening
+    g.globalAlpha = 0.8;
+    for (const side of [-1, 1]) line3([markX + 1.4 + side * spread(z0), floor, z0], [markX + 1.4 + side * spread(z1), floor, z1]);
+  }
+  g.globalAlpha = 1;
+
   // The fingerboard at the strike line. Everything on the board comes after it, and the notes come after the
   // strings, so nothing hides them
   g.fillStyle = t.board;
@@ -325,34 +356,65 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
   g.globalAlpha = 1;
 
-  // Tails, under every gem: sustains trail back along their string and fade into the distance; slides drift
-  // along the neck, bends climb toward the next string, vibrato wobbles, tremolo jitters
+  // Under every gem: slide ramps into and out of notes, slurs from a hammer-on or pull-off back to its note, ties,
+  // and tails. A tail is a ribbon along its string that fades into the distance; its shape is the technique: a slide
+  // drifts along the neck, a bend or the whammy bar rises and falls with its curve, vibrato is an even wave, tremolo
+  // picking jitters, let ring is dashed
+  const arc = (from, to, bulge) => { // a curve between two points on the highway, rising by bulge in the middle
+    const points = Array.from({ length: 13 }, (_, j) => {
+      const u = j / 12;
+      return [from[0] + (to[0] - from[0]) * u, from[1] + (to[1] - from[1]) * u + Math.sin(Math.PI * u) * bulge, from[2] + (to[2] - from[2]) * u];
+    });
+    path(points, false);
+    g.stroke();
+  };
   for (const note of visible) {
     const dt = note.time - now, chord = chordOf(note), slide = note.slideTo ?? note.slideUnpitchTo ?? null;
+    const { a, open, x, y } = spot(note), c = note.missed ? '#5a606b' : color(note.string), z = Z(dt);
+    const hw = (open ? (a.width - 0.2) / 2 : 0.34) * (note.grace ? 0.6 : 1), hh = (open ? 0.12 : 0.42) * gap * (note.grace ? 0.6 : 1);
+    if (dt > -0.15 && !chord?.highDensity && !note.repeat) {
+      g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
+      g.strokeStyle = c;
+      g.lineWidth = 2;
+      g.setLineDash([4, 4]);
+      if (note.slideIn) line3([x + (note.slideIn === 'below' ? -1.4 : 1.4), y - hh, Math.max(0, z - 1)], [x + (note.slideIn === 'below' ? -hw : hw), y, z]);
+      if (note.slideOut) line3([x + (note.slideOut === 'up' ? hw : -hw), y, z], [x + (note.slideOut === 'up' ? 1.4 : -1.4), y - hh, z + 1]);
+      g.setLineDash([]);
+      if (typeof note.slurFrom === 'number') { // a solid arc back to the note a hammer-on or pull-off comes from
+        const from = arr.notes[note.slurFrom], p = spot(from);
+        arc([p.x, p.y + hh, Z(from.time - now)], [x, y + hh, z], gap * 0.9);
+      }
+      if (typeof note.tieTo === 'number') { // a dashed arc to the note it is tied to
+        const to = arr.notes[note.tieTo], q = spot(to);
+        g.setLineDash([5, 4]);
+        arc([x, y + hh, z], [q.x, q.y + hh, Z(to.time - now)], gap * 0.9);
+        g.setLineDash([]);
+      }
+      g.globalAlpha = 1;
+    }
+
     const tail = slide === null ? note.sustain : Math.max(note.sustain, 0.25);
     if (tail <= 0.2 || dt + tail <= 0 || chord?.highDensity) continue;
-    const { a, open, x, y } = spot(note), c = note.missed ? '#5a606b' : color(note.string);
-    const hw = open ? (a.width - 0.2) / 2 : 0.34, hh = (open ? 0.12 : 0.42) * gap;
-    const d0 = Math.max(dt, 0), d1 = Math.min(dt + tail, LOOK), steps = 18;
+    const d0 = Math.max(dt, 0), d1 = Math.min(dt + tail, LOOK), steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
     const along = (d) => {
-      const p = (d - dt) / tail;
-      return [
-        x + (slide === null ? 0 : (slide - 0.5 - x) * p) + (note.vibrato ? Math.sin(p * 38) * 0.07 : 0) + (note.tremolo ? (Math.round(p * 70) % 2 ? 0.06 : -0.06) : 0),
-        y + (note.bend ? Math.min(1, p * 4) * note.bend * gap : 0),
-        Z(d),
-      ];
+      const p = Math.min(1, Math.max(0, (d - dt) / tail)), zz = Z(d), glide = p * p * (3 - 2 * p);
+      const wave = note.vibrato ? Math.sin((zz / 1.6) * Math.PI * 2) * (note.vibratoWide ? 0.13 : 0.07) : 0; // a steady wavelength along the highway
+      const jitter = note.tremolo ? (Math.floor(zz / 0.3) % 2 ? 0.05 : -0.05) : 0;
+      return [x + (slide === null ? 0 : (slide - 0.5 - x) * glide) + wave + jitter, y + pitchAt(note, p) * gap, zz];
     };
     const spine = Array.from({ length: steps + 1 }, (_, j) => along(d0 + ((d1 - d0) * j) / steps));
-    glow(t.glow, c, 6);
-    g.fillStyle = fade(c, 0.6, 0.08);
-    path([...spine.map(([px, py, pz]) => [px - 0.08, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + 0.08, py, pz])]);
+    glow(t.glow && !note.letRing, c, 6);
+    g.fillStyle = fade(c, note.letRing ? 0.3 : 0.6, 0.06);
+    path([...spine.map(([px, py, pz]) => [px - 0.09, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + 0.09, py, pz])]);
     g.fill();
     glow(false);
-    if (slide !== null || note.bend || note.vibrato || note.tremolo) { // a bright spine traces the shape
-      g.strokeStyle = fade('#ffffff', 0.6, 0.1);
-      g.lineWidth = 1.5;
+    if (note.letRing || slide !== null || note.bend || note.whammy || note.vibrato || note.tremolo) { // a bright spine traces the shape, dashed while ringing
+      g.strokeStyle = fade(note.letRing ? c : '#ffffff', 0.7, 0.1);
+      g.lineWidth = note.letRing ? 2 : 1.5;
+      g.setLineDash(note.letRing ? [7, 6] : []);
       path(spine, false);
       g.stroke();
+      g.setLineDash([]);
     }
     if (slide !== null) { // where the slide ends
       const [ex, ey, ez] = along(dt + tail);
@@ -374,11 +436,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (chord?.name && dt > 0) nextChord = chord; // far to near, so the last one kept is the nearest
     const muted = note.mute || chord?.fretHandMute, palm = note.palmMute || chord?.palmMute;
     const c = note.missed ? '#5a606b' : color(note.string);
-    const hw = open ? (a.width - 0.2) / 2 : 0.34, hh = (open ? 0.12 : 0.42) * gap;
+    const hw = (open ? (a.width - 0.2) / 2 : 0.34) * (note.grace ? 0.6 : 1), hh = (open ? 0.12 : 0.42) * gap * (note.grace ? 0.6 : 1); // grace notes are small
     const slide = note.slideTo ?? note.slideUnpitchTo ?? null;
 
     if (dt < -0.15) continue;
-    g.globalAlpha = dt < 0 ? Math.max(0, 1 + dt / 0.15) : Math.min(1, (LOOK - dt) / 0.4); // fade in at the far end, out once played
+    const faded = dt < 0 ? Math.max(0, 1 + dt / 0.15) : Math.min(1, (LOOK - dt) / 0.4); // fade in at the far end, out once played
+    g.globalAlpha = faded;
 
     if (chord && !boxed.has(note.chord)) {
       boxed.add(note.chord);
@@ -410,6 +473,24 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = 2;
       line3([l, floor, z], [r, floor, z]);
       if (chord.highDensity && (chord.palmMute || chord.fretHandMute)) xMark((l + r) / 2, floor + gap * 0.4, z, 0.14, gap * 0.3);
+      if (chord.barre) { // one finger across several strings: a bar over them at its fret
+        const bx = chord.barre.fret - 0.5;
+        g.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        g.lineWidth = Math.max(3, 0.1 * P(bx, stack / 2, z)[2]);
+        line3([bx, ys(chord.barre.from) + gap * 0.4, z], [bx, ys(chord.barre.to) - gap * 0.4, z]);
+        label(chord.barre.half ? '½B' : 'B', bx, boardHi + 0.12, z, 0.22, t.text);
+      }
+      if (chord.strum || chord.roll) { // strum or roll beside the frame: down runs from the low strings, on top, to the high ones
+        const ax = l - 0.25, down = (chord.strum ?? chord.roll) === 'down', [from, to] = down ? [boardHi - 0.1, floor + 0.15] : [floor + 0.15, boardHi - 0.1];
+        g.strokeStyle = t.text;
+        g.lineWidth = 2;
+        if (chord.roll) path(Array.from({ length: 17 }, (_, j) => [ax + Math.sin((j / 16) * Math.PI * 6) * 0.06, from + ((to - from) * j) / 16, z]), false); // rolled: a wavy arrow
+        else path([[ax, from, z], [ax, to, z]], false);
+        g.stroke();
+        const head = down ? 0.14 : -0.14;
+        line3([ax - 0.08, to + head, z], [ax, to, z]);
+        line3([ax + 0.08, to + head, z], [ax, to, z]);
+      }
       const before = arr.chords[note.chord - 1], changed = !before || note.time - before.time > 1 || before.name !== chord.name;
       if (z > NEAR && chord.name && !chord.highDensity && changed) label(chord.name, l - 0.12, boardHi / 2, z, 0.34, t.text, 600, 'right'); // name it once per change
     }
@@ -431,9 +512,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.globalAlpha = 1;
       continue;
     }
-    if (!open && t.number === 'floor' && z > 1.75) label(note.harmonic || note.harmonicPinch ? `<${note.fret}>` : String(note.fret), x, floor, z - 0.3, 0.26, c);
+    if (!open && t.number === 'floor' && z > 1.75) {
+      const fret = note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
+      label(fret, x, floor, z - 0.3, note.grace ? 0.18 : 0.26, c);
+    }
+    if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 
     const fill = note.hit ? '#ffffff' : c;
+    if (note.ghost) g.globalAlpha = faded * 0.5;
     if (muted || palm) { // mutes an X, in a hollow gem for a palm mute (open strings keep their bar)
       glow(t.glow && z < NEAR, fill, 8);
       g.strokeStyle = fill;
@@ -497,17 +583,86 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
     }
 
-    // Technique marks stack upwards above the block
-    let above = cy - hh * k - 0.18 * k;
-    const mark = note.hammerOn ? 'H' : note.pullOff ? 'P' : note.tap ? 'T' : note.harmonicPinch ? 'PH' : '';
-    g.strokeStyle = t.text;
-    g.lineWidth = Math.max(1.2, 0.04 * k);
-    if (mark && 0.28 * k >= 8) {
-      g.font = `700 ${0.28 * k}px ${t.num}`;
+    g.globalAlpha = faded;
+    if (note.ghost && 0.2 * k >= 4) { // ghost note: dimmed, in brackets
+      const [lx] = P(x - hw, y, z), [rx] = P(x + hw, y, z), r = hh * k * 1.5;
+      g.strokeStyle = c;
+      g.lineWidth = Math.max(1.2, 0.035 * k);
+      g.beginPath();
+      g.arc(lx + r * 0.35, cy, r, Math.PI * 0.7, Math.PI * 1.3);
+      g.stroke();
+      g.beginPath();
+      g.arc(rx - r * 0.35, cy, r, -Math.PI * 0.3, Math.PI * 0.3);
+      g.stroke();
+    }
+    if (note.grace) { // grace note: small, with a slash
+      g.strokeStyle = t.text;
+      g.lineWidth = Math.max(1, 0.03 * k);
+      line2(g, cx - hw * k * 1.2, cy + hh * k * 1.4, cx + hw * k * 1.2, cy - hh * k * 1.4);
+    }
+    if (note.showString && 0.16 * k >= 5) { // the string's number in a circle, to the left of the note
+      const [lx] = P(x - hw, y, z), r = 0.12 * k, sx = lx - r - 0.06 * k;
+      g.strokeStyle = g.fillStyle = c;
+      g.lineWidth = Math.max(1, 0.025 * k);
+      g.beginPath();
+      g.arc(sx, cy, r, 0, Math.PI * 2);
+      g.stroke();
+      g.font = `700 ${0.15 * k}px ${t.num}`;
       g.textAlign = 'center';
-      g.fillStyle = t.text;
-      g.fillText(mark, cx, above);
-      above -= 0.3 * k;
+      g.fillText(String(n - note.string), sx, cy);
+    }
+
+    // Marks stack upwards above the note, articulation nearest to it as in notation
+    let above = cy - hh * k - 0.18 * k;
+    g.strokeStyle = g.fillStyle = t.text;
+    g.lineWidth = Math.max(1.2, 0.04 * k);
+    g.textAlign = 'center';
+    const write = (word, size, style = '700') => {
+      if (size * k < 8) return; // too far away to read yet
+      g.font = `${style} ${size * k}px ${t.num}`;
+      g.fillText(word, cx, above);
+      above -= (size + 0.04) * k;
+    };
+    if (note.staccato && 0.1 * k >= 3) { // staccato: a dot
+      g.beginPath();
+      g.arc(cx, above + 0.04 * k, Math.max(1.5, 0.045 * k), 0, Math.PI * 2);
+      g.fill();
+      above -= 0.16 * k;
+    }
+    if (note.accent) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3);
+    const words = [
+      note.hammerOn ? 'H' : note.pullOff ? 'P' : '',
+      note.tapLeft ? 'm.g.' : note.tap ? (note.tapLeft === false ? 'm.d.' : 'T') : '', // Guitar Pro says which hand taps
+      TEXT_MARKS[note.harmonicType] ?? (note.harmonicPinch ? 'PH' : ''),
+      note.slap ? 'slap' : note.pop ? 'pop' : '', note.golpe ? `golpe (${note.golpe})` : '', note.rasgueado ? `rasg. ${note.rasgueado}` : '',
+      typeof note.trill === 'number' ? `tr ${note.trill}` : '', note.ornament ?? '', note.fade ?? '', note.whammy ? 'w/bar' : '',
+      note.wah === 'open' ? 'o' : note.wah === 'closed' ? '+' : '',
+    ];
+    for (const word of words) if (word) write(word, word.length > 2 ? 0.22 : 0.28);
+    if (note.rightFinger) write(note.rightFinger, 0.26, 'italic 700'); // picking-hand finger: p i m a c
+    if (note.vibrato && 0.2 * k >= 5) { // vibrato: a short wave, taller when wide
+      const w = 0.24 * k, amp = (note.vibratoWide ? 0.07 : 0.035) * k;
+      g.beginPath();
+      for (let j = 0; j <= 20; j++) g[j ? 'lineTo' : 'moveTo'](cx - w + (2 * w * j) / 20, above + Math.sin((j / 20) * Math.PI * 4) * amp);
+      g.stroke();
+      above -= (0.16 + (note.vibratoWide ? 0.06 : 0)) * k;
+    }
+    if (note.pick && 0.2 * k >= 5) { // pick stroke: ⊓ down, V up
+      const w = 0.09 * k, h = 0.13 * k;
+      g.beginPath();
+      if (note.pick === 'down') [[-w, h / 2], [-w, -h / 2], [w, -h / 2], [w, h / 2]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, above + dy));
+      else [[-w, -h / 2], [0, h / 2], [w, -h / 2]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, above + dy));
+      g.stroke();
+      above -= 0.22 * k;
+    }
+    if (note.fermata && 0.2 * k >= 5) { // fermata: an arch over a dot
+      g.beginPath();
+      g.arc(cx, above + 0.06 * k, 0.14 * k, Math.PI, 0);
+      g.stroke();
+      g.beginPath();
+      g.arc(cx, above + 0.02 * k, Math.max(1.5, 0.03 * k), 0, Math.PI * 2);
+      g.fill();
+      above -= 0.24 * k;
     }
     if (note.tremolo) { // three short slashes, as in notation
       for (let j = -1; j <= 1; j++) line2(g, cx - 0.12 * k, above + (j * 0.08 + 0.05) * k, cx + 0.12 * k, above + (j * 0.08 - 0.05) * k);
@@ -520,17 +675,34 @@ export function drawHighway(canvas, arr, now, t, cam) {
       line2(g, x1, yt, x1, yt + 0.1 * k);
       above -= 0.3 * k;
     }
-    if (note.bend) {
-      const base = above + 0.12 * k, tip = base - 0.36 * k;
+    const bendPeak = Math.max(note.bend || 0, ...(note.bendCurve ?? []).map(([, v]) => v));
+    if (bendPeak > 0) { // bend: an arrow up, then back down for a release; "pre" when it is bent before it is played
+      const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < bendPeak;
+      const base = above + 0.12 * k, tip = base - 0.36 * k, rx = cx + 0.14 * k;
       line2(g, cx, base, cx, tip);
       line2(g, cx - 0.08 * k, tip + 0.09 * k, cx, tip);
       line2(g, cx + 0.08 * k, tip + 0.09 * k, cx, tip);
+      if (release) {
+        line2(g, rx, tip, rx, base);
+        line2(g, rx - 0.06 * k, base - 0.08 * k, rx, base);
+        line2(g, rx + 0.06 * k, base - 0.08 * k, rx, base);
+      }
       g.font = `600 ${Math.max(9, 0.22 * k)}px ${t.num}`;
       g.textAlign = 'left';
-      g.fillStyle = t.text;
-      g.fillText(bendLabel(note.bend), cx + 0.12 * k, tip + 0.05 * k);
+      g.fillText(`${pre ? 'pre ' : ''}${bendLabel(bendPeak)}`, cx + (release ? 0.24 : 0.12) * k, tip + 0.05 * k);
     }
     g.globalAlpha = 1;
+  }
+
+  // A barre being played: its bar across the strings on the board
+  const barred = new Set();
+  for (const note of visible) {
+    const dt = note.time - now, chord = chordOf(note);
+    if (!chord?.barre || barred.has(chord) || dt > 0.06 || dt < -Math.max(note.sustain, 0.12)) continue;
+    barred.add(chord);
+    g.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    g.lineWidth = Math.max(4, 0.12 * k0);
+    line3([chord.barre.fret - 0.5, ys(chord.barre.from) + gap * 0.45, 0], [chord.barre.fret - 0.5, ys(chord.barre.to) - gap * 0.45, 0]);
   }
 
   // Where to press, on top of everything on the board: targets fill in as notes approach, finger number and all,

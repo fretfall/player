@@ -107,7 +107,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
 <script type="module">
-import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats } from './music.js';
+import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats, annotate } from './music.js';
 import { suggestPositions, fingerFor } from './fingering.js';
 import { loadSong } from './the reference game.js';
 import { LOOKS, COLORS, FONTS, DEFAULT_STYLE, theme as makeTheme } from './themes.js';
@@ -123,29 +123,114 @@ const PAUSE = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" strok
 const clock = (s) => `${s < 0 ? '-' : ''}${Math.floor(Math.abs(s) / 60)}:${String(Math.floor(Math.abs(s) % 60)).padStart(2, '0')}`; // negative: the recording's intro before the tab starts
 const paint = () => new Promise((r) => { requestAnimationFrame(() => setTimeout(r)); setTimeout(r, 100); }); // background tabs get no frames
 
-// Original practice riff so there's something to play before you open a file.
+// Original practice piece so there's something to play before you open a file. About two minutes, and it uses every
+// notation the highway draws: mutes, repeats, slides (legato, shift, in and out), hammer-ons and pull-offs, bends
+// (pre-bend, release), whammy bar, vibrato (wide too), ties, let ring, tremolo picking, tapping with either hand, every
+// harmonic type, accents, staccato, ghost and grace notes, trills and ornaments, dynamics and hairpins, fades, wah,
+// fermata, ottava, pick strokes, picking-hand fingers, strums and rolled chords, barres, slap, pop, golpe, rasgueado,
+// string numbers, free text, and at the bar lines: repeats with endings, segno and coda, key, tempo, meter and feel.
 const DEMO = `
 \\title "Fretfall Demo"
-\\subtitle "Original practice riff"
+\\subtitle "Original practice piece"
 \\tempo 100
 .
 \\track "Guitar"
 \\staff {tabs}
 \\instrument distortionguitar
-\\ro :8 (0.6{pm} 2.5{pm}){ch "E5"} (0.6{pm} 2.5{pm}) (0.6 2.5) (0.6 2.5) (3.6{sl} 5.5{sl}){ch "G5"} (5.6 7.5){ch "A5"} (x.6 x.5) (x.6 x.5) |
-\\rc 2 (7.6 9.5){ch "B5"} (7.6 9.5) (5.5{pm} 7.4{pm}){ch "D5"} (5.5{pm} 7.4{pm}) (3.6 5.5){ch "G5"} (3.6 5.5) (5.6 7.5){ch "A5"} r |
-:16 12.1{h lf 2} 15.1{lf 5} 12.2{lf 2} 15.2{lf 5} 12.3{lf 2} 14.3{lf 4} 12.4{lf 2} 14.4{lf 4} :8 14.3{sl lf 4} 16.3{lf 5} 14.4{lf 4} 12.4{lf 2} |
-:4 14.5{b (0 4) lf 4} :8 12.5{lf 2} 14.5{sl lf 4} :2 17.5{v lf 4} |
-:2 12.2{tp 16 lf 2} :4 (5.6{lf 2} 7.5{lf 4} 7.4{lf 5}){ch "A5"} (5.6 7.5 7.4) |
+\\section "Chugs" \\ro :8 (0.6{pm} 2.5{pm}){ch "E5"} (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (3.6{sl} 5.5{sl}){ch "G5"} (5.6 7.5){ch "A5"} (x.6 x.5) (x.6 x.5) |
+\\rc 2 :8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} (7.6 9.5){ch "B5"} (7.6 9.5) (5.5{pm} 7.4{pm}){ch "D5"} (5.5{pm} 7.4{pm}) |
+:16 0.6{pm} 0.6{pm} :8 0.6{pm} :16 0.6{pm} 0.6{pm} :8 0.6{pm} :4 (5.6 7.5 7.4){ch "A5"} (5.6 7.5 7.4) |
+:8 (x.6 x.5 x.4) (x.6 x.5 x.4) :4 (3.6 5.5 5.4){ch "G5"} :2 (5.6 7.5 7.4){ch "A5"} |
+\\section "Riff" :16 5.6{h lf 2} 7.6{lf 4} 5.5{h lf 2} 7.5{lf 4} 7.4{h lf 4} 5.4{lf 2} 7.4{h lf 4} 5.4{lf 2} :8 7.3{sl lf 4} 9.3{lf 5} 7.4{lf 3} 5.4{lf 2} |
+:8 5.3{ss lf 2} 12.3{lf 2} :16 12.2{h lf 2} 15.2{lf 5} 12.1{h lf 2} 15.1{lf 5} 15.1{h lf 5} 12.1{lf 2} 14.2{h lf 4} 12.2{lf 2} :4 14.3{lf 4} |
+\\section "Lead" :4 14.3{b (0 4) lf 4} 14.3{b (0 2) lf 4} :8 12.2{lf 2} 15.2{b (0 4 4 0) lf 5} :4 14.2{v lf 4} |
+:2 17.1{v lf 4} :4 -.1 12.1{tp 16 lf 2} |
+:16 19.1{tt h} 12.1{h} 15.1{h} 12.1 19.1{tt h} 12.1{h} 15.1{h} 12.1 19.2{tt h} 12.2{h} 15.2{h} 12.2 19.2{tt h} 12.2{h} 15.2{h} 12.2 |
+\\section "Harmonics" :4 (12.3{nh} 12.2{nh} 12.1{nh}) 7.3{nh} :8 5.2{nh} 5.1{nh} :4 5.3{ph lf 2} |
+\\section "Chords" :2 (3.6 2.5 0.4 0.3 0.2 3.1){ch "G"} (0.5 2.4 2.3 1.2 0.1){ch "Am"} |
+:2 (3.5 2.4 0.3 1.2 0.1){ch "C"} (0.4 2.3 3.2 2.1){ch "D"} |
+:4 (1.6{lf 2} 3.5{lf 4} 3.4{lf 5} 2.3{lf 3} 1.2{lf 2} 1.1{lf 2}){ch "F"} (1.6 3.5 3.4 2.3 1.2 1.1) (1.6 3.5 3.4 2.3 1.2 1.1) (1.6 3.5 3.4 2.3 1.2 1.1) |
+:8 (2.5 4.4 4.3 3.2 2.1){ch "Bm"} (2.5 4.4 4.3 3.2 2.1) (2.5 4.4 4.3 3.2 2.1) (2.5 4.4 4.3 3.2 2.1) :2 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E"} |
+\\section "Double stops" :8 (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (4.3{sl} 5.2{sl}) (6.3 7.2) :4 (8.3 10.2) |
+:16 (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) :8 (4.3 5.2) (4.3 5.2) :4 (6.3 7.2) |
+\\ts 3 4 \\tempo 120 \\section "Waltz" :4 0.5 (2.4 2.3 1.2){ch "Am"} (2.4 2.3 1.2) |
+:4 3.6 (0.4 0.3 3.1){ch "G"} (0.4 0.3 3.1) |
+:4 0.4 (2.3 3.2 2.1){ch "D"} (2.3 3.2 2.1) |
+\\ts 4 4 \\tempo 100 \\section "Solo" :8 12.3{h lf 2} 14.3{lf 4} 12.2{lf 2} 15.2{b (0 4) lf 5} 15.2{lf 5} 12.2{lf 2} 14.3{lf 4} 12.3{lf 2} |
+:16 17.1{sl lf 3} 19.1{lf 5} 17.1{h lf 3} 15.1{lf 2} 17.2{h lf 4} 15.2{lf 2} 16.3{h lf 3} 14.3{lf 2} :4 17.2{b (0 4) v lf 4} 15.1{v lf 2} |
+:4 12.2{tp 32 lf 2} 12.2{tp 32 lf 2} :2 7.3{ph v lf 2} |
+\\section "Articulation" :4 5.3{ac dy p} 7.3{hac} 5.3{ten st} 7.3{g} |
+:8 5.2{cre} 7.2{cre} 8.2{cre} 10.2{cre} :4 12.2{dy ff} 10.2{dec} |
+:2 (3.6{lr} 2.5{lr} 0.4{lr}){ch "G"} :4 0.3{lr} 0.2{lr dy mf} |
+\\section "Slides and harmonics" :4 7.3{sib} 9.3{sou} 7.2{sia} 5.2{sod} |
+:4 12.3{ah} 7.2{th} 5.3{sh} 7.4{fh} |
+\\section "Bends and whammy" :4 7.3{b (4 4 0)} 7.3{b (0 4 4 0)} 0.6{tb (0 -4 0)} 0.6{tb (0 -8)} |
+\\section "Ornaments" :4 5.2{tr 7 16} 5.2{turn} 5.2{iturn} 5.2{umordent} |
+:4 3.3{gr} 5.3 5.3{lmordent} :2 7.3{vw} |
+\\section "Picking" :8 5.4{sd rf 2} 7.4{su rf 3} 5.3{sd rf 2} 7.3{su rf 3} 5.2{sd rf 4} 7.2{su rf 3} 5.1{sd rf 5} 7.1{su rf 1} |
+:4 (0.6 2.5 2.4 1.3 0.2 0.1){bd ch "E"} (0.6 2.5 2.4 1.3 0.2 0.1){bu} (0.6 2.5 2.4 1.3 0.2 0.1){ad} (0.6 2.5 2.4 1.3 0.2 0.1){au} |
+\\section "Barres" :2 (5.6 7.5 7.4 6.3 5.2 5.1){barre 5 full ch "A"} (7.5 9.4 9.3 8.2 7.1){barre 7 half ch "E/B"} |
+\\section "Percussive" :8 0.4{s} 0.3{p} 5.4{s} 7.3{p} :4 0.6{glpt} 0.6{glpf} |
+:4 (0.6 2.5 2.4 1.3 0.2 0.1){rasg amii ch "E"} 12.1{lht} 15.1{tt} 12.1{string} |
+\\section "Colour" :4 5.3{f} 7.3{vs} 5.3{fo} 7.3{waho} |
+:4 5.3{wahc} 7.3{fermata medium} 12.2{ot 8va} 12.2{ot regular} |
+:4 3.5{txt "pizz."} 3.5 3.5{txt "bass stop"} r |
+\\ks g \\tf triplet8th \\jump segno \\section "Swing" \\ro :8 3.6 5.6 3.6 5.6 7.6 5.6 3.6 5.6 |
+\\ae 1 \\rc 2 :4 (3.6 5.5 5.4){ch "G5"} (5.6 7.5 7.4){ch "A5"} :2 (7.6 9.5 9.4){ch "B5"} |
+\\ae 2 \\tf none \\ks c \\jump coda :4 (8.6 10.5 10.4){ch "C5"} (10.6 12.5 12.4){ch "D5"} :2 (0.6 2.5 2.4){ch "E5"} |
+\\section "Outro" :8 0.6{pm} x.6 0.6{pm} x.6 (0.6 2.5 2.4){ch "E5"} (x.6 x.5 x.4) (3.6 5.5){ch "G5"} (x.6 x.5) |
+:8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} :4 (5.6 7.5){ch "A5"} (7.6 9.5){ch "B5"} |
+:1 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E"} |
+:2 (-.6 -.5 -.4 -.3 -.2 -.1) r |
 \\track "Bass"
 \\staff {tabs}
 \\tuning (G2 D2 A1 E1)
 \\instrument electricbassfinger
 \\ro :8 0.4 0.4 0.4 0.4 3.4 3.4 5.4 5.4 |
-\\rc 2 7.4 7.4 5.3 5.3 3.4 3.4 5.4 r |
-:4 0.4 0.4 3.4 5.4 |
+\\rc 2 :8 0.4 0.4 0.4 0.4 7.4 7.4 5.3 5.3 |
+:16 0.4 0.4 :8 0.4 :16 0.4 0.4 :8 0.4 :4 5.4 5.4 |
+:4 r 3.4 :2 5.4 |
+:8 5.4 5.4 5.4 5.4 7.4 7.4 5.4 5.4 |
+:4 5.4 3.4 2.3 0.3 |
+:2 7.3 7.3 |
+:1 0.4 |
+:4 0.4 0.4 0.4 0.4 |
+:1 r |
+:2 3.4 0.3 |
+:2 3.3 0.2 |
+:4 1.4 1.4 1.4 1.4 |
+:2 2.3 0.4 |
+:4 3.4 3.4 5.4 5.4 |
+:4 3.4 3.4 5.4 5.4 |
+\\ts 3 4 :4 0.3 r r |
+:4 3.4 r r |
+:4 0.2 r r |
+\\ts 4 4 :2 0.4 0.4 |
+:2 5.4 7.4 |
+:2 0.4 5.3 |
+:2 0.3 0.3 |
+:2 0.2 5.3 |
+:1 3.4 |
+:2 0.3 0.2 |
+:1 0.3 |
 :2 0.4 0.4 |
-:2 0.4 :4 0.3 0.3 |
+:1 0.2 |
+:1 0.3 |
+:2 0.4 0.4 |
+:1 0.4 |
+:2 5.4 7.4 |
+:8 0.4{s} 0.4{p} 0.4{s} 0.4{p} :2 0.4 |
+:1 0.4 |
+:1 0.3 |
+:1 0.3 |
+:1 r |
+\\ro :8 3.4 3.4 5.4 5.4 7.4 7.4 5.4 5.4 |
+\\ae 1 \\rc 2 :4 3.4 5.4 :2 7.4 |
+\\ae 2 :4 8.4 10.4 :2 0.4 |
+:8 0.4 0.4 0.4 0.4 0.4 0.4 3.4 3.4 |
+:8 0.4 0.4 0.4 0.4 :4 5.4 7.4 |
+:1 0.4 |
+:2 -.4 r |
 `;
 
 // --- Settings: look, colours and fonts mix freely; everything is remembered per browser
@@ -230,8 +315,10 @@ const api = new alphaTab.AlphaTabApi($('tab'), {
   display: { staveProfile: 'Tab' },
   player: { playerMode: 'EnabledSynthesizer', soundFont: CDN + 'soundfont/sonivox.sf2', enableCursor: false, enableUserInteraction: false },
 });
-const synth = { tick: 0, at: 0, playing: false, tempo: [] };
-api.playerPositionChanged.on((e) => { synth.tick = e.currentTick; synth.at = performance.now(); });
+// paused: the tick the player was paused at. alphaTab 1.8 rewinds to the start on pause, so the position it reports
+// then is ignored and play resumes from here.
+const synth = { tick: 0, at: 0, playing: false, tempo: [], paused: null };
+api.playerPositionChanged.on((e) => { if (synth.paused === null) [synth.tick, synth.at] = [e.currentTick, performance.now()]; });
 api.playerStateChanged.on((e) => { synth.playing = e.state === alphaTab.synth.PlayerState.Playing; synth.at = performance.now(); updatePlayButton(); });
 api.soundFontLoad.on((e) => status(`Loading instrument sounds ${Math.round((e.loaded / e.total) * 100)}%`, true));
 api.playerReady.on(() => status(null));
@@ -239,13 +326,26 @@ api.error.on((e) => status(`Could not read that file: ${e.message}`));
 
 const synthPlayer = {
   // position events arrive every few ms; extrapolate between them, never far past the last one
-  get time() { return synth.tempo.length ? (tickToMs(synth.tempo, synth.tick) + (synth.playing ? Math.min(performance.now() - synth.at, 100) * api.playbackSpeed : 0)) / 1000 : 0; },
+  get time() { return synth.tempo.length ? (tickToMs(synth.tempo, synth.tick) + (synth.playing && synth.paused === null ? Math.min(performance.now() - synth.at, 100) * api.playbackSpeed : 0)) / 1000 : 0; },
   get playing() { return synth.playing; },
-  play: () => api.play(),
-  pause: () => api.pause(),
-  seek: (t) => { synth.tick = msToTick(synth.tempo, Math.max(0, t) * 1000); synth.at = performance.now(); api.tickPosition = synth.tick; },
+  play: () => {
+    if (synth.paused !== null) api.tickPosition = synth.paused;
+    synth.paused = null;
+    return api.play();
+  },
+  pause: () => {
+    synth.tick = synth.paused = msToTick(synth.tempo, synthPlayer.time * 1000); // right where the highway is
+    synth.at = performance.now();
+    api.pause();
+  },
+  seek: (t) => {
+    synth.tick = msToTick(synth.tempo, Math.max(0, t) * 1000);
+    synth.at = performance.now();
+    if (synth.paused !== null) synth.paused = synth.tick;
+    api.tickPosition = synth.tick;
+  },
   setSpeed: (v) => { api.playbackSpeed = v; },
-  stop: () => api.stop(),
+  stop: () => { synth.paused = null; api.stop(); },
 };
 
 function usePlayer(next) {
@@ -256,44 +356,111 @@ function usePlayer(next) {
 }
 function updatePlayButton() { $('play').innerHTML = player?.playing ? PAUSE : PLAY; }
 
-// alphaTab score → the same model the reference game.js produces (seconds, string 0 = lowest)
+// alphaTab score → the same model the reference game.js produces (seconds, string 0 = lowest), with Guitar Pro's notation
+// named the way the highway draws it
+const GP = alphaTab.model;
+const words = (name = '') => name.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(); // "AmiTriplet" → "ami triplet"
+const curve = (points) => (points?.length ? points.map((p) => [p.offset / 60, p.value / 4]) : null); // [share of the note, steps]
+const HARMONICS = [null, 'natural', 'artificial', 'pinch', 'tap', 'semi', 'feedback'];
+const ACCENTS = [null, 'accent', 'heavy', 'tenuto'];
+const ORNAMENTS = [null, 'inverted turn', 'turn', 'upper mordent', 'lower mordent'];
+const OTTAVAS = ['15ma', '8va', null, '8vb', '15mb'];
+const KEYS = { major: ['C♭', 'G♭', 'D♭', 'A♭', 'E♭', 'B♭', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯'], minor: ['A♭', 'E♭', 'B♭', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯', 'G♯', 'D♯', 'A♯'] };
+const jump = (direction) => GP.Direction[direction].replace(/^(Target|Jump)/, '').replace('DaCapo', 'D.C.').replace('DalSegnoSegno', 'D.S.S.').replace('DalSegno', 'D.S.')
+  .replace(/^DaDoubleCoda$/, 'To double coda').replace(/^DaCoda$/, 'To coda').replace('SegnoSegno', 'Segno segno').replace('DoubleCoda', 'Double coda').replace(/Al(.*)$/, ' al $1').replace(' al Double', ' al double');
+
 let builtCache = null;
 function songFromScore(score, cache) {
   const tempo = tempoMap(cache.masterBars.flatMap((mb) => mb.tempoChanges), score.tempo);
   const sec = (tick) => tickToMs(tempo, tick) / 1000;
   const arrangements = score.tracks.filter((tr) => tr.staves[0].isStringed && !tr.staves[0].isPercussion).map((track) => {
     const staff = track.staves[0], notes = [], chords = [], anchors = [], phrases = [], beats = [], sections = [], handShapes = [], lastOnString = {};
+    const markers = [], hairpins = [], passes = {};
+    let meter = '4/4', key = '0:0', bpm = score.tempo, feel = 0, ottava = null, swell = null;
     for (const mb of cache.masterBars) {
-      const master = mb.masterBar, start = sec(mb.start), end = sec(mb.end), perBeat = (mb.end - mb.start) / master.timeSignatureNumerator;
+      const master = mb.masterBar, bar = staff.bars[master.index], start = sec(mb.start), end = sec(mb.end), perBeat = (mb.end - mb.start) / master.timeSignatureNumerator;
       for (let i = 0; i < master.timeSignatureNumerator; i++) beats.push({ time: sec(mb.start + i * perBeat), measure: i ? -1 : master.index });
       if (master.section) sections.push({ time: start, name: master.section.text });
+
+      // What the bar line says: meter, key, tempo, feel, repeats, endings, jumps
+      const mark = (text, time = start) => markers.push({ time, text });
+      const pass = (passes[master.index] = (passes[master.index] ?? 0) + 1);
+      const barMeter = `${master.timeSignatureNumerator}/${master.timeSignatureDenominator}`;
+      if (barMeter !== meter) mark((meter = barMeter));
+      const barKey = `${bar.keySignature}:${bar.keySignatureType}`, mode = bar.keySignatureType ? 'minor' : 'major';
+      if (barKey !== key) {
+        mark(`${KEYS[mode][bar.keySignature + 7]} ${mode}`);
+        key = barKey;
+      }
+      for (const change of mb.tempoChanges) { // every bar repeats its tempo: mark only a change
+        if (Math.round(change.tempo) === Math.round(bpm)) continue;
+        bpm = change.tempo;
+        mark(`♩ = ${Math.round(bpm)}`, sec(change.tick));
+      }
+      if (master.tripletFeel !== feel) {
+        mark(master.tripletFeel ? `${words(GP.TripletFeel[master.tripletFeel])} feel` : 'straight');
+        feel = master.tripletFeel;
+      }
+      if (master.isRepeatStart) mark(`repeat · pass ${pass}`);
+      if (master.repeatCount > 0) mark(`repeat ×${master.repeatCount}`, end);
+      if (master.alternateEndings) mark(`ending ${[0, 1, 2, 3, 4, 5, 6, 7].filter((i) => master.alternateEndings & (1 << i)).map((i) => i + 1).join(', ')}`);
+      for (const direction of master.directions ?? []) mark(jump(direction));
+      if (master.isFreeTime) mark('free time');
+
       const inBar = [];
-      for (const voice of staff.bars[master.index].voices) for (const beat of voice.beats) {
+      bar.voices.forEach((voice, v) => { for (const beat of voice.beats) {
         const t0 = sec(mb.start + beat.playbackStart), t1 = sec(mb.start + beat.playbackStart + beat.playbackDuration);
+        if (!v) { // beat-wide marks from the first voice only: free text, ottava, crescendo hairpins
+          if (beat.text) mark(beat.text, t0);
+          if (OTTAVAS[beat.ottava] !== ottava) {
+            ottava = OTTAVAS[beat.ottava];
+            mark(ottava ?? 'loco', t0);
+          }
+          const kind = [null, 'cresc', 'dim'][beat.crescendo];
+          if (swell && swell.kind !== kind) swell = null;
+          if (kind && !swell) hairpins.push((swell = { time: t0, endTime: t1, kind }));
+          if (swell) swell.endTime = t1;
+        }
         let chord = null;
         if (beat.notes.length > 1) { // the same chord back to back is one held shape; its repeats show as outlines
           const frets = Array(staff.tuning.length).fill(-1), fingers = [...frets];
           for (const x of beat.notes) [frets[x.string - 1], fingers[x.string - 1]] = [x.fret, Math.max(-1, x.leftHandFinger)];
           const held = handShapes.at(-1), repeat = !!held && held.frets.join() === frets.join() && Math.abs(held.endTime - t0) < 0.01;
-          chord = chords.push({ time: t0, name: beat.chord?.name ?? '', notes: [], frets, fingers, highDensity: repeat, palmMute: beat.notes.every((x) => x.isPalmMute), fretHandMute: beat.notes.every((x) => x.isDead) }) - 1;
+          const barred = beat.barreShape ? beat.notes.filter((x) => x.fret === beat.barreFret).map((x) => x.string - 1) : [];
+          chord = chords.push({
+            time: t0, name: beat.chord?.name ?? '', notes: [], frets, fingers, highDensity: repeat, palmMute: beat.notes.every((x) => x.isPalmMute), fretHandMute: beat.notes.every((x) => x.isDead),
+            strum: [null, 'up', 'down', null, null][beat.brushType] ?? [null, 'up', 'down'][beat.pickStroke] ?? null, roll: [null, null, null, 'up', 'down'][beat.brushType] ?? null,
+            barre: barred.length ? { fret: beat.barreFret, from: Math.min(...barred), to: Math.max(...barred), half: beat.barreShape === GP.BarreShape.Half } : undefined,
+          }) - 1;
           if (repeat) held.endTime = t1;
           else handShapes.push({ startTime: t0, endTime: t1, name: chords[chord].name, frets, fingers });
         }
         for (const nt of beat.notes) {
           const tied = nt.isTieDestination && lastOnString[nt.string];
           if (tied) { tied.sustain = t1 - tied.time; continue; }
-          const origin = nt.hammerPullOrigin;
+          const origin = nt.hammerPullOrigin, harmonic = HARMONICS[nt.harmonicType];
           const note = {
             time: t0, sustain: nt.slideTarget || t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord, midi: nt.realValue,
             hammerOn: !!origin && nt.fret > origin.fret, pullOff: !!origin && nt.fret < origin.fret,
             slideTo: nt.slideTarget ? nt.slideTarget.fret : null, slideUnpitchTo: null,
-            bend: nt.hasBend ? (nt.maxBendPoint?.value ?? 0) / 4 : 0, harmonic: nt.isHarmonic, palmMute: nt.isPalmMute, mute: nt.isDead, tap: beat.tap, vibrato: nt.vibrato > 0,
-            tremolo: beat.isTremolo, finger: nt.leftHandFinger >= 0 ? nt.leftHandFinger : null,
+            slideIn: [null, 'below', 'above'][nt.slideInType] ?? null, slideOut: [null, null, null, 'up', 'down', 'down', 'up'][nt.slideOutType] ?? null,
+            bend: nt.hasBend ? (nt.maxBendPoint?.value ?? 0) / 4 : 0, bendCurve: nt.hasBend ? curve(nt.bendPoints) : null,
+            whammy: curve(beat.whammyBarPoints),
+            harmonic: !!harmonic && harmonic !== 'pinch', harmonicPinch: harmonic === 'pinch', harmonicType: harmonic,
+            palmMute: nt.isPalmMute, mute: nt.isDead || beat.deadSlapped, ghost: nt.isGhost, staccato: nt.isStaccato, letRing: nt.isLetRing,
+            accent: ACCENTS[nt.accentuated] ?? null, dynamic: words(GP.DynamicValue[nt.dynamics]),
+            vibrato: nt.vibrato > 0 || beat.vibrato > 0, vibratoWide: nt.vibrato === GP.VibratoType.Wide || beat.vibrato === GP.VibratoType.Wide,
+            trill: nt.trillValue >= 0 ? nt.trillValue : null, ornament: ORNAMENTS[nt.ornament] ?? null, grace: beat.graceType !== GP.GraceType.None,
+            tremolo: beat.isTremolo, tap: beat.tap, tapLeft: nt.isLeftHandTapped, slap: beat.slap, pop: beat.pop,
+            golpe: [null, 'thumb', 'finger'][beat.golpe] ?? null, rasgueado: beat.rasgueado ? words(GP.Rasgueado[beat.rasgueado]) : null,
+            fade: [null, 'fade in', 'fade out', 'swell'][beat.fade] ?? null, wah: [null, 'open', 'closed'][beat.wahPedal] ?? null, fermata: !!beat.fermata,
+            pick: beat.notes.length > 1 ? null : [null, 'up', 'down'][beat.pickStroke] ?? null, showString: nt.showStringNumber,
+            finger: nt.leftHandFinger >= 0 ? nt.leftHandFinger : null, rightFinger: 'pimac'[nt.rightHandFinger] ?? null,
           };
           notes.push((lastOnString[nt.string] = note));
           inBar.push(note);
         }
-      }
+      } });
       phrases.push({ time: start, endTime: end, name: '', maxDifficulty: inBar.length });
     }
     notes.sort((a, b) => a.time - b.time || a.string - b.string);
@@ -303,7 +470,7 @@ function songFromScore(score, cache) {
     for (const x of notes) x.finger ??= suggested.fingers.get(x) ?? null;
     for (const c of chords) for (const j of c.notes) if (c.fingers[notes[j].string] < 0 && notes[j].finger !== null) c.fingers[notes[j].string] = notes[j].finger;
     const name = (track.name || `Track ${track.index + 1}`).replace(/\s+-\s+.*$/, ''); // "Farin Gitarre - Electric Guitar (clean)" → "Farin Gitarre"
-    return { name, program: track.playbackInfo.program, strings: staff.tuning.length, open: [...staff.tuning].reverse(), notes, chords, anchors, phrases, sections, beats, handShapes, track };
+    return { name, program: track.playbackInfo.program, strings: staff.tuning.length, open: [...staff.tuning].reverse(), notes, chords, anchors, phrases, sections, beats, handShapes, markers, hairpins, track };
   });
   return { title: score.title, artist: score.artist, bpm: score.tempo, length: sec(cache.masterBars.at(-1)?.end ?? 0), arrangements, lyrics: [], tempo };
 }
@@ -325,7 +492,10 @@ function lyricLines(lyrics) {
 }
 
 function setSong(next) {
-  for (const a of next.arrangements) markRepeats(a.notes, a.chords);
+  for (const a of next.arrangements) {
+    markRepeats(a.notes, a.chords);
+    annotate(a.notes, a.chords);
+  }
   song = { ...next, lines: lyricLines(next.lyrics) };
   loop = null;
   $('title').textContent = song.title || 'Untitled';
@@ -408,6 +578,7 @@ async function openFile(file) {
   const bytes = await file.arrayBuffer();
   if (!/\.pak$/i.test(file.name)) {
     usePlayer(synthPlayer);
+    synth.paused = null;
     builtCache = api.tickCache; // rebuild once alphaTab has the new score
     songReady = new Promise((resolve) => (resolveSong = resolve));
     return api.load(new Uint8Array(bytes));

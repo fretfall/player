@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats } from './music.js';
+import { tempoMap, tickToMs, msToTick, detectPitch, noteName, tuningName, markRepeats, annotate } from './music.js';
 
 // 120 bpm for 4 quarters, then 60 bpm
 const map = tempoMap([{ tick: 3840, tempo: 60 }], 120);
@@ -29,5 +29,22 @@ const chords = [{}, {}, {}];
 markRepeats(notes, chords);
 assert.deepEqual(notes.map((x) => x.repeat), [false, true, false, false, false, false, true, true, false, false]);
 assert.deepEqual(chords.map((c) => !!c.highDensity), [false, true, false]);
+const ornamented = [n(0, 2, 5), n(0.5, 2, 5, { ornament: 'turn' }), n(1, 2, 5, { ornament: 'turn', pick: 'up' })];
+markRepeats(ornamented, []);
+assert.deepEqual(ornamented.map((x) => x.repeat), [false, false, true]); // new notation shows in full; a pick direction alone doesn't
+
+// Annotations: slur back to the hammered-from note, a tie, let ring to the next note on the string, dynamics on change, barres
+const an = [
+  { time: 0, string: 1, fret: 5, sustain: 0, letRing: true, dynamic: 'f' },
+  { time: 0.5, string: 1, fret: 7, sustain: 0, hammerOn: true, dynamic: 'f' },
+  { time: 1, string: 2, fret: 3, sustain: 0, linkNext: true, dynamic: 'p' },
+  { time: 3, string: 2, fret: 3, sustain: 0, dynamic: 'p' },
+];
+const shapes = [{ frets: [3, 5, 5, 4, 3, 3], fingers: [1, 3, 4, 2, 1, 1] }, { frets: [-1, 5, 7, 7], fingers: [-1, 1, 3, 3] }];
+annotate(an, shapes);
+assert.deepEqual(an.map((x) => x.slurFrom), [null, 0, null, null]);
+assert.deepEqual([an[0].sustain, an[2].tieTo], [0.5, 3]);
+assert.deepEqual(an.map((x) => x.dynamicLabel), [null, null, 'p', null]);
+assert.deepEqual(shapes.map((c) => c.barre), [{ fret: 3, from: 0, to: 5 }, null]);
 
 console.log('ok');
