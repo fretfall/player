@@ -49,7 +49,7 @@
   #score b { display: block; font: 600 40px/1 var(--num); }
   #score span { font-size: 13px; color: var(--muted); }
   #status { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); max-width: min(560px, 90vw); padding: 10px 16px; border-radius: 10px; background: var(--chip); border: 1px solid var(--chip-border); backdrop-filter: blur(10px); text-align: center; }
-  #settings { position: fixed; right: 32px; top: 66px; z-index: 2; width: min(352px, calc(100vw - 32px)); max-height: calc(100vh - 82px); display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--ink) 94%, transparent); backdrop-filter: blur(18px); border: 1px solid var(--chip-border); box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+  .sheet { position: fixed; right: 32px; top: 66px; z-index: 2; width: min(352px, calc(100vw - 32px)); max-height: calc(100vh - 82px); display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--ink) 94%, transparent); backdrop-filter: blur(18px); border: 1px solid var(--chip-border); box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
   .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 10px 18px; }
   .sheet-head h2 { margin: 0; font: 600 15px var(--ui); }
   .close { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
@@ -70,12 +70,13 @@
   .hint { margin: -2px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
   .text-button { justify-self: start; padding: 4px 0; border: 0; background: none; font: 500 12px var(--ui); color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .text-button:hover { color: var(--text); }
-  #settings input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: none; cursor: pointer; }
-  #settings input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--fill, 50%), var(--chip-border) var(--fill, 50%)); }
-  #settings input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
-  #settings input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--chip-border); }
-  #settings input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
-  #settings input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); }
+  :is(#settings, .volume) input[type="range"] { -webkit-appearance: none; appearance: none; height: 18px; margin: 0; background: none; cursor: pointer; }
+  #settings input[type="range"] { width: 100%; }
+  :is(#settings, .volume) input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--fill, 50%), var(--chip-border) var(--fill, 50%)); }
+  :is(#settings, .volume) input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+  :is(#settings, .volume) input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--chip-border); }
+  :is(#settings, .volume) input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+  :is(#settings, .volume) input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); }
   .toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 13px; font-weight: 500; cursor: pointer; }
   .toggle small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--muted); }
   .toggle input { -webkit-appearance: none; appearance: none; flex: none; position: relative; width: 36px; height: 20px; margin: 0; border-radius: 10px; background: var(--chip-border); cursor: pointer; transition: background .15s; }
@@ -90,11 +91,34 @@
   .dots { display: flex; gap: 4px; }
   .dots i { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
   .order { font: 600 12px var(--num); letter-spacing: .12em; color: var(--text); }
+  #legend { width: min(430px, calc(100vw - 32px)); }
+  .legend-find { padding: 0 14px 6px; }
+  .legend-find input { width: 100%; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--chip-border); background: var(--chip); color: var(--text); font: 13px var(--ui); }
+  .legend-find input::placeholder { color: var(--muted); }
+  .legend { gap: 4px; padding-top: 10px; }
+  .legend h3 { margin: 14px 0 4px; }
+  .legend h3:first-child { margin-top: 0; }
+  .legend-item { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; padding: 4px 0; }
+  .legend-item b { display: block; font-size: 13px; font-weight: 500; }
+  .legend-item span { display: block; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .legend-item svg { width: 64px; height: 36px; border-radius: 8px; background: var(--chip); border: 1px solid var(--chip-border); fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .legend-item text { font-family: var(--num); font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+  .legend-empty { margin: 8px 0; font-size: 13px; color: var(--muted); }
+  .f0 { fill: var(--s0); } .f1 { fill: var(--s1); } .f2 { fill: var(--s2); } .f3 { fill: var(--s3); } .f4 { fill: var(--s4); }
+  .l0 { stroke: var(--s0); } .l1 { stroke: var(--s1); } .l2 { stroke: var(--s2); } .l3 { stroke: var(--s3); } .l4 { stroke: var(--s4); } .lm { stroke: var(--muted); }
+  .ft { fill: var(--text); } .lt { stroke: var(--text); } .fi { fill: var(--ink); } .fa { fill: var(--accent); } .fl { fill: var(--lane); } .ll { stroke: var(--lane); } .lw { stroke: #fff; } .fw { fill: #fff; }
+  .volume { position: relative; }
+  .volume .icon[aria-pressed="true"] { background: var(--chip); border-color: var(--chip-border); color: var(--muted); }
+  .volume-drop { position: absolute; z-index: 3; top: 100%; left: 50%; padding-top: 8px; transform: translate(-50%, -4px); opacity: 0; visibility: hidden; transition: opacity .15s, transform .15s, visibility .15s; }
+  .volume:hover .volume-drop, .volume:focus-within .volume-drop { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+  .volume-drop div { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--ink); border: 1px solid var(--chip-border); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
+  .volume-drop input { width: 120px; }
+  .volume-drop output { min-width: 34px; font: 600 12px var(--num); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   #drop { position: fixed; inset: 12px; z-index: 3; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgba(0, 0, 0, .45); font: 600 20px var(--num); }
   #tab { position: fixed; left: -10000px; top: 0; width: 1000px; }
   @media (max-width: 1200px) { .wordmark, .song span { display: none; } .song b { max-width: 18vw; } }
   @media (max-width: 900px) { .time { display: none; } }
-  @media (max-width: 520px) { #settings { right: 16px; } }
+  @media (max-width: 520px) { .sheet { right: 16px; } }
 </style>
 </head>
 <body>
@@ -112,11 +136,16 @@
       <output id="speed" aria-label="Speed">100%</output>
       <button id="faster" aria-label="Faster"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 5v10M5 10h10"/></svg></button>
     </div>
+    <div class="volume">
+      <button class="icon" id="volumeButton" aria-pressed="false" title="Mute (M). Hover for the volume."></button>
+      <div class="volume-drop"><div><input id="volume" type="range" min="0" max="1" step="0.02" aria-label="Volume"><output id="volumeOut" for="volume"></output></div></div>
+    </div>
     <button class="icon" id="loop" aria-pressed="false" title="Loop this phrase (L). Shift-click the phrase bar to extend."><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3.5l2.5 2.5-2.5 2.5"/><path d="M4 10V9a3 3 0 0 1 3-3h9"/><path d="M6.5 16.5L4 14l2.5-2.5"/><path d="M16 10v1a3 3 0 0 1-3 3H4"/></svg></button>
     <button class="icon" id="listen" aria-pressed="false" title="Listen to your guitar and score hits (use headphones)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="6" height="10" rx="3"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></button>
     <button class="icon" id="play" title="Play / pause (Space)"></button>
     <div class="divider"></div>
     <button class="icon" id="open" title="Open a .pak, a Guitar Pro file, or a tab with its recording (or drop them anywhere)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"/></svg></button>
+    <button class="icon" id="legendButton" aria-expanded="false" aria-controls="legend" title="What the notation means (?)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M7.8 7.6a2.3 2.3 0 0 1 4.4.9c0 1.5-2.2 1.9-2.2 3.2"/><path d="M10 14.4h.01"/></svg></button>
     <button class="icon" id="settingsButton" aria-expanded="false" aria-controls="settings" title="Settings"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 6h8M15.5 6h1M3.5 14h2M9.5 14h7"/><circle cx="13.5" cy="6" r="2"/><circle cx="7.5" cy="14" r="2"/></svg></button>
   </div>
 </header>
@@ -125,7 +154,7 @@
 <div id="lyrics"><div id="section"></div><div id="line"></div><div id="next"></div></div>
 <div id="info"></div>
 <div id="score" hidden><b id="accuracy">–</b><span id="heard">accuracy</span></div>
-<div id="settings" role="dialog" aria-labelledby="settingsTitle" hidden>
+<div id="settings" class="sheet" role="dialog" aria-labelledby="settingsTitle" hidden>
   <div class="sheet-head">
     <h2 id="settingsTitle">Settings</h2>
     <button class="close" id="settingsClose" aria-label="Close settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
@@ -159,6 +188,10 @@
     <div class="setting">
       <div class="setting-head"><span id="framesLabel">Chord frames</span></div>
       <div class="seg" data-setting="frames" role="group" aria-labelledby="framesLabel"></div>
+    </div>
+    <div class="setting">
+      <div class="setting-head"><span id="repeatMarksLabel">Marks on repeated notes</span></div>
+      <div class="seg" data-setting="repeatMarks" role="group" aria-labelledby="repeatMarksLabel"></div>
     </div>
     <label class="toggle"><span>Hand position guides<small>A band down the highway where your hand goes</small></span><input id="guides" type="checkbox" role="switch"></label>
   </section>
@@ -199,6 +232,14 @@
     <button class="text-button" id="resetOffset">Reset delay</button>
     <label class="toggle"><span>Mute my part<small>Guitar Pro files: hear the other tracks without yours</small></span><input id="mute" type="checkbox" role="switch"></label>
   </section>
+</div>
+<div id="legend" class="sheet" role="dialog" aria-labelledby="legendTitle" hidden>
+  <div class="sheet-head">
+    <h2 id="legendTitle">Notation</h2>
+    <button class="close" id="legendClose" aria-label="Close notation"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+  </div>
+  <div class="legend-find"><input id="legendFind" type="search" placeholder="Find a notation, like bend or mute" aria-label="Find a notation"></div>
+  <div class="pane legend" id="legendList"></div>
 </div>
 <div id="status" role="status" hidden></div>
 <div id="drop" hidden>Drop a .pak, a Guitar Pro file, or a tab with its recording</div>
@@ -334,11 +375,12 @@ const DEMO = `
 `;
 
 // --- Settings: look, colours and fonts mix freely; everything is remembered per browser
-const FRAMES = { box: { label: 'Box' }, gradient: { label: 'Gradient' } };
+const FRAMES = { gradient: { label: 'Gradient' }, box: { label: 'Box' } };
+const REPEAT_MARKS = { grey: { label: 'Greyed out' }, hide: { label: 'Hidden' } };
 const STRING_ORDERS = { low: { label: 'Low E on top' }, high: { label: 'High e on top' } }; // looking down at the guitar, or as in tab
 const VIEW_DEFAULTS = 3; // bumped whenever the view sliders' defaults or scale change
 const VIEW_START = { viewAngle: 30, noteSpeed: 1, drawDistance: 1 };
-const settings = { ...DEFAULT_STYLE, frames: 'box', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
+const settings = { ...DEFAULT_STYLE, volume: 0.8, volumeMuted: false, frames: 'gradient', repeatMarks: 'grey', stringOrder: 'low', offset: 0, mute: false, guides: true, ...VIEW_START, viewDefaults: VIEW_DEFAULTS, panel: 'highway' };
 try {
   const saved = JSON.parse(localStorage.getItem('fretfall') ?? '{}');
   if (saved.viewDefaults !== VIEW_DEFAULTS) { // saved under older defaults: the view starts from the current ones
@@ -346,14 +388,16 @@ try {
   }
   Object.assign(settings, saved);
 } catch {}
-for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['strings', STRINGS], ['frames', FRAMES, 'box'], ['stringOrder', STRING_ORDERS, 'low']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
+for (const [key, options, fallback] of [['look', LOOKS], ['colors', COLORS], ['fonts', FONTS], ['strings', STRINGS], ['frames', FRAMES, 'gradient'], ['repeatMarks', REPEAT_MARKS, 'grey'], ['stringOrder', STRING_ORDERS, 'low']]) if (!options[settings[key]]) settings[key] = fallback ?? DEFAULT_STYLE[key];
 const save = () => { try { localStorage.setItem('fretfall', JSON.stringify(settings)); } catch {} };
+const loudness = () => (settings.volumeMuted ? 0 : settings.volume);
 let theme;
 
 function applyTheme() {
-  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance };
+  theme = { ...makeTheme(settings), guides: settings.guides, frames: settings.frames, repeatMarks: settings.repeatMarks, stringOrder: settings.stringOrder, viewAngle: settings.viewAngle, noteSpeed: settings.noteSpeed, drawDistance: settings.drawDistance };
   $('fonts').href = theme.href;
   const vars = { bg: theme.bg, ink: theme.ink, text: theme.text, muted: theme.muted, accent: theme.accent, chip: theme.chip, 'chip-border': theme.chipBorder, done: theme.phraseDone, todo: theme.phraseTodo, ui: theme.ui, num: theme.num, lyric: theme.lyric, 'lyric-style': theme.lyricStyle };
+  Object.assign(vars, { lane: theme.anchorLane }, Object.fromEntries(theme.str.map((c, i) => [`s${i}`, c]))); // the legend draws with these
   for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(`--${k}`, v);
   for (const seg of document.querySelectorAll('[data-setting]')) for (const b of seg.children) {
     b.setAttribute('aria-pressed', String(b.value === settings[seg.dataset.setting]));
@@ -368,7 +412,7 @@ const dotsFor = (setting, value) => {
   return [c.floor0, c.lane, c.accent, c.text];
 };
 for (const seg of document.querySelectorAll('[data-setting]')) {
-  const setting = seg.dataset.setting, options = { look: LOOKS, colors: COLORS, fonts: FONTS, strings: STRINGS, frames: FRAMES, stringOrder: STRING_ORDERS }[setting];
+  const setting = seg.dataset.setting, options = { look: LOOKS, colors: COLORS, fonts: FONTS, strings: STRINGS, frames: FRAMES, repeatMarks: REPEAT_MARKS, stringOrder: STRING_ORDERS }[setting];
   for (const [value, { label }] of Object.entries(options)) {
     const b = Object.assign(document.createElement('button'), { value, textContent: label });
     if (setting === 'stringOrder') b.prepend(Object.assign(document.createElement('span'), { className: 'order', textContent: value === 'low' ? 'E A D G B e' : 'e B G D A E' }));
@@ -406,6 +450,22 @@ const setOffset = (ms) => {
 setOffset(settings.offset);
 $('offset').oninput = (e) => setOffset(+e.target.value);
 $('resetOffset').onclick = () => setOffset(0);
+
+// Volume: the speaker mutes and unmutes; the slider beside it slides out on hover or focus
+const SPEAKER = (waves) => `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h3L10.5 4v12l-4-3.5h-3z"/>${waves}</svg>`;
+function setVolume(volume = settings.volume, muted = settings.volumeMuted) {
+  Object.assign(settings, { volume, volumeMuted: muted || volume === 0 });
+  $('volume').value = loudness();
+  $('volumeOut').value = `${Math.round(loudness() * 100)}%`;
+  fill($('volume'));
+  $('volumeButton').innerHTML = SPEAKER(settings.volumeMuted ? '<path d="M13.5 8l4 4M17.5 8l-4 4"/>' : volume < 0.5 ? '<path d="M13.5 8a3 3 0 0 1 0 4"/>' : '<path d="M13.5 8a3 3 0 0 1 0 4M15.5 5.5a6.5 6.5 0 0 1 0 9"/>');
+  $('volumeButton').setAttribute('aria-pressed', String(settings.volumeMuted));
+  $('volumeButton').setAttribute('aria-label', settings.volumeMuted ? 'Unmute' : 'Mute');
+  player?.setVolume(loudness());
+  save();
+}
+$('volume').oninput = (e) => setVolume(+e.target.value, false);
+$('volumeButton').onclick = () => setVolume(settings.volume || 0.8, !settings.volumeMuted);
 $('guides').checked = settings.guides;
 $('guides').onchange = (e) => { settings.guides = e.target.checked; save(); applyTheme(); };
 $('mute').checked = settings.mute;
@@ -431,10 +491,120 @@ for (const tab of document.querySelectorAll('[data-tab]')) {
   };
 }
 showPanel(document.querySelector(`[data-tab="${settings.panel}"]`) ? settings.panel : 'highway');
-const toggleSettings = (open = $('settings').hidden) => { $('settings').hidden = !open; $('settingsButton').setAttribute('aria-expanded', String(open)); };
-$('settingsButton').onclick = () => toggleSettings();
-$('settingsClose').onclick = () => { toggleSettings(false); $('settingsButton').focus(); };
-addEventListener('pointerdown', (e) => { if (!$('settings').hidden && !e.target.closest('#settings, #settingsButton')) toggleSettings(false); });
+// Settings and the notation legend open as sheets from the header, one at a time
+const SHEETS = { settings: 'settingsButton', legend: 'legendButton' };
+function toggleSheet(name, open = $(name).hidden) {
+  for (const [sheet, button] of Object.entries(SHEETS)) {
+    const show = sheet === name && open;
+    $(sheet).hidden = !show;
+    $(button).setAttribute('aria-expanded', String(show));
+  }
+}
+const toggleSettings = (open) => toggleSheet('settings', open);
+for (const [sheet, button] of Object.entries(SHEETS)) {
+  $(button).onclick = () => toggleSheet(sheet);
+  $(`${sheet}Close`).onclick = () => { toggleSheet(sheet, false); $(button).focus(); };
+}
+addEventListener('pointerdown', (e) => { if (!e.target.closest('.sheet, #settingsButton, #legendButton')) toggleSheet('settings', false); });
+
+// --- Notation legend: what each mark on the highway means, drawn in the current theme's colours
+const svg = (inner) => `<svg viewBox="0 0 56 32" aria-hidden="true">${inner}</svg>`;
+const gem = (x, y, w = 24, h = 12, c = 1, label = '') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="f${c}"/><rect x="${x}" y="${y}" width="${w}" height="${h / 4}" class="fw" opacity=".35"/>${label ? `<text x="${x + w / 2}" y="${y + h / 2 + 0.5}" class="fi" font-size="${h * 0.75}">${label}</text>` : ''}`;
+const word = (text, size = 13, cls = 'ft', extra = '') => `<text x="28" y="16.5" class="${cls}" font-size="${size}" ${extra}>${text}</text>`;
+const above = (mark, size = 11) => `${gem(16, 17, 24, 11)}<text x="28" y="9" class="ft" font-size="${size}">${mark}</text>`;
+const LEGEND = [
+  ['Notes and chords', [
+    ['Note', 'Play this string at this fret when its white line on the floor reaches the fretboard. The number on it is the finger to use (T = thumb).', svg(`${gem(16, 8, 24, 12, 1, '1')}<path d="M16 27h24" class="lw" stroke-width="2" opacity=".6"/>`)],
+    ['Fret number', 'The fret to play, on the floor under the note.', svg(`${gem(20, 3, 16, 7)}<path d="M28 10v8" class="l1" stroke-width="1.5"/><text x="28" y="25" class="f1" font-size="11">7</text>`)],
+    ['Open string', 'Play the string without fretting it. The bar spans your hand position; held, it becomes a lane that wide.', svg(`<rect x="6" y="10" width="44" height="12" class="f3" opacity=".15"/><rect x="6" y="8" width="44" height="4" class="f3"/><path d="M7 10v14M49 10v14" class="l3" stroke-width="2.5"/><path d="M6 25h44" class="lw" stroke-width="2" opacity=".6"/>`)],
+    ['Played again', 'The same note or chord as just before: play it again on this beat. Its marks show greyed out, or not at all (Settings).', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
+    ['Chord', 'Play these notes together. The white line marks the beat; the chord name shows when it changes.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
+    ['Chord name', 'The chord you are playing, big, to the right of your hand. It shows up a second before the chord.', svg(word('G5', 16))],
+    ['Barre', 'Lay one finger across several strings at this fret. ½B is a half barre.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/><path d="M24 8v16" class="lt" stroke-width="4" opacity=".8"/><text x="36" y="10" class="ft" font-size="9">B</text>`)],
+    ['Hand position', 'Where your index finger sits. A new band with a number means move your hand there.', svg(`<rect x="16" y="2" width="34" height="28" class="fl" opacity=".2"/><path d="M16 2v28M50 2v28" class="ll" stroke-width="1.5"/><text x="9" y="17" class="fl" font-size="10">5</text>`)],
+    ['Where to press', 'The spot on the fretboard lights up as the note comes close and fills in when you play it.', svg(`<path d="M2 16h52" class="l2" stroke-width="2"/><rect x="18" y="10" width="20" height="12" class="f2" opacity=".35"/><rect x="18" y="10" width="20" height="12" class="l2" stroke-width="1.6"/>`)],
+    ['String number', 'Play it on this string (1 is the high e).', svg(`<circle cx="28" cy="16" r="9" class="l2" stroke-width="1.5"/><text x="28" y="16.5" class="f2" font-size="10">3</text>`)],
+  ]],
+  ['Picking hand', [
+    ['Palm mute', 'Rest the side of your picking hand on the strings near the bridge.', svg(`<rect x="16" y="10" width="24" height="12" class="fi l0" stroke-width="1.6"/><path d="M19 12l18 8M19 20l18-8" class="l0" stroke-width="1.6"/>`)],
+    ['Muted note', 'Touch the string with your fretting hand without pressing it down, for a percussive click.', svg(`<path d="M20 8l16 16M20 24l16-16" class="l0" stroke-width="2.5"/>`)],
+    ['Down and up strokes', 'Pick down (⊓) or up (V).', svg(`<path d="M10 22V10h12v12" class="lt" stroke-width="1.8"/><path d="M34 10l6 12 6-12" class="lt" stroke-width="1.8"/>`)],
+    ['Picking-hand fingers', 'p thumb, i index, m middle, a ring, c little finger.', svg(word('p i m a', 12, 'ft', 'font-style="italic"'))],
+    ['Strum', 'Strum the chord in the direction of the arrow.', svg(`<path d="M28 5v22M23 21l5 6 5-6" class="lt" stroke-width="1.8"/>`)],
+    ['Rolled chord', 'Roll the chord: sound the strings one after another, quickly.', svg(`<path d="M28 4q4 3 0 5.5t0 5.5 0 5.5 0 5.5M23 21l5 6 5-6" class="lt" stroke-width="1.6"/>`)],
+    ['Tremolo picking', 'Pick the note as fast as you can for its whole length.', svg(`${gem(16, 20, 24, 9)}<path d="M22 12l12-4M22 16l12-4M22 8l12-4" class="lt" stroke-width="1.6"/>`)],
+    ['Rasgueado', 'Flamenco strum: flick the fingers out one after another in the pattern shown.', svg(word('rasg.', 12))],
+    ['Slap and pop', 'Bass: hit the string with your thumb, or pull it away with a finger and let it snap back.', svg(word('slap', 12))],
+    ['Golpe', 'Tap the body of the guitar with your thumb or a finger.', svg(word('golpe', 12))],
+  ]],
+  ['Fretting hand and legato', [
+    ['Hammer-on', 'Sound the note by hammering a finger down, without picking. The arc links it to the note before.', svg(`${gem(4, 19, 16, 8)}${gem(36, 19, 16, 8)}<path d="M12 18Q28 8 44 18" class="lt" stroke-width="1.4"/><text x="28" y="6" class="ft" font-size="9">H</text>`)],
+    ['Pull-off', 'Pull your finger off the string to sound the lower note.', svg(`${gem(4, 19, 16, 8)}${gem(36, 19, 16, 8)}<path d="M12 18Q28 8 44 18" class="lt" stroke-width="1.4"/><text x="28" y="6" class="ft" font-size="9">P</text>`)],
+    ['Tie', 'Hold the note on into the next one without playing it again.', svg(`${gem(4, 19, 16, 8)}${gem(36, 19, 16, 8)}<path d="M12 18Q28 4 44 18" class="lt" stroke-width="1.4" stroke-dasharray="3 3"/>`)],
+    ['Slide', 'Slide to the fret where the trail ends. A dashed end means slide off without a clear target.', svg(`${gem(4, 20, 16, 8)}<path d="M12 20L40 8" class="l1" stroke-width="3" opacity=".6"/><rect x="32" y="3" width="16" height="7" class="l1" stroke-width="1.5"/>`)],
+    ['Slide in and out', 'Slide into the note from below or above, or off it at the end.', svg(`<path d="M6 27L22 17" class="l1" stroke-width="2" stroke-dasharray="3 3"/>${gem(22, 10, 22, 12)}`)],
+    ['Tapping', 'Tap the note with a finger of your picking hand. m.d. and m.g. say which hand taps.', svg(above('T'))],
+    ['Grace note', 'A quick note played just before the beat.', svg(`${gem(22, 12, 12, 7, 2)}<path d="M18 24L38 7" class="lt" stroke-width="1.4"/>`)],
+    ['Trill', 'Alternate quickly between the note and the fret shown.', svg(word('tr 7', 13, 'ft', 'font-style="italic"'))],
+    ['Turn and mordent', 'Ornaments: a quick flick to the neighbouring notes and back.', svg(word('turn', 12))],
+  ]],
+  ['Sustain and pitch', [
+    ['Sustain', 'Keep the note ringing for as long as its trail.', svg(`<path d="M24 20L26 2h4l2 18z" class="f1" opacity=".5"/>${gem(16, 18, 24, 10)}`)],
+    ['Let ring', 'Let the note ring on over the notes after it.', svg(`<path d="M28 18V2" class="l1" stroke-width="2" stroke-dasharray="3 3"/>${gem(16, 18, 24, 10)}`)],
+    ['Vibrato', 'Shake the note. A taller wave means a wider vibrato.', svg(`${gem(16, 19, 24, 9)}<path d="M13 9q2.5-4 5 0t5 0 5 0 5 0 5 0 5 0" class="lt" stroke-width="1.6"/>`)],
+    ['Bend', 'Bend the string up by the amount shown: ½ is one fret higher, full is two.', svg(`${gem(6, 19, 20, 9)}<path d="M16 17V5M12 9l4-4 4 4" class="lt" stroke-width="1.6"/><text x="38" y="9" class="ft" font-size="9">full</text>`)],
+    ['Bend and release', 'Bend up, then let the string back down. The trail follows the shape.', svg(`${gem(6, 19, 20, 9)}<path d="M14 17V5M10 9l4-4 4 4M22 5v12M18 13l4 4 4-4" class="lt" stroke-width="1.5"/><text x="40" y="9" class="ft" font-size="9">full</text>`)],
+    ['Pre-bend', 'Bend the string before you pick it, then play.', svg(word('pre ½', 12))],
+    ['Whammy bar', 'Push or pull the whammy bar; the trail dips and rises with it.', svg(`<text x="28" y="8" class="ft" font-size="9">w/bar</text><path d="M6 20q11 12 22 0t22 0" class="l1" stroke-width="2"/>`)],
+  ]],
+  ['Harmonics', [
+    ['Natural harmonic', 'Touch the string lightly right above the fret wire, without pressing, and pick.', svg(`<path d="M20 4l7 7-7 7-7-7z" class="f4"/><text x="40" y="12" class="f4" font-size="10">&lt;12&gt;</text>`)],
+    ['Pinch harmonic', 'Catch the string with the side of your thumb just after the pick.', svg(above('PH', 10))],
+    ['Artificial harmonic', 'Fret the note and touch the string 12 frets higher while you pick.', svg(above('AH', 10))],
+    ['Tapped harmonic', 'Fret the note and tap the string 12 frets higher.', svg(above('TH', 10))],
+    ['Semi and feedback harmonics', 'SH: half harmonic, half note. FH: hold it until it feeds back.', svg(above('SH', 10))],
+  ]],
+  ['Articulation and expression', [
+    ['Accent', 'Play it louder. ^ is a strong accent; – means hold it for its full length.', svg(above('&gt;', 12))],
+    ['Staccato', 'Short: stop the note right after you play it.', svg(`${gem(16, 17, 24, 11)}<circle cx="28" cy="9" r="2.2" class="ft"/>`)],
+    ['Ghost note', 'Barely audible: felt more than heard.', svg(word('(7)', 14, 'f1'))],
+    ['Dynamics', 'How loud, from very soft (pp) to very loud (ff). Shown where it changes.', svg(word('mf', 15, 'ft', 'font-style="italic"'))],
+    ['Crescendo and diminuendo', 'Get louder along an opening wedge, softer along a closing one.', svg(`<path d="M8 16L48 8M8 16l40 8" class="lt" stroke-width="1.6"/>`)],
+    ['Swell and fade', 'Fade the note in with the volume knob, or fade it out.', svg(word('swell', 12))],
+    ['Wah', 'Wah pedal open (o) or closed (+).', svg(word('o  +', 14))],
+    ['Fermata', 'Hold the note longer than written.', svg(`<path d="M16 22a12 12 0 0 1 24 0" class="lt" stroke-width="1.8"/><circle cx="28" cy="19" r="2.2" class="ft"/>`)],
+  ]],
+  ['On the floor', [
+    ['Tempo, time and key', 'From this bar on, a new tempo, time signature, key or swing feel.', svg(word('♩ = 120', 11, 'fa'))],
+    ['Repeats and endings', 'Where a repeat starts, how many times, and which ending you are on.', svg(word('repeat ×2', 10, 'fa'))],
+    ['Jumps', 'Road signs to follow: segno, coda, D.C. (from the start), D.S. (from the segno), fine.', svg(word('D.S. al coda', 8, 'fa'))],
+    ['8va and loco', 'Play an octave higher, until loco.', svg(word('8va', 13, 'fa'))],
+    ['Text', 'Instructions written in the file, like pizz. or bass stop.', svg(word('pizz.', 13, 'fa'))],
+  ]],
+];
+$('legendList').replaceChildren(...LEGEND.flatMap(([group, items]) => [
+  Object.assign(document.createElement('h3'), { textContent: group }),
+  ...items.map(([name, meaning, drawing]) => {
+    const row = Object.assign(document.createElement('div'), { className: 'legend-item', innerHTML: drawing });
+    row.append(Object.assign(document.createElement('div'), { innerHTML: '<b></b><span></span>' }));
+    row.querySelector('b').textContent = name;
+    row.querySelector('span').textContent = meaning;
+    return row;
+  }),
+]), Object.assign(document.createElement('p'), { className: 'legend-empty', textContent: 'Nothing matches.', hidden: true }));
+$('legendFind').oninput = (e) => { // show the matching rows, and only the headings that still have some
+  const needle = e.target.value.trim().toLowerCase();
+  let heading = null, shown = 0, groupShown = 0;
+  const closeGroup = () => heading && (heading.hidden = !groupShown);
+  for (const el of $('legendList').children) {
+    if (el.tagName === 'H3') { closeGroup(); [heading, groupShown] = [el, 0]; continue; }
+    if (!el.classList.contains('legend-item')) continue;
+    el.hidden = !!needle && !el.textContent.toLowerCase().includes(needle);
+    if (!el.hidden) groupShown++, shown++;
+  }
+  closeGroup();
+  $('legendList').lastElementChild.hidden = shown > 0;
+};
 applyTheme();
 
 let statusTimer;
@@ -460,6 +630,7 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
     pause: () => el.pause(),
     seek: (t) => { el.currentTime = Math.max(0, offset + ratio * t); },
     setSpeed: (v) => { el.playbackRate = v; },
+    setVolume: (v) => { el.volume = v; },
     stop: () => { el.pause(); URL.revokeObjectURL(el.src); },
   };
 }
@@ -499,6 +670,7 @@ const synthPlayer = {
     api.tickPosition = synth.tick;
   },
   setSpeed: (v) => { api.playbackSpeed = v; },
+  setVolume: (v) => { api.masterVolume = v; },
   stop: () => { synth.paused = null; api.stop(); },
 };
 
@@ -506,6 +678,7 @@ function usePlayer(next) {
   if (player && player !== next) player.stop();
   player = next;
   player.setSpeed(speed);
+  player.setVolume(loudness());
   updatePlayButton();
 }
 function updatePlayButton() { $('play').innerHTML = player?.playing ? PAUSE : PLAY; }
@@ -807,9 +980,9 @@ $('slower').onclick = () => setSpeed(speed - 0.1);
 $('faster').onclick = () => setSpeed(speed + 0.1);
 $('loop').onclick = toggleLoop;
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') toggleSettings(false);
-  if (e.target.tagName === 'INPUT' || e.target.closest?.('#settings')) return; // space and arrows belong to the settings controls there
-  const action = { ' ': togglePlay, l: toggleLoop, ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
+  if (e.key === 'Escape') toggleSheet('settings', false);
+  if (e.target.tagName === 'INPUT' || e.target.closest?.('.sheet')) return; // space and arrows belong to the controls there
+  const action = { ' ': togglePlay, l: toggleLoop, m: () => $('volumeButton').click(), '?': () => toggleSheet('legend'), ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
   if (!action) return;
   e.preventDefault();
   action();
@@ -916,6 +1089,7 @@ function frame() {
 }
 
 usePlayer(synthPlayer);
+setVolume();
 api.tex(DEMO);
 requestAnimationFrame(frame);
 </script>
