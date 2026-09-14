@@ -703,13 +703,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
         glow(false);
         g.lineCap = 'round';
       }
-      if (chord.barre) { // one finger across several strings: a bar over them at its fret
+      if (chord.barre && (!chord.highDensity || t.repeatMarks === 'grey')) { // one finger across several strings: a bar over them at its fret (a repeat's like its other marks: greyed out, or left off)
         const bx = chord.barre.fret - 0.5;
-        g.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        g.strokeStyle = chord.highDensity ? t.muted : 'rgba(255, 255, 255, 0.7)';
         g.lineWidth = Math.max(3, 0.1 * P(bx, stack / 2, z)[2]);
         const [y0, y1] = [ys(chord.barre.from), ys(chord.barre.to)].sort((p, q) => p - q);
         line3([bx, y0 - gap * 0.4, z], [bx, y1 + gap * 0.4, z]);
-        label(chord.barre.half ? '½B' : 'B', bx, boardHi + 0.12, z, 0.22, t.text);
+        label(chord.barre.half ? '½B' : 'B', bx, boardHi + 0.12, z, 0.22, chord.highDensity ? t.muted : t.text);
       }
       if (chord.strum || chord.roll) { // strum or roll beside the frame: down runs from the low strings to the high ones
         const ax = l - 0.25, lowSide = ys(0) > ys(n - 1) ? boardHi - 0.1 : floor + 0.15, highSide = lowSide > stack / 2 ? floor + 0.15 : boardHi - 0.1;
