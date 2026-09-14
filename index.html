@@ -149,6 +149,7 @@
     <button class="icon" id="open" title="Open a .pak, a Guitar Pro file, or a tab with its recording (or drop them anywhere)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"/></svg></button>
     <button class="icon" id="legendButton" aria-expanded="false" aria-controls="legend" title="What the notation means (?)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M7.8 7.6a2.3 2.3 0 0 1 4.4.9c0 1.5-2.2 1.9-2.2 3.2"/><path d="M10 14.4h.01"/></svg></button>
     <button class="icon" id="settingsButton" aria-expanded="false" aria-controls="settings" title="Settings"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 6h8M15.5 6h1M3.5 14h2M9.5 14h7"/><circle cx="13.5" cy="6" r="2"/><circle cx="7.5" cy="14" r="2"/></svg></button>
+    <button class="icon" id="fullscreen" title="Full screen (F)"></button>
   </div>
 </header>
 <div id="phrases"></div>
@@ -272,6 +273,8 @@ const WW2OGG = 'https://cdn.jsdelivr.net/npm/ww2ogg-ts@0.2.0/+esm';
 const OPEN_STRINGS = { 4: [28, 33, 38, 43], 5: [23, 28, 33, 38, 43], 6: [40, 45, 50, 55, 59, 64], 7: [35, 40, 45, 50, 55, 59, 64] };
 const PLAY = '<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 4.2v11.6L16 10z"/></svg>';
 const PAUSE = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7.5 4.5v11M12.5 4.5v11"/></svg>';
+const ENTER_FULLSCREEN = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4"/></svg>';
+const EXIT_FULLSCREEN = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3.5v4h-4M16.5 7.5h-4v-4M12.5 16.5v-4h4M3.5 12.5h4v4"/></svg>';
 const clock = (s) => `${s < 0 ? '-' : ''}${Math.floor(Math.abs(s) / 60)}:${String(Math.floor(Math.abs(s) % 60)).padStart(2, '0')}`; // negative: the recording's intro before the tab starts
 const paint = () => new Promise((r) => { requestAnimationFrame(() => setTimeout(r)); setTimeout(r, 100); }); // background tabs get no frames
 
@@ -1001,13 +1004,20 @@ $('play').onclick = togglePlay;
 $('slower').onclick = () => setSpeed(speed - 0.1);
 $('faster').onclick = () => setSpeed(speed + 0.1);
 $('loop').onclick = toggleLoop;
+const toggleFullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+const updateFullscreenButton = () => { $('fullscreen').innerHTML = document.fullscreenElement ? EXIT_FULLSCREEN : ENTER_FULLSCREEN; };
+$('fullscreen').onclick = toggleFullscreen;
+$('fullscreen').hidden = !document.fullscreenEnabled; // iPhones can't take a page full screen
+document.onfullscreenchange = updateFullscreenButton;
+updateFullscreenButton();
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     toggleSheet('settings', false);
     toggleVolume(false);
   }
   if (e.target.tagName === 'INPUT' || e.target.closest?.('.sheet')) return; // space and arrows belong to the controls there
-  const action = { ' ': togglePlay, l: toggleLoop, m: () => $('volumeMute').click(), '?': () => toggleSheet('legend'), ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
+  if (e.metaKey || e.ctrlKey || e.altKey) return; // the browser's own shortcuts, like Cmd+F to find
+  const action = { ' ': togglePlay, l: toggleLoop, m: () => $('volumeMute').click(), f: toggleFullscreen, '?': () => toggleSheet('legend'), ArrowLeft: () => player?.seek(songTime() - 5), ArrowRight: () => player?.seek(songTime() + 5) }[e.key];
   if (!action) return;
   e.preventDefault();
   action();
