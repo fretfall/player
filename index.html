@@ -61,6 +61,10 @@
                 align-items: center;
                 justify-content: space-between;
                 gap: 24px;
+                transition:
+                    transform 0.25s ease,
+                    opacity 0.25s ease,
+                    visibility 0.25s;
             }
             .group {
                 display: flex;
@@ -293,6 +297,23 @@
             #info b {
                 color: var(--text);
                 font-weight: 600;
+            }
+            /* Full screen is focus mode: the highway, the phrase bars and the lyrics. The header slides down while the
+               pointer is over the phrase bars or the header, and leaves a moment after (time to cross the gap between them) */
+            :root:fullscreen .bar {
+                transform: translateY(calc(-100% - 18px));
+                opacity: 0;
+                visibility: hidden;
+                transition-delay: 0.4s;
+            }
+            :root:fullscreen:has(#phrases:hover, #progress:hover, .bar:hover) .bar {
+                transform: none;
+                opacity: 1;
+                visibility: visible;
+                transition-delay: 0s;
+            }
+            :root:fullscreen #info {
+                display: none;
             }
             #status {
                 position: fixed;

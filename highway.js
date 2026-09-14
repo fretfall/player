@@ -952,12 +952,17 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
 
   // Where to press, on top of everything on the board: targets fill in as notes approach, finger number and all,
-  // and light up while they sound
+  // and light up while they sound. A spot played again straight after stays lit from the strike before (see markRepeats), so
+  // repeated notes and chords hold their targets until the fingering switches instead of flashing on every strike
+  const lit = new Set(); // one lit target per spot, however many notes hold it
   for (const note of visible) {
-    const dt = note.time - now, chord = chordOf(note), pressed = dt <= 0.06, bent = bending.get(note.string);
+    const dt = note.time - now, chord = chordOf(note), bent = bending.get(note.string), heldFrom = note.heldFrom ?? null;
+    const pressed = dt <= 0.06 || (heldFrom !== null && now >= heldFrom - 0.06);
     const slides = (note.slideTo ?? note.slideUnpitchTo ?? null) !== null;
-    if (note.mute || dt > PRESS_AHEAD || dt < -Math.max(note.sustain, slides ? 0.25 : 0.12) || (chord?.highDensity && !pressed)) continue;
+    if (note.mute || dt > PRESS_AHEAD || dt < -Math.max(note.sustain, slides ? 0.25 : 0.12) || ((chord?.highDensity || heldFrom !== null) && !pressed)) continue;
     if (bent && bent.note !== note && !pressed) continue; // the next note on a string being bent shows once it is let down
+    if (pressed && lit.has(`${note.string}:${note.fret}`)) continue;
+    if (pressed) lit.add(`${note.string}:${note.fret}`);
     const { a, open, x: from } = spot(note), x = slideX(note, from, -dt), y = boardY(note), c = color(note.string);
     const hw = (open ? (a.width - 0.2) / 2 : 0.32) + 2 / k0, hh = (open ? 0.1 : 0.36) * gap + 2 / k0; // 2px bigger than the gem shape
     gem(x, y, 0, hw, hh);

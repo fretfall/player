@@ -23,6 +23,15 @@ const ornamented = [n(0, 2, 5, { chord: 0 }), n(0, 3, 7, { chord: 0 }), n(0.5, 2
 markRepeats(ornamented, [{}, {}, {}]);
 assert.deepEqual(ornamented.map((x) => x.repeat), [false, false, false, false, true, true]); // new notation shows in full; a pick direction alone doesn't
 
+// Holds: a spot the very next strike plays again stays held down in between, until the fingering switches
+const held = [
+  n(0, 0, 0), n(0.3, 0, 0), n(0.6, 0, 0), n(0.9, 1, 2), n(1.2, 0, 0), n(3, 0, 0), // chugs, a switch, back after it, a long rest
+  n(4, 1, 5, { chord: 0 }), n(4, 2, 7, { chord: 0 }), n(4.5, 1, 5, { chord: 1 }), n(4.5, 2, 7, { chord: 1 }), n(5, 1, 5, { chord: 2 }), n(5, 2, 9, { chord: 2 }), // a chord again, then a change keeping a finger
+  n(6, 3, 4, { slideTo: 6 }), n(6.3, 3, 4), // slid away from in between
+];
+markRepeats(held, [{}, {}, {}]);
+assert.deepEqual(held.map((x) => x.heldFrom), [null, 0, 0.3, null, null, null, null, null, 4, 4, 4.5, null, null, null]);
+
 // Annotations: slur back to the hammered-from note, a tie, let ring to the next note on the string, dynamics on change, barres
 const an = [
   { time: 0, string: 1, fret: 5, sustain: 0, letRing: true, dynamic: 'f' },

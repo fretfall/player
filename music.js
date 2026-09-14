@@ -46,17 +46,24 @@ export function tuningName(open) {
 // The highway draws those as beats instead of full chords: their notes get `repeat`, the chord becomes `highDensity`
 // (the format's own flag for a repeated chord). Single notes are never marked: each one is still a note to play. Timing,
 // links and pick direction don't count: alternate picking is still the same chord again.
-const UNMARKED = new Set(['time', 'sustain', 'chord', 'repeat', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
+// A spot played again by the very next strike (the same string and fret, within `gap`) is held down between the two: the
+// later note gets `heldFrom`, the time of the strike before, so its target on the board stays lit instead of flashing off
+// and on. A spot let go of in between (a mute, a slide or a bend moving off it) isn't held.
+const UNMARKED = new Set(['time', 'sustain', 'chord', 'repeat', 'heldFrom', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
 const fingering = (n) => JSON.stringify(Object.entries(n).filter(([k, v]) => !UNMARKED.has(k) && v !== null && v !== undefined && v !== false && v !== 0).sort());
 export function markRepeats(notes, chords, gap = 1) {
   let before = null;
   for (let i = 0, j; i < notes.length; i = j) {
     for (j = i + 1; j < notes.length && notes[j].time - notes[i].time < 0.005; j++);
     const group = notes.slice(i, j), shape = group.map(fingering).sort().join('|');
-    const chord = group[0].chord ?? null, repeat = chord !== null && !!before && before.shape === shape && group[0].time - before.time <= gap;
-    for (const n of group) n.repeat = repeat;
+    const chord = group[0].chord ?? null, soon = !!before && group[0].time - before.time <= gap, repeat = chord !== null && soon && before.shape === shape;
+    for (const n of group) {
+      n.repeat = repeat;
+      const kept = soon && !n.mute && before.group.some((b) => b.string === n.string && b.fret === n.fret && !b.mute && !b.bend && !b.bendCurve && (b.slideTo ?? b.slideUnpitchTo ?? null) === null);
+      n.heldFrom = kept ? before.time : null;
+    }
     if (repeat) chords[chord].highDensity = true;
-    before = { shape, time: group[0].time };
+    before = { shape, time: group[0].time, group };
   }
 }
 
