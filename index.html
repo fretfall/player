@@ -518,7 +518,7 @@ const LEGEND = [
     ['Fret number', 'The fret to play, on the floor under the note.', svg(`${gem(20, 3, 16, 7)}<path d="M28 10v8" class="l1" stroke-width="1.5"/><text x="28" y="25" class="f1" font-size="11">7</text>`)],
     ['Open string', 'Play the string without fretting it. The bar spans your hand position; held, it becomes a lane that wide.', svg(`<rect x="6" y="10" width="44" height="12" class="f3" opacity=".15"/><rect x="6" y="8" width="44" height="4" class="f3"/><path d="M7 10v14M49 10v14" class="l3" stroke-width="2.5"/><path d="M6 25h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Played again', 'The same note or chord as just before: play it again on this beat. Its marks show greyed out, or not at all (Settings).', svg(`<rect x="16" y="10" width="24" height="12" class="l1" stroke-width="1.6"/><path d="M20 12l16 8M20 20l16-8" class="lm" stroke-width="1.6"/>`)],
-    ['Chord', 'Play these notes together. The white line marks the beat; the chord name shows when it changes.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
+    ['Chord', 'Play these notes together. The white line marks the beat; the chord name shows when it changes. Held or played again, its edges run on as rails until the shape changes.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/>${gem(14, 16, 12, 5, 0)}${gem(30, 10, 12, 5, 1)}<path d="M6 26h44" class="lw" stroke-width="2" opacity=".6"/>`)],
     ['Chord name', 'The chord you are playing, big, to the right of your hand. It shows up a second before the chord.', svg(word('G5', 16))],
     ['Barre', 'Lay one finger across several strings at this fret. ½B is a half barre.', svg(`<rect x="6" y="4" width="44" height="22" class="lt" stroke-width="1" opacity=".5"/><path d="M24 8v16" class="lt" stroke-width="4" opacity=".8"/><text x="36" y="10" class="ft" font-size="9">B</text>`)],
     ['Hand position', 'Where your index finger sits. A new band with a number means move your hand there.', svg(`<rect x="16" y="2" width="34" height="28" class="fl" opacity=".2"/><path d="M16 2v28M50 2v28" class="ll" stroke-width="1.5"/><text x="9" y="17" class="fl" font-size="10">5</text>`)],
@@ -552,8 +552,8 @@ const LEGEND = [
     ['Sustain', 'Keep the note ringing for as long as its trail.', svg(`<path d="M24 20L26 2h4l2 18z" class="f1" opacity=".5"/>${gem(16, 18, 24, 10)}`)],
     ['Let ring', 'Let the note ring on over the notes after it.', svg(`<path d="M28 18V2" class="l1" stroke-width="2" stroke-dasharray="3 3"/>${gem(16, 18, 24, 10)}`)],
     ['Vibrato', 'Shake the note. A taller wave means a wider vibrato.', svg(`${gem(16, 19, 24, 9)}<path d="M13 9q2.5-4 5 0t5 0 5 0 5 0 5 0 5 0" class="lt" stroke-width="1.6"/>`)],
-    ['Bend', 'Bend the string up by the amount shown: ½ is one fret higher, full is two.', svg(`${gem(6, 19, 20, 9)}<path d="M16 17V5M12 9l4-4 4 4" class="lt" stroke-width="1.6"/><text x="38" y="9" class="ft" font-size="9">full</text>`)],
-    ['Bend and release', 'Bend up, then let the string back down. The trail follows the shape.', svg(`${gem(6, 19, 20, 9)}<path d="M14 17V5M10 9l4-4 4 4M22 5v12M18 13l4 4 4-4" class="lt" stroke-width="1.5"/><text x="40" y="9" class="ft" font-size="9">full</text>`)],
+    ['Bend', 'Bend the string up by the amount shown: ½ is one fret higher, full is two. The chevrons on the note point up; its trail rises where the bend happens; on the fretboard the string bends up while you hold it.', svg(`${gem(6, 21, 20, 8)}<path d="M10 16l6-4 6 4M10 11l6-4 6 4" class="lt" stroke-width="1.6"/><text x="40" y="11" class="ft" font-size="9">full</text>`)],
+    ['Bend and release', 'Bend up, then let the string back down: chevrons up, then down, and the trail rises and comes back down.', svg(`${gem(4, 21, 20, 8)}<path d="M8 16l6-4 6 4M24 8l6 4 6-4" class="lt" stroke-width="1.6"/><text x="46" y="11" class="ft" font-size="9">full</text>`)],
     ['Pre-bend', 'Bend the string before you pick it, then play.', svg(word('pre ½', 12))],
     ['Whammy bar', 'Push or pull the whammy bar; the trail dips and rises with it.', svg(`<text x="28" y="8" class="ft" font-size="9">w/bar</text><path d="M6 20q11 12 22 0t22 0" class="l1" stroke-width="2"/>`)],
   ]],
@@ -767,7 +767,7 @@ function songFromScore(score, cache) {
           if (tied) { tied.sustain = t1 - tied.time; continue; }
           const origin = nt.hammerPullOrigin, harmonic = HARMONICS[nt.harmonicType];
           const note = {
-            time: t0, sustain: nt.slideTarget || t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord, midi: nt.realValue,
+            time: t0, sustain: nt.slideTarget || nt.hasBend || t1 - t0 >= 0.4 ? t1 - t0 : 0, string: nt.string - 1, fret: nt.fret, chord, midi: nt.realValue,
             hammerOn: !!origin && nt.fret > origin.fret, pullOff: !!origin && nt.fret < origin.fret,
             slideTo: nt.slideTarget ? nt.slideTarget.fret : null, slideUnpitchTo: null,
             slideIn: [null, 'below', 'above'][nt.slideInType] ?? null, slideOut: [null, null, null, 'up', 'down', 'down', 'up'][nt.slideOutType] ?? null,

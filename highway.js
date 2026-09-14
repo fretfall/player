@@ -11,10 +11,22 @@ const GAP = 0.34, LAST_FRET = 24, PRESS_AHEAD = 1.2; // string spacing; how earl
 // Fret widths from the board where arriving notes and frames light up: a distance, not a time, so everything lights
 // at the same place on the highway whatever the note speed
 const NEAR = 5;
+const BEND_LIFT = 1, BEND_RISE = 1.6; // string gaps a bent string rises on the fretboard, and its trail on the highway, per step bent
+const BEND_EASE = 2; // fret widths before the board over which the trail's rise settles to the string's
+const RAIL = 0.19; // half the width of a bent note's trail
+const BEND_SPREAD = 2.5; // fret widths either side of a bent note that its string curves up over
 const FRAME_AHEAD = 3, MIN_SPAN = 8;
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
 
+const shade = (color, amount) => { // a hex colour mixed toward white (amount > 0) or black (amount < 0)
+  if (!color.startsWith('#')) return color;
+  const mix = (i) => {
+    const v = parseInt(color.slice(i, i + 2), 16);
+    return Math.round(amount > 0 ? v + (255 - v) * amount : v * (1 + amount)).toString(16).padStart(2, '0');
+  };
+  return `#${mix(1)}${mix(3)}${mix(5)}`;
+};
 const alpha = (color, a) =>
   color.startsWith('#') ? `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${a})` : color;
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -31,15 +43,40 @@ const anchorAt = (anchors, time) => {
   return found;
 };
 
-// Steps at share p of a [share, steps] curve (a bend or the whammy bar over the note), straight between points
-const shapeAt = (points, p) => {
-  if (!points?.length) return 0;
-  const i = points.findIndex(([q]) => q >= p);
-  if (i <= 0) return points[i < 0 ? points.length - 1 : 0][1];
-  const [[q0, s0], [q1, s1]] = [points[i - 1], points[i]];
-  return s0 + (s1 - s0) * (q1 > q0 ? (p - q0) / (q1 - q0) : 1);
-};
-const pitchAt = (note, p) => (note.bendCurve ? shapeAt(note.bendCurve, p) : note.bend ? Math.min(1, p * 4) * note.bend : 0) + shapeAt(note.whammy, p);
+const smooth = (u) => u * u * (3 - 2 * u);
+
+// Bends and the whammy bar. Charts store a curve of [share of the note, steps]; Guitar Pro often spreads a plain bend
+// evenly over the whole note, but it is played up quickly and then held, as it is drawn here. So on the highway each
+// change takes at most BEND_RAMP seconds, eased into an S, and then holds: from where it starts, or, when a curve only
+// says when a later point is reached (the chart's bend values), up to that point.
+const BEND_RAMP = 0.3;
+const timedCurves = new WeakMap();
+function timedCurve(note, key) { // → [seconds, steps, reached by then] points, or null
+  let cache = timedCurves.get(note);
+  if (!cache) timedCurves.set(note, (cache = {}));
+  if (!(key in cache)) {
+    const length = Math.max(note.sustain, 0.05), given = note[key] ?? (key === 'bendCurve' && note.bend ? [[0, 0], [0.25, note.bend]] : null);
+    const points = given?.map(([share, steps]) => [share * length, steps, false]) ?? [];
+    if (points.length && points[0][0] > 0.001) { // starts unbent, reaching the first point by its time
+      points[0][2] = true;
+      points.unshift([0, 0, false]);
+    }
+    cache[key] = points.length ? points : null;
+  }
+  return cache[key];
+}
+function curveAt(points, sec) {
+  if (!points) return 0;
+  let value = points[0][1];
+  for (let i = 1; i < points.length && sec > points[i - 1][0]; i++) {
+    const [[t0, v0], [t1, v1, reached]] = [points[i - 1], points[i]], ramp = Math.min(t1 - t0, BEND_RAMP) || 1e-6;
+    value = v0 + (v1 - v0) * smooth(Math.min(1, Math.max(0, (sec - (reached ? t1 - ramp : t0)) / ramp)));
+  }
+  return value;
+}
+export const bendAt = (note, sec) => curveAt(timedCurve(note, 'bendCurve'), sec); // steps bent, sec seconds after the note starts
+const pitchAt = (note, sec) => bendAt(note, sec) + curveAt(timedCurve(note, 'whammy'), sec); // bend and whammy bar together
+const bendPeak = (note) => Math.max(note.bend || 0, ...(note.bendCurve ?? []).map(([, v]) => v));
 // The chords named big beside the hand: runs of the same chord (named again, or restruck as a repeat) count as one
 // span, from the first strike to when its last note stops, so the name stays put through a riff
 function chordSpans(arr) {
@@ -52,6 +89,21 @@ function chordSpans(arr) {
     else if (c.name) spans.push({ name: c.name, time: c.time, end });
   }
   return (arr.chordSpans = spans);
+}
+// Chord shapes worth rails on the highway: a chord and the repeats that follow it, from the first strike until the last
+// one stops (or the next different chord starts), when that lasts long enough to see
+function chordRails(arr) {
+  if (arr.chordRails) return arr.chordRails;
+  const rails = [], ends = (c) => Math.max(c.time + 0.15, ...c.notes.map((j) => arr.notes[j].time + arr.notes[j].sustain));
+  for (let i = 0; i < arr.chords.length; i++) {
+    const first = arr.chords[i];
+    if (first.highDensity) continue;
+    let end = ends(first), j = i + 1;
+    for (; arr.chords[j]?.highDensity && arr.chords[j].time - end < 1; j++) end = Math.max(end, ends(arr.chords[j]));
+    end = Math.min(end, arr.chords[j]?.time ?? Infinity);
+    if (end - first.time > 0.2) rails.push({ time: first.time, end, frets: first.notes.map((n) => arr.notes[n].fret) });
+  }
+  return (arr.chordRails = rails);
 }
 const TEXT_MARKS = { artificial: 'AH', pinch: 'PH', tap: 'TH', semi: 'SH', feedback: 'FH' };
 
@@ -99,6 +151,24 @@ export function moveCamera(cam, anchors, now, clock) {
   cam.left = ease(cam.left, here.fret - 1, ms, 90);
   cam.right = ease(cam.right, here.fret - 1 + here.width, ms, 90);
   return here;
+}
+
+// A chevron with its point at (x, y), pointing up (dir -1) or down (dir 1): a bar in its colour on a dark edge, lit along
+// its middle, so it reads on any background
+function chevron(g, x, y, w, h, dir, color, ink) {
+  g.beginPath();
+  g.moveTo(x - w, y - dir * h);
+  g.lineTo(x, y);
+  g.lineTo(x + w, y - dir * h);
+  g.lineWidth = Math.max(3, h * 1.15);
+  g.strokeStyle = ink;
+  g.stroke();
+  g.lineWidth = Math.max(1.5, h * 0.65);
+  g.strokeStyle = color;
+  g.stroke();
+  g.lineWidth = Math.max(0.6, h * 0.2);
+  g.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  g.stroke();
 }
 
 function line2(g, x1, y1, x2, y2) {
@@ -239,7 +309,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Bar markings on the floor at the left of the view, where they happen (meter, key, tempo, feel, repeats, endings,
   // jumps, ottava, free text like "pizz."), and crescendo and diminuendo hairpins beside them
-  const markX = cam.center - cam.span / 2 + 0.4, moments = new Map();
+  const moments = new Map();
   for (const m of arr.markers ?? []) { // everything at the same moment goes on one line, so nothing overlaps
     const dt = m.time - now;
     if (dt < 0 || dt > LOOK) continue;
@@ -247,11 +317,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (!moments.has(key)) moments.set(key, { dt, texts: [] });
     if (!moments.get(key).texts.includes(m.text)) moments.get(key).texts.push(m.text);
   }
-  for (const { dt, texts } of moments.values()) { // right-aligned beside the hand position, past its fret number
-    const z = Z(dt), [px, py, k] = P(anchorAt(anchors, now + dt).fret - 2.4, floor, z), size = 0.3 * Math.sqrt(k * k0), text = texts.join('  ·  ');
-    g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
+  const markRight = W * 0.4; // bar markings and hairpins keep to one column left of the highway, wherever the hand is
+  for (const { dt, texts } of moments.values()) { // right-aligned in that column, at the depth of their bar
+    const [, py, k] = P(0, floor, Z(dt)), size = 0.3 * Math.sqrt(k * k0), text = texts.join('  ·  ');
     g.font = `700 ${size}px ${t.num}`;
-    const right = Math.max(px, 24 + g.measureText(text).width); // kept on screen
+    g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
+    const right = Math.max(markRight, 24 + g.measureText(text).width); // kept on screen
     g.textAlign = 'right';
     g.lineWidth = size * 0.2;
     g.strokeStyle = alpha(t.ink, 0.9);
@@ -264,9 +335,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
   for (const h of arr.hairpins ?? []) {
     if (h.endTime < now || h.time > now + LOOK) continue;
     const from = (h.time - now) * SPEED, to = (h.endTime - now) * SPEED, z0 = Math.max(0, from), z1 = Math.min(far, to);
-    const spread = (zz) => (h.kind === 'cresc' ? (zz - from) / (to - from || 1) : 1 - (zz - from) / (to - from || 1)) * 0.2; // half the opening
+    const open = (zz) => (h.kind === 'cresc' ? (zz - from) / (to - from || 1) : 1 - (zz - from) / (to - from || 1)) * 0.2; // half the opening
+    const [, y0, s0] = P(0, floor, z0), [, y1, s1] = P(0, floor, z1), hx = markRight - 0.6 * Math.sqrt(s0 * k0);
     g.globalAlpha = 0.8;
-    for (const side of [-1, 1]) line3([markX + 1.4 + side * spread(z0), floor, z0], [markX + 1.4 + side * spread(z1), floor, z1]);
+    for (const side of [-1, 1]) line2(g, hx + side * open(z0) * Math.sqrt(s0 * k0), y0, hx + side * open(z1) * Math.sqrt(s1 * k0), y1);
   }
   g.globalAlpha = 1;
 
@@ -299,6 +371,29 @@ export function drawHighway(canvas, arr, now, t, cam) {
     return { a, open, x: open ? a.fret - 1 + a.width / 2 : note.fret - 0.5, y: ys(note.string) };
   };
 
+  // A bend raises what shows the note: its trail on the highway, and its string and target on the fretboard, all by the
+  // same amount, so they meet at the board
+  const liftAt = (note, sec) => pitchAt(note, sec) * gap * BEND_LIFT; // sec seconds into the note
+  const noteLift = (note) => { // while it sounds
+    const sec = now - note.time;
+    return sec < 0 || note.fret === 0 || !(bendPeak(note) > 0) ? 0 : liftAt(note, Math.min(sec, Math.max(note.sustain, 0.15)));
+  };
+
+  // Strings being bent right now: pushed up in a smooth bump around the fretted note+
+  const bending = new Map();
+  for (const note of visible) {
+    const dt = note.time - now, held = Math.max(note.sustain, 0.15);
+    if (dt > 0 || -dt > held || note.fret === 0 || !(bendPeak(note) > 0)) continue;
+    bending.set(note.string, { note, x: note.fret - 0.5, dy: noteLift(note) });
+  }
+  const stringPath = (s, lift = 0) => { // along the string at the board, bent where it is being bent
+    const b = bending.get(s), y0 = ys(s) + lift;
+    if (!b) return path([[-0.6, y0, 0], [LAST_FRET + 0.6, y0, 0]], false);
+    const bump = (fx) => [fx, y0 + b.dy * smooth(Math.max(0, 1 - Math.abs(fx - b.x) / BEND_SPREAD)), 0];
+    path([[-0.6, y0, 0], ...Array.from({ length: 25 }, (_, j) => bump(b.x - BEND_SPREAD + (j * BEND_SPREAD) / 12)), [LAST_FRET + 0.6, y0, 0]], false);
+  };
+  const boardY = (note) => ys(note.string) + noteLift(note); // a bent note rides with its string
+
   // The strike line: metal fret wires, the nut, the hand position's posts, and the strings
   const [, wireTop] = P(focus[0], boardHi, 0), [, wireBottom] = P(focus[0], boardLo, 0);
   const metal = g.createLinearGradient(0, wireTop, 0, wireBottom); // lit from above, like fret wire
@@ -320,22 +415,25 @@ export function drawHighway(canvas, arr, now, t, cam) {
     glow(t.glow, color(s), 3);
     g.strokeStyle = alpha(color(s), 0.9);
     g.lineWidth = width;
-    line3([-0.6, ys(s), 0], [LAST_FRET + 0.6, ys(s), 0]);
+    stringPath(s);
+    g.stroke();
     glow(false);
     g.strokeStyle = 'rgba(255, 255, 255, 0.25)'; // the light catching the string
     g.lineWidth = Math.max(0.6, width * 0.3);
-    line3([-0.6, ys(s) + 0.012, 0], [LAST_FRET + 0.6, ys(s) + 0.012, 0]);
+    stringPath(s, 0.012);
+    g.stroke();
   }
 
   // Sounding notes light their whole string, with a flash where they landed
   for (const note of visible) {
     const dt = note.time - now;
     if (dt > 0 || -dt > Math.max(note.sustain, 0.15) || note.mute) continue;
-    const c = color(note.string), y = ys(note.string);
+    const c = color(note.string), y = boardY(note);
     glow(true, c, 10);
     g.strokeStyle = c;
     g.lineWidth = t.strW + 3;
-    line3([-0.6, y, 0], [LAST_FRET + 0.6, y, 0]);
+    stringPath(note.string);
+    g.stroke();
     glow(false);
     if (-dt < 0.2) {
       const [px, py, k] = P(spot(note).x, y, 0);
@@ -380,7 +478,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (open) continue;
     g.strokeStyle = alpha(note.missed ? '#5a606b' : color(note.string), note.repeat || chord?.highDensity ? 0.35 : 0.75); // fainter under a repeat
     g.lineWidth = 1.5;
-    line3([x, y - 0.42 * gap, z], [x, floor, z]);
+    line3([x, Math.min(y, boardY(note)) - 0.42 * gap, z], [x, floor, z]);
   }
   g.globalAlpha = 1;
 
@@ -396,6 +494,19 @@ export function drawHighway(canvas, arr, now, t, cam) {
     path(points, false);
     g.stroke();
   };
+  // Chord shapes being held or played again: two glowing rails on the floor along the frame's edges
+  for (const rail of chordRails(arr)) {
+    if (rail.end <= now || rail.time >= now + LOOK) continue;
+    const [l, r] = frameAt(rail.frets, rail.time), dt = rail.time - now, z0 = Z(Math.max(dt, 0)), z1 = Z(Math.min(rail.end - now, LOOK));
+    g.globalAlpha = Math.min(1, (LOOK - Math.max(dt, 0)) / 0.4);
+    glow(t.glow, t.anchorLane, 10);
+    g.strokeStyle = fade(t.anchorLane, 1, 0.2);
+    g.lineWidth = 3.5;
+    for (const side of [l, r]) line3([side, floor, z0], [side, floor, z1]);
+    glow(false);
+  }
+  g.globalAlpha = 1;
+
   for (const [i, note] of visible.entries()) {
     const dt = note.time - now, chord = chordOf(note), slide = note.slideTo ?? note.slideUnpitchTo ?? null;
     const { a, open, x, y } = spot(note), c = note.missed ? '#5a606b' : color(note.string), z = Z(dt);
@@ -424,17 +535,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const tail = slide === null ? note.sustain : Math.max(note.sustain, 0.25);
     const moves = slide !== null || note.bend || note.bendCurve || note.whammy;
     if (tail <= 0.2 || dt + tail <= 0 || (chord && !moves)) continue; // chords sustain without trails: their frames already show the beats
-    const d0 = Math.max(dt, 0), d1 = Math.min(dt + tail, LOOK), steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
-    const along = (d) => {
-      const p = Math.min(1, Math.max(0, (d - dt) / tail)), zz = Z(d), glide = p * p * (3 - 2 * p);
-      const wave = note.vibrato ? Math.sin((zz / 1.6) * Math.PI * 2) * (note.vibratoWide ? 0.13 : 0.07) : 0; // a steady wavelength along the highway
-      const jitter = note.tremolo ? (Math.floor(zz / 0.3) % 2 ? 0.05 : -0.05) : 0;
-      const pitch = pitchAt(note, p); // a bend swings the trail up the neck as the pitch rises and back as it falls
-      return [x + (slide === null ? 0 : (slide - 0.5 - x) * glide) + wave + jitter + pitch * 0.6, y + pitch * gap * 0.4, zz];
-    };
-    const spine = Array.from({ length: steps + 1 }, (_, j) => along(d0 + ((d1 - d0) * j) / steps));
-    // Trails ride at string height, so the camera shows them past the floor line of whatever follows; cut them off at
-    // the line of the next chord, the next note on the same string, or any later note lying across the trail
+    // A trail ends where the next note in its way starts: the next chord, the next note on its string (a slide runs into
+    // the note it slides to), or a later note lying across it. Cut there in time, so the trail keeps its shape as it comes
     let next = null;
     for (let j = i + 1; j < visible.length && visible[j].time <= note.time + tail + 0.02; j++) {
       const later = visible[j];
@@ -445,13 +547,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
         break;
       }
     }
-    g.save();
-    if (next) {
-      const [, lineY] = P(x, floor, Z(next.time - now));
-      g.beginPath();
-      g.rect(-W, lineY, 3 * W, VH);
-      g.clip();
-    }
+    const d0 = Math.max(dt, 0), d1 = Math.min(dt + tail, LOOK, next ? next.time - now : Infinity);
+    if (d1 <= d0) continue;
+    const steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
+    const along = (d) => {
+      const sec = d - dt, p = Math.min(1, Math.max(0, sec / tail)), zz = Z(d), glide = p * p * (3 - 2 * p);
+      const railed = note.bend || note.bendCurve || note.whammy; // a rail stays straight: its vibrato shows in the mark above the note
+      const wave = note.vibrato && !railed ? Math.sin((zz / 1.6) * Math.PI * 2) * (note.vibratoWide ? 0.13 : 0.07) : 0; // a steady wavelength along the highway
+      const jitter = note.tremolo ? (Math.floor(zz / 0.3) % 2 ? 0.05 : -0.05) : 0;
+      // A bend raises the trail in a smooth S where the pitch rises, holds it up and lowers it again for a release; it rises
+      // a little more than the string on the fretboard, so it reads from behind, and settles to the string at the board
+      const rise = BEND_LIFT + (BEND_RISE - BEND_LIFT) * smooth(Math.min(1, zz / BEND_EASE));
+      return [x + (slide === null ? 0 : (slide - 0.5 - x) * glide) + wave + jitter, y + (liftAt(note, sec) * rise) / BEND_LIFT, zz];
+    };
+    const spine = Array.from({ length: steps + 1 }, (_, j) => along(d0 + ((d1 - d0) * j) / steps));
     if (open && !chord) { // an open string sounds as a lane as wide as the hand position, edged in its colour
       g.fillStyle = fade(c, note.letRing ? 0.14 : 0.26, 0.03);
       path([...spine.map(([px, py, pz]) => [px - hw, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + hw, py, pz])]);
@@ -466,6 +575,22 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
       g.setLineDash([]);
       glow(false);
+    } else if (note.bend || note.bendCurve || note.whammy) { // a bend: a solid band, raised where the string is bent
+      const band = (half) => path([...spine.map(([px, py, pz]) => [px - half, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + half, py, pz])]);
+      band(RAIL);
+      g.fillStyle = fade(c, 1, 0.6);
+      g.fill();
+      band(RAIL * 0.35); // a slightly darker stripe along the middle
+      g.fillStyle = fade(shade(c, -0.22), 1, 0.55);
+      g.fill();
+      glow(t.glow, c, 8);
+      g.strokeStyle = fade(shade(c, 0.6), 1, 0.5); // bright edges
+      g.lineWidth = 2;
+      for (const side of [-RAIL, RAIL]) {
+        path(spine.map(([px, py, pz]) => [px + side, py, pz]), false);
+        g.stroke();
+      }
+      glow(false);
     } else {
       glow(t.glow && !note.letRing, c, 6);
       g.fillStyle = fade(c, note.letRing ? 0.3 : 0.6, 0.06);
@@ -473,7 +598,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.fill();
       glow(false);
     }
-    if (note.letRing || slide !== null || note.bend || note.whammy || note.vibrato || note.tremolo) { // a bright spine traces the shape, dashed while ringing
+    const bent = note.bend || note.bendCurve || note.whammy;
+    if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
       g.strokeStyle = fade(note.letRing ? c : '#ffffff', 0.7, 0.1);
       g.lineWidth = note.letRing ? 2 : 1.5;
       g.setLineDash(note.letRing ? [7, 6] : []);
@@ -481,7 +607,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.stroke();
       g.setLineDash([]);
     }
-    if (slide !== null) { // where the slide ends
+    if (slide !== null && d1 >= Math.min(dt + tail, LOOK) - 0.001) { // where the slide ends, unless the trail was cut short
       const [ex, ey, ez] = along(dt + tail);
       g.strokeStyle = c;
       g.lineWidth = 2;
@@ -490,14 +616,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.stroke();
       g.setLineDash([]);
     }
-    g.restore();
   }
 
   // Notes, far to near: gems riding at their string's height
   const boxed = new Set();
   for (let i = visible.length - 1; i >= 0; i--) {
     const note = visible[i], dt = note.time - now, z = Z(dt);
-    const chord = chordOf(note), { a, open, x, y } = spot(note);
+    const chord = chordOf(note), { a, open, x } = spot(note), y = boardY(note); // a note being bent rides up with its string
     const muted = note.mute || chord?.fretHandMute, palm = note.palmMute || chord?.palmMute;
     const c = note.missed ? '#5a606b' : color(note.string);
     const hw = (open ? (a.width - 0.2) / 2 : 0.34) * (note.grace ? 0.6 : 1), hh = (open ? 0.12 : 0.42) * gap * (note.grace ? 0.6 : 1); // grace notes are small
@@ -712,6 +837,24 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.fillText(word, cx, above);
       above -= (size + 0.04) * k;
     };
+    const peak = bendPeak(note);
+    if (peak > 0) { // bend: chevrons in the note's colour right on top of it, up (and down again for a release)
+      const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < peak;
+      const count = Math.min(3, Math.max(1, Math.round(peak * 2))), w = hw * k * 0.6, h = w * 0.5, step = h * 1.25, edge = alpha(t.ink, 0.9);
+      let top = cy - hh * k - 0.04 * k;
+      const stack = (dir) => {
+        for (let j = 0; j < count; j++) chevron(g, cx, top - j * step - (dir > 0 ? 0 : h), w, h, dir, repeated ? ink : c, edge);
+        top -= count * step + 0.08 * k;
+      };
+      if (!pre || !release) stack(-1); // a pre-bend that is let down only needs the way down
+      if (release) stack(1);
+      g.font = `700 ${0.22 * k}px ${t.num}`;
+      g.textAlign = 'left';
+      g.fillStyle = ink;
+      g.fillText(`${pre ? 'pre ' : ''}${bendLabel(peak)}`, cx + w + 0.08 * k, (cy - hh * k + top) / 2);
+      g.textAlign = 'center';
+      above = Math.min(above, top - 0.1 * k);
+    }
     if (note.staccato) { // staccato: a dot
       g.beginPath();
       g.arc(cx, above + 0.04 * k, Math.max(1.5, 0.045 * k), 0, Math.PI * 2);
@@ -764,22 +907,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       line2(g, x1, yt, x1, yt + 0.1 * k);
       above -= 0.3 * k;
     }
-    const bendPeak = Math.max(note.bend || 0, ...(note.bendCurve ?? []).map(([, v]) => v));
-    if (bendPeak > 0) { // bend: an arrow up, then back down for a release; "pre" when it is bent before it is played
-      const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < bendPeak;
-      const base = above + 0.12 * k, tip = base - 0.36 * k, rx = cx + 0.14 * k;
-      line2(g, cx, base, cx, tip);
-      line2(g, cx - 0.08 * k, tip + 0.09 * k, cx, tip);
-      line2(g, cx + 0.08 * k, tip + 0.09 * k, cx, tip);
-      if (release) {
-        line2(g, rx, tip, rx, base);
-        line2(g, rx - 0.06 * k, base - 0.08 * k, rx, base);
-        line2(g, rx + 0.06 * k, base - 0.08 * k, rx, base);
-      }
-      g.font = `600 ${0.22 * k}px ${t.num}`;
-      g.textAlign = 'left';
-      g.fillText(`${pre ? 'pre ' : ''}${bendLabel(bendPeak)}`, cx + (release ? 0.24 : 0.12) * k, tip + 0.05 * k);
-    }
     g.globalAlpha = 1;
   }
 
@@ -798,9 +925,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // Where to press, on top of everything on the board: targets fill in as notes approach, finger number and all,
   // and light up while they sound
   for (const note of visible) {
-    const dt = note.time - now, chord = chordOf(note), pressed = dt <= 0.06;
+    const dt = note.time - now, chord = chordOf(note), pressed = dt <= 0.06, bent = bending.get(note.string);
     if (note.mute || dt > PRESS_AHEAD || dt < -Math.max(note.sustain, 0.12) || (chord?.highDensity && !pressed)) continue;
-    const { a, open, x, y } = spot(note), c = note.missed ? '#5a606b' : color(note.string);
+    if (bent && bent.note !== note && !pressed) continue; // the next note on a string being bent shows once it is let down
+    const { a, open, x } = spot(note), y = boardY(note), c = note.missed ? '#5a606b' : color(note.string);
     const hw = (open ? (a.width - 0.2) / 2 : 0.32) + 2 / k0, hh = (open ? 0.1 : 0.36) * gap + 2 / k0; // 2px bigger than the gem shape
     gem(x, y, 0, hw, hh);
     if (pressed) {
@@ -823,6 +951,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     const finger = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
     if (!open && finger !== null) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, pressed ? t.ink : t.text, 800);
+    if (!open && bendPeak(note) > 0) { // a bend: a chevron on top of its target, down for a pre-bend let down
+      const [px, py] = P(x, y + hh, 0), letDown = note.bendCurve?.[0]?.[1] > 0 && note.bendCurve.at(-1)[1] < bendPeak(note);
+      chevron(g, px, py - (letDown ? 0.14 : 0.05) * k0, 0.17 * k0, 0.085 * k0, letDown ? 1 : -1, '#ffffff', alpha(t.ink, 0.9));
+    }
     g.globalAlpha = 1;
   }
 

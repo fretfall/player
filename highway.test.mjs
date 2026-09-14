@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { moveCamera } from './highway.js';
+import { moveCamera, bendAt } from './highway.js';
 
 const run = (anchors, until, snapshotsAt) => {
   const cam = {}, seen = {}, targets = new Set();
@@ -32,5 +32,15 @@ moveCamera(glide, shift, 6.9, 0);
 const start = glide.center;
 for (let ms = 16; ms <= 64; ms += 16) moveCamera(glide, shift, 6.9 + ms / 1000 + 0.1, ms);
 assert.ok(Math.abs(glide.center - start) < 0.2, 'no lurch when the camera starts to move');
+
+// Bends on the highway: up within 0.3 s and held, back down where a release starts; the chart's late points are reached on time
+const near = (a, b) => Math.abs(a - b) < 0.01;
+const even = { sustain: 0.6, bendCurve: [[0, 0], [1, 1]] }; // Guitar Pro's "b (0 4)": spread over the note, drawn up quickly
+assert.ok(near(bendAt(even, 0), 0) && near(bendAt(even, 0.15), 0.5) && near(bendAt(even, 0.3), 1) && near(bendAt(even, 0.6), 1));
+const release = { sustain: 0.9, bendCurve: [[0, 0], [1 / 3, 1], [2 / 3, 1], [1, 0]] };
+assert.ok(near(bendAt(release, 0.3), 1) && near(bendAt(release, 0.55), 1) && bendAt(release, 0.65) < 1 && near(bendAt(release, 0.9), 0));
+const late = { sustain: 1, bendCurve: [[0.5, 1]] }; // only when the peak is reached
+assert.ok(near(bendAt(late, 0.2), 0) && near(bendAt(late, 0.35), 0.5) && near(bendAt(late, 0.5), 1));
+assert.ok(near(bendAt({ sustain: 1, bendCurve: [[0, 1], [1, 1]] }, 0), 1) && near(bendAt({ sustain: 1, bend: 0.5 }, 0.3), 0.5)); // pre-bend; no curve
 
 console.log('ok');
