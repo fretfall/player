@@ -20,6 +20,57 @@ const FRAME_AHEAD = 3, MIN_SPAN = 8;
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
 
+// Headstocks in front of the nut, after the classic types rather than any maker's outline. Measured in half neck widths
+// from the middle of the nut: u runs away from the nut, v across toward the bass strings (±1: the neck's edges). The
+// outline runs from the nut's bass corner round the tip to its treble corner (a point given twice is a corner). Tuner
+// posts run from `from` to `to` at `v`, lowest string nearest the nut: all on the bass side, or split, the treble strings
+// mirrored on the other side. Their keys stick out past the edge at `key`; a classical headstock has slots
+export const HEADSTOCKS = {
+  inline: {
+    label: 'Six in line',
+    outline: [[0, 1], [0.5, 1.12], [1.4, 1.22], [2.4, 1.3], [3.05, 1.36], [3.45, 1.22], [3.62, 0.82], [3.5, 0.38], [3.2, 0.16], [2.7, 0.12], [2, -0.05], [1.3, -0.38], [0.7, -0.78], [0.25, -1.02], [0, -1]],
+    tuners: { from: 0.75, to: 3.05, v: 0.9, key: 1.28 },
+  },
+  split: {
+    label: 'Three a side',
+    outline: [[0, 1], [0.5, 1.18], [1.4, 1.33], [2.35, 1.42], [2.8, 1.4], [3.02, 1.15], [3.12, 0.66], [2.9, 0.16], [2.8, 0], [2.8, 0], [2.9, -0.16], [3.12, -0.66], [3.02, -1.15], [2.8, -1.4], [2.35, -1.42], [1.4, -1.33], [0.5, -1.18], [0, -1]],
+    tuners: { from: 0.8, to: 2.35, v: 0.98, key: 1.36, split: true },
+  },
+  pointed: {
+    label: 'Pointed',
+    outline: [[0, 1], [0.6, 1.12], [1.6, 1.22], [2.6, 1.3], [3.2, 1.33], [3.55, 1.22], [3.8, 0.85], [4.3, -0.5], [4.3, -0.5], [3.4, -0.02], [2.6, 0.12], [1.7, -0.1], [0.9, -0.6], [0.35, -0.95], [0, -1]],
+    tuners: { from: 0.75, to: 3.05, v: 0.92, key: 1.28 },
+  },
+  classical: {
+    label: 'Classical',
+    outline: [[0, 1.02], [1.2, 1.12], [2.5, 1.2], [2.72, 1.24], [2.95, 1], [2.86, 0.55], [3.08, 0], [2.86, -0.55], [2.95, -1], [2.72, -1.24], [2.5, -1.2], [1.2, -1.12], [0, -1.02]],
+    slots: [0.55, 2.3, 0.3, 0.68], // u from, to, v from, to (and mirrored)
+    tuners: { from: 0.8, to: 2.05, v: 0.49, key: 1.14, split: true },
+  },
+  none: { label: 'None' },
+};
+export const tunerPosts = ({ tuners: { from, to, v, split } }, n) => { // [u, v] of each string's post, lowest string first
+  const side = split ? Math.ceil(n / 2) : n, at = (i) => from + ((to - from) * i) / Math.max(1, side - 1);
+  return Array.from({ length: n }, (_, s) => (s < side ? [at(s), v] : [at(n - 1 - s), -v]));
+};
+export const slotOutline = ([u0, u1, v0, v1]) => { // a slot with rounded ends
+  const vm = (v0 + v1) / 2;
+  return spline([[u0 + 0.12, v1], [u1 - 0.12, v1], [u1, vm], [u1 - 0.12, v0], [u0 + 0.12, v0], [u0, vm], [u0 + 0.12, v1]], 4);
+};
+// Points along a smooth curve through the given ones (Catmull-Rom), `steps` of them to each; a point given twice is a
+// corner the curve comes into and leaves straight
+export const spline = (points, steps = 8) => [
+  ...points.slice(0, -1).flatMap((p1, i) => {
+    const p0 = points[Math.max(0, i - 1)], p2 = points[i + 1], p3 = points[Math.min(points.length - 1, i + 2)];
+    if (p1[0] === p2[0] && p1[1] === p2[1]) return [p1];
+    return Array.from({ length: steps }, (_, j) => {
+      const s = j / steps;
+      return [0, 1].map((c) => 0.5 * (2 * p1[c] + (p2[c] - p0[c]) * s + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * s * s + (3 * p1[c] - p0[c] - 3 * p2[c] + p3[c]) * s ** 3));
+    });
+  }),
+  points.at(-1),
+];
+
 const shade = (color, amount) => { // a hex colour mixed toward white (amount > 0) or black (amount < 0)
   if (!color.startsWith('#')) return color;
   const mix = (i) => {
@@ -371,6 +422,40 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.fill();
   }
 
+  // The headstock in front of the nut, in the board's colours. Kept to its shape whatever the fret width; the strings run
+  // on over it to their posts (see stringPath), and the tuners go on top of them further down
+  const head = HEADSTOCKS[t.headstock] ?? HEADSTOCKS.none, half = (boardHi - boardLo) / 2, flip = t.stringOrder === 'high' ? -1 : 1;
+  const onHead = ([u, v]) => [(-u * half) / stretch, stack / 2 + v * half * flip, 0];
+  const posts = head.tuners ? tunerPosts(head, n).map(onHead) : null;
+  const oval = ([x, y], ru, rv) => { // radii in half neck widths, in the board's plane
+    const [px, py] = P(x, y, 0), [ex] = P(x + (ru * half) / stretch, y, 0), [, ey] = P(x, y + rv * half, 0);
+    g.beginPath();
+    g.ellipse(px, py, Math.abs(ex - px), Math.abs(ey - py), 0, 0, Math.PI * 2);
+  };
+  if (head.outline) {
+    for (const [u, v] of head.tuners ? tunerPosts(head, n) : []) { // tuning keys, sticking out from under the edge
+      oval(onHead([u, Math.sign(v) * head.tuners.key]), 0.1, 0.17);
+      g.fillStyle = alpha(t.text, 0.2);
+      g.fill();
+      g.strokeStyle = alpha(t.anchorLane, 0.5);
+      g.lineWidth = 1;
+      g.stroke();
+    }
+    path(spline(head.outline).map(onHead));
+    g.fillStyle = t.board;
+    g.fill();
+    glow(t.glow, t.anchorLane, 8);
+    g.strokeStyle = alpha(t.anchorLane, 0.55);
+    g.lineWidth = Math.max(1.5, 0.03 * k0);
+    g.stroke();
+    glow(false);
+    g.fillStyle = alpha(t.ink, 0.85);
+    for (const side of head.slots ? [1, -1] : []) {
+      path(slotOutline(head.slots).map(([u, v]) => onHead([u, v * side])));
+      g.fill();
+    }
+  }
+
   const visible = [];
   for (const note of arr.notes) {
     if (note.time > now + LOOK) break;
@@ -406,11 +491,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (dt > 0 || -dt > held || note.fret === 0 || !(bendPeak(note) > 0)) continue;
     bending.set(note.string, { note, x: note.fret - 0.5, dy: noteLift(note) });
   }
-  const stringPath = (s, lift = 0) => { // along the string at the board, bent where it is being bent
-    const b = bending.get(s), y0 = ys(s) + lift;
-    if (!b) return path([[-0.6, y0, 0], [LAST_FRET + 0.6, y0, 0]], false);
+  const stringPath = (s, lift = 0) => { // along the string at the board from its tuner post, bent where it is being bent
+    const b = bending.get(s), y0 = ys(s) + lift, start = [posts ? [posts[s][0], posts[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
+    if (!b) return path([...start, [LAST_FRET + 0.6, y0, 0]], false);
     const bump = (fx) => [fx, y0 + b.dy * smooth(Math.max(0, 1 - Math.abs(fx - b.x) / BEND_SPREAD)), 0];
-    path([[-0.6, y0, 0], ...Array.from({ length: 25 }, (_, j) => bump(b.x - BEND_SPREAD + (j * BEND_SPREAD) / 12)), [LAST_FRET + 0.6, y0, 0]], false);
+    path([...start, ...Array.from({ length: 25 }, (_, j) => bump(b.x - BEND_SPREAD + (j * BEND_SPREAD) / 12)).filter(([fx]) => fx > 0), [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
   };
   const boardY = (note) => ys(note.string) + noteLift(note); // a bent note rides with its string
 
@@ -442,6 +527,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.lineWidth = Math.max(0.6, width * 0.3);
     stringPath(s, 0.012);
     g.stroke();
+  }
+  for (const post of posts ?? []) { // the tuner posts, over the string ends
+    oval(post, 0.09, 0.09);
+    g.fillStyle = t.nut;
+    g.fill();
+    oval(post, 0.035, 0.035);
+    g.fillStyle = alpha(t.ink, 0.8);
+    g.fill();
   }
 
   // Sounding notes light their whole string, with a flash where they landed

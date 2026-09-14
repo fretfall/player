@@ -601,6 +601,10 @@
                 border-radius: 50%;
                 box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
             }
+            .headstock {
+                width: 100%;
+                height: 52px;
+            }
             .order {
                 font: 600 12px var(--num);
                 letter-spacing: 0.12em;
@@ -1335,6 +1339,17 @@
                         aria-labelledby="stringsLabel"
                     ></div>
                 </div>
+                <div class="setting">
+                    <div class="setting-head">
+                        <span id="headstockLabel">Headstock</span>
+                    </div>
+                    <div
+                        class="cards"
+                        data-setting="headstock"
+                        role="group"
+                        aria-labelledby="headstockLabel"
+                    ></div>
+                </div>
             </section>
 
             <section
@@ -1489,7 +1504,14 @@
                 DEFAULT_STYLE,
                 theme as makeTheme,
             } from "./themes.js";
-            import { drawHighway, lookAhead } from "./highway.js";
+            import {
+                drawHighway,
+                lookAhead,
+                HEADSTOCKS,
+                tunerPosts,
+                slotOutline,
+                spline,
+            } from "./highway.js";
             import { onsetEnvelope, align } from "./sync.js";
 
             const $ = (id) => document.getElementById(id);
@@ -1657,6 +1679,7 @@
                 frames: "gradient",
                 repeatMarks: "frame",
                 stringOrder: "low",
+                headstock: "inline",
                 offset: 0,
                 mute: false,
                 guides: true,
@@ -1684,6 +1707,7 @@
                 ["frames", FRAMES, "gradient"],
                 ["repeatMarks", REPEAT_MARKS, "frame"],
                 ["stringOrder", STRING_ORDERS, "low"],
+                ["headstock", HEADSTOCKS, "inline"],
             ])
                 if (!options[settings[key]])
                     settings[key] = fallback ?? DEFAULT_STYLE[key];
@@ -1702,6 +1726,7 @@
                     frames: settings.frames,
                     repeatMarks: settings.repeatMarks,
                     stringOrder: settings.stringOrder,
+                    headstock: settings.headstock,
                     viewAngle: settings.viewAngle,
                     noteSpeed: settings.noteSpeed,
                     drawDistance: settings.drawDistance,
@@ -1749,6 +1774,40 @@
                             );
                     }
             }
+            // A headstock's card draws it as on the fretboard: its outline, slots and tuners, the strings running from their
+            // posts over the nut and on along the neck to the right
+            const headstockCard = (id) => {
+                const head = HEADSTOCKS[id],
+                    posts = head.tuners ? tunerPosts(head, 6) : [];
+                const x = (u) => (92 - u * 13).toFixed(1),
+                    y = (v) => (26 - v * 13).toFixed(1),
+                    d = (points) =>
+                        `M${points.map(([u, v]) => `${x(u)} ${y(v)}`).join("L")}`;
+                return `<svg class="headstock" viewBox="32 4 88 44" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
+                    ...posts.map(
+                        ([u, v]) =>
+                            `<ellipse cx="${x(u)}" cy="${y(Math.sign(v) * head.tuners.key)}" rx="1.6" ry="2.6" fill-opacity=".35" stroke="none"/>`,
+                    ),
+                    head.outline &&
+                        `<path d="${d(spline(head.outline))}Z" fill-opacity=".1" stroke-width="1.2"/>`,
+                    ...(head.slots ? [1, -1] : []).map(
+                        (side) =>
+                            `<path d="${d(slotOutline(head.slots).map(([u, v]) => [u, v * side]))}Z" fill-opacity=".4" stroke="none"/>`,
+                    ),
+                    `<path d="${d([[0, 1], [-2.1, 1]])} ${d([[0, -1], [-2.1, -1]])}" fill="none" stroke-width="1.2"/>`,
+                    `<path d="${d([[0, 1.05], [0, -1.05]])}" stroke-width="2.4"/>`,
+                    ...Array.from({ length: 6 }, (_, s) => {
+                        const v = 0.8 * (1 - (2 * s) / 5);
+                        return `<path d="${d([posts[s] ?? [0.3, v], [0, v], [-2.1, v]])}" fill="none" stroke-width=".7"/>`;
+                    }),
+                    ...posts.map(
+                        ([u, v]) =>
+                            `<circle cx="${x(u)}" cy="${y(v)}" r="1.1" stroke="none"/>`,
+                    ),
+                ]
+                    .filter(Boolean)
+                    .join("")}</svg>`;
+            };
             // Cards preview their option: a preset's six string colours, a colour theme's floor, lanes, accent and text, or the
             // strings in order from the top
             const dotsFor = (setting, value) => {
@@ -1769,6 +1828,7 @@
                         frames: FRAMES,
                         repeatMarks: REPEAT_MARKS,
                         stringOrder: STRING_ORDERS,
+                        headstock: HEADSTOCKS,
                     }[setting];
                 for (const [value, { label }] of Object.entries(options)) {
                     const b = Object.assign(document.createElement("button"), {
@@ -1785,6 +1845,8 @@
                                         : "e B G D A E",
                             }),
                         );
+                    else if (setting === "headstock")
+                        b.insertAdjacentHTML("afterbegin", headstockCard(value));
                     else if (seg.classList.contains("cards"))
                         b.prepend(
                             (b.dots = Object.assign(
