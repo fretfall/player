@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { tempoMap, tickToMs, msToTick, tuningName, markRepeats, annotate, lyricsShown, markArpeggios } from './music.js';
+import { tempoMap, tickToMs, msToTick, tuningName, tuningReference, markRepeats, annotate, lyricsShown, markArpeggios } from './music.js';
 
 // 120 bpm for 4 quarters, then 60 bpm
 const map = tempoMap([{ tick: 3840, tempo: 60 }], 120);
@@ -10,6 +10,18 @@ for (const tick of [0, 960, 3840, 4800]) assert.equal(msToTick(map, tickToMs(map
 
 assert.deepEqual([[40, 45, 50, 55, 59, 64], [38, 45, 50, 55, 59, 64], [39, 44, 49, 54, 58, 63], [26, 33, 38, 43], [38, 45, 50, 55, 57, 62]].map(tuningName),
   ['E Standard', 'Drop D', 'E♭ Standard', 'Drop D', 'D A D G A D']);
+
+// A tuning against the one it's named after: standard ones against E Standard, drop ones against Drop D (Drop D itself
+// against E Standard), anything else string by string against E Standard
+const against = (open) => { const r = tuningReference(open); return [r.reference, r.shift.join(' ')]; };
+assert.deepEqual(against([36, 41, 46, 51, 55, 60]), ['E Standard', '-4 -4 -4 -4 -4 -4']); // C Standard
+assert.deepEqual(against([34, 41, 46, 51, 55, 60]), ['Drop D', '-4 -4 -4 -4 -4 -4']); // Drop B♭
+assert.deepEqual(against([38, 45, 50, 55, 59, 64]), ['E Standard', '-2 0 0 0 0 0']); // Drop D
+assert.deepEqual(against([38, 45, 50, 55, 57, 62]), ['E Standard', '-2 0 0 0 -2 -2']); // D A D G A D
+assert.deepEqual(against([40, 45, 50, 55, 59, 64]), ['E Standard', '0 0 0 0 0 0']);
+assert.deepEqual(against([26, 31, 36, 41]), ['E Standard', '-2 -2 -2 -2']); // bass in D Standard
+assert.deepEqual(against([21, 28, 33, 38, 43]), ['B Standard', '-2 0 0 0 0']); // 5-string bass, drop A
+assert.equal(tuningReference([40, 45, 50]), null); // no standard to go by
 
 // Repeats: the same chord again soon after is a beat; a change, a new technique or a long rest shows it in full, and single
 // notes always show in full

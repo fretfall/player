@@ -41,6 +41,19 @@ export function tuningName(open) {
   if (shift && shift[0] === shift[1] - 2 && shift.slice(1).every((d) => d === shift[1])) return `Drop ${FLATS[open[0] % 12]}`;
   return open.map((m) => FLATS[m % 12]).join(' ');
 }
+export const noteName = (midi) => FLATS[midi % 12];
+
+// The tuning a tuning is best told against: a standard one against E Standard (B Standard on 5 and 7 strings), a drop one
+// against Drop D (Drop A), and Drop D itself or anything else string by string against standard. null: no standard to go by
+// → { reference: its name, open: its open strings, shift: semitones each string is tuned away from it }
+export function tuningReference(open) {
+  const standard = STANDARD[open.length];
+  if (!standard) return null;
+  const offset = open.map((m, i) => m - standard[i]);
+  const drop = offset[0] === offset[1] - 2 && offset.slice(1).every((d) => d === offset[1]) && offset[1] !== 0;
+  const reference = drop ? standard.map((m, i) => (i ? m : m - 2)) : standard;
+  return { reference: tuningName(reference), open: reference, shift: open.map((m, i) => m - reference[i]) };
+}
 
 // Marks chords that only repeat the chord just played: the same strings, frets and notation again within `gap` seconds.
 // The highway draws those as beats instead of full chords: their notes get `repeat`, the chord becomes `highDensity`
