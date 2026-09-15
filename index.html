@@ -289,7 +289,7 @@
             #info {
                 position: fixed;
                 left: 40px;
-                right: 140px; /* clear of the tools */
+                right: 180px; /* clear of the tools */
                 bottom: 14px;
                 font-size: 13px;
                 color: var(--muted);
@@ -1313,6 +1313,30 @@
                     <path d="M10 11V7.8M8.3 2.8h3.4M15 5.5l1-1" />
                 </svg>
                 <span class="tip" role="tooltip" id="countInTip"><b>Count-in</b>A bar of clicks before the song plays, from the beat</span>
+            </button>
+            <button
+                class="icon"
+                id="band"
+                aria-label="Play as a band"
+                aria-describedby="bandTip"
+                disabled
+            >
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="7.5" cy="7" r="2.5" />
+                    <path d="M3 16.5a4.5 4.5 0 0 1 9 0" />
+                    <circle cx="13.8" cy="7.5" r="2" />
+                    <path d="M13.5 12.2a3.8 3.8 0 0 1 4 4.3" />
+                </svg>
+                <span class="tip" role="tooltip" id="bandTip"><b>Play as a band</b>Opens every other part in a window of its own, all in time with this one. Play, pause, jump and loop from any of them; the sound comes from this window</span>
             </button>
         </div>
         <div
@@ -2710,6 +2734,10 @@
                 speed = 1,
                 loop = null;
 
+            // A band window (?band=part, see Band below) draws another window's player instead of playing one of its own
+            const bandPart = new URLSearchParams(location.search).get("band"),
+                following = bandPart !== null;
+
             // src: a blob of the song's audio. sync maps it onto the chart: audio time = offset + ratio * chart time
             function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
                 const el = new Audio(URL.createObjectURL(src));
@@ -2745,7 +2773,7 @@
                 display: { staveProfile: "Tab" },
                 // Automatic: a Guitar Pro file's own recording (its backing track) when it has one, the synth otherwise
                 player: {
-                    playerMode: "EnabledAutomatic",
+                    playerMode: following ? "Disabled" : "EnabledAutomatic",
                     soundFont: CDN + "soundfont/sonivox.sf2",
                     enableCursor: false,
                     enableUserInteraction: false,
@@ -3395,9 +3423,11 @@
                     annotate(a.notes, a.chords);
                 }
                 song = { ...next, lines: lyricLines(next.lyrics) };
-                loop = null;
+                if (!following) loop = null; // a band window keeps the loop it was sent
+                if (leading) band.postMessage({ song: bandSong() });
                 document.title = `${song.title || "Untitled"} – Fretfall`;
                 const parts = song.arrangements;
+                $("band").disabled = parts.length < 2;
                 if (parts.length > 4) {
                     // too many parts for buttons (Guitar Pro files often carry vocals, horns, …)
                     const select = Object.assign(
@@ -3537,6 +3567,8 @@
                         width: `${bars[last].offsetLeft + bars[last].offsetWidth - bars[first].offsetLeft + 6}px`,
                     });
                 $("loop").setAttribute("aria-pressed", String(!!range));
+                if (following && range === loop && JSON.stringify(loop) !== JSON.stringify(leader.loop))
+                    band.postMessage({ do: "loop", loop }); // looped here: the band's first window loops everyone
                 syncLoopTools();
             }
             addEventListener("resize", () => markLoop());
@@ -3608,6 +3640,8 @@
                 resolveSong = () => {};
 
             async function openFiles(files) {
+                if (following)
+                    return status("Open songs in the window the band started from");
                 // a tab and its recording can come together: the tab first
                 for (const file of [...files].sort(
                     (a, b) => AUDIO.test(a.name) - AUDIO.test(b.name),
@@ -3946,6 +3980,110 @@
                 action();
             });
 
+            // --- Band: every other part in a window of its own, all in time. The window that opened them plays the song and
+            // sends the others its time every frame; they draw from it, and send it their play, pause, jumps, speed and loop.
+            // ponytail: windows of one browser on one computer (BroadcastChannel), a server if players join from elsewhere
+            const band = new BroadcastChannel("fretfall-band"),
+                bandWindows = [],
+                leader = { t: 0, at: 0, playing: false, speed: 1, loop: null },
+                wallClock = () => performance.timeOrigin + performance.now(); // the same in every window
+            let leading = false;
+            const bandSong = () => ({
+                ...song,
+                audio: null,
+                arrangements: song.arrangements.map(({ track, ...a }) => a), // alphaTab's tracks stay with the synth here
+            });
+            const bandPlayer = {
+                get time() {
+                    return (
+                        leader.t +
+                        (leader.playing
+                            ? ((wallClock() - leader.at) / 1000) * leader.speed
+                            : 0)
+                    );
+                },
+                get playing() {
+                    return leader.playing;
+                },
+                play: () => band.postMessage({ do: "play" }),
+                pause: () => band.postMessage({ do: "pause" }),
+                seek: (t) => band.postMessage({ do: "seek", t }),
+                setSpeed: (v) =>
+                    v !== leader.speed && band.postMessage({ do: "speed", v }),
+                setVolume: () => {},
+                stop: () => {},
+            };
+            band.onmessage = ({ data }) => {
+                if (following) {
+                    if (data.bye) return close();
+                    if (data.song && (data.part ?? bandPart) === bandPart) {
+                        setSong(data.song);
+                        if (arr) {
+                            selectArrangement(
+                                Math.min(+bandPart, song.arrangements.length - 1),
+                            );
+                            document.title = `${arr.name} · ${document.title}`;
+                        }
+                        status(null);
+                    }
+                    const clock = data.clock; // the other band windows' messages to the first one aren't for us
+                    if (!clock) return;
+                    const changed = clock.playing !== leader.playing;
+                    Object.assign(leader, clock);
+                    if (changed) updatePlayButton();
+                    if (clock.speed !== speed) setSpeed(clock.speed);
+                    if (JSON.stringify(clock.loop) !== JSON.stringify(loop)) {
+                        loop = clock.loop;
+                        markLoop();
+                    }
+                    return;
+                }
+                if (!leading) return;
+                if (data.hello !== undefined)
+                    band.postMessage({ song: bandSong(), part: data.hello });
+                if (data.do === "play" && !player.playing)
+                    Promise.resolve(player.play()).catch(
+                        (e) => e.name !== "AbortError" && status(e.message),
+                    );
+                if (data.do === "pause" && player.playing) player.pause();
+                if (data.do === "seek") player.seek(data.t);
+                if (data.do === "speed") setSpeed(data.v);
+                if (data.do === "loop") {
+                    loop = data.loop;
+                    markLoop();
+                }
+            };
+            // Each part in a column of the screen by its place in the header. Browsers let a click open one window unless
+            // the page may open pop-ups, so it says when some didn't open; pressing again opens the rest
+            $("band").onclick = () => {
+                leading = true;
+                const parts = song.arrangements,
+                    width = Math.floor(screen.availWidth / parts.length);
+                let blocked = 0;
+                parts.forEach((part, i) => {
+                    if (part === arr) return;
+                    if (bandWindows[i] && !bandWindows[i].closed)
+                        return bandWindows[i].focus();
+                    const url = new URL(location.href);
+                    url.searchParams.set("band", i);
+                    bandWindows[i] = window.open(
+                        url,
+                        `fretfall-band-${i}`,
+                        `popup,left=${(screen.availLeft ?? 0) + i * width},top=${screen.availTop ?? 0},width=${width},height=${screen.availHeight}`,
+                    );
+                    if (!bandWindows[i]) blocked++;
+                });
+                if (blocked)
+                    status(
+                        `The browser blocked ${blocked} ${blocked > 1 ? "windows" : "window"}: allow pop-ups for this page, then press again`,
+                    );
+            };
+            $("band").hidden = following;
+            addEventListener(
+                "pagehide",
+                () => leading && band.postMessage({ bye: true }),
+            ); // the band ends with the window it started from
+
             // --- Frame loop
             const canvas = $("highway"),
                 cam = {};
@@ -4033,11 +4171,21 @@
                         );
                 }
                 const t = songTime();
-                if (loop && player?.playing && t >= loop.end) {
+                if (loop && player?.playing && t >= loop.end && !following) {
                     player.seek(Math.max(0, loop.start - 1)); // one second of run-up
                     if (training) setSpeed(speed + 0.1); // the speed trainer: faster each time round
                 }
                 metronome(t);
+                if (leading)
+                    band.postMessage({
+                        clock: {
+                            t: player.time,
+                            at: wallClock(),
+                            playing: player.playing,
+                            speed,
+                            loop,
+                        },
+                    });
                 lap("song");
                 const shown = benchTime() ?? t;
                 drawHighway(canvas, arr, shown, theme, cam);
@@ -4046,9 +4194,13 @@
                 endFrame();
             }
 
-            usePlayer(synthPlayer);
+            usePlayer(following ? bandPlayer : synthPlayer);
             setVolume();
-            api.tex(DEMO);
+            if (!following) api.tex(DEMO);
+            else {
+                band.postMessage({ hello: bandPart });
+                status("Waiting for the window the band started from", true);
+            }
             if (new URLSearchParams(location.search).has("perf"))
                 startProfiler(canvas, () => song?.length ?? 0); // see perf.js
             requestAnimationFrame(frame);
