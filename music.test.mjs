@@ -41,7 +41,6 @@ const an = [
 ];
 const shapes = [{ frets: [3, 5, 5, 4, 3, 3], fingers: [1, 3, 4, 2, 1, 1] }, { frets: [-1, 5, 7, 7], fingers: [-1, 1, 3, 3] }];
 annotate(an, shapes);
-assert.deepEqual(an.map((x) => x.slurFrom), [null, 0, null, null]);
 assert.deepEqual([an[0].sustain, an[2].tieTo], [0.5, 3]);
 assert.deepEqual(an.map((x) => x.dynamicLabel), [null, null, 'p', null]);
 assert.deepEqual(shapes.map((c) => c.barre), [{ fret: 3, from: 0, to: 5 }, null]);

@@ -976,6 +976,9 @@
             .lm {
                 stroke: var(--muted);
             }
+            .li {
+                stroke: var(--ink);
+            }
             .ft {
                 fill: var(--text);
             }
@@ -2554,16 +2557,16 @@
                     [
                         [
                             "Hammer-on",
-                            "Sound the note by hammering a finger down, without picking. The arc links it to the note before.",
+                            "Sound the note by hammering a finger down, without picking: a white triangle on the note, pointing down.",
                             svg(
-                                `${gem(4, 19, 16, 8)}${gem(36, 19, 16, 8)}<path d="M12 18Q28 8 44 18" class="lt" stroke-width="1.4"/><text x="28" y="6" class="ft" font-size="9">H</text>`,
+                                `${gem(16, 14, 24, 12)}<path d="M22 7h12l-6 10z" class="fw li" stroke-width="1.2"/>`,
                             ),
                         ],
                         [
                             "Pull-off",
-                            "Pull your finger off the string to sound the lower note.",
+                            "Pull your finger off the string to sound the lower note: a white triangle on the note, pointing up.",
                             svg(
-                                `${gem(4, 19, 16, 8)}${gem(36, 19, 16, 8)}<path d="M12 18Q28 8 44 18" class="lt" stroke-width="1.4"/><text x="28" y="6" class="ft" font-size="9">P</text>`,
+                                `${gem(16, 14, 24, 12)}<path d="M22 17h12l-6-10z" class="fw li" stroke-width="1.2"/>`,
                             ),
                         ],
                         [

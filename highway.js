@@ -838,10 +838,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (note.slideIn) line3([x + (note.slideIn === 'below' ? -1.4 : 1.4), y - hh, Math.max(0, z - 1)], [x + (note.slideIn === 'below' ? -hw : hw), y, z]);
       if (note.slideOut) line3([x + (note.slideOut === 'up' ? hw : -hw), y, z], [x + (note.slideOut === 'up' ? 1.4 : -1.4), y - hh, z + 1]);
       g.setLineDash([]);
-      if (typeof note.slurFrom === 'number') { // a solid arc back to the note a hammer-on or pull-off comes from
-        const from = arr.notes[note.slurFrom], p = spot(from);
-        arc([p.x, p.y + hh, Z(from.time - now)], [x, y + hh, z], gap * 0.9);
-      }
       if (typeof note.tieTo === 'number') { // a dashed arc to the note it is tied to
         const to = arr.notes[note.tieTo], q = spot(to);
         g.setLineDash([5, 4]);
@@ -1166,11 +1162,29 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.fillText(word, cx, above);
       above -= (size + 0.04) * k;
     };
+    let onTop = cy - hh * k; // the top of the gem, and then of what sits on it
+    if (note.hammerOn || note.pullOff) { // a white triangle on the note, pointing down to hammer on and up to pull off
+      const w = hw * k * stretch * 0.6, h = hh * k * 0.9, [tip, base] = note.hammerOn ? [onTop + 0.4 * h, onTop - 0.6 * h] : [onTop - 0.6 * h, onTop + 0.4 * h];
+      g.beginPath();
+      g.moveTo(cx - w, base);
+      g.lineTo(cx + w, base);
+      g.lineTo(cx, tip);
+      g.closePath();
+      g.fillStyle = repeated ? ink : '#ffffff';
+      g.strokeStyle = alpha(t.ink, 0.9);
+      g.lineWidth = Math.max(1.5, 0.03 * k);
+      stroke();
+      fill();
+      onTop -= 0.6 * h;
+      above = Math.min(above, onTop - 0.14 * k);
+      g.strokeStyle = g.fillStyle = ink;
+      g.lineWidth = Math.max(1.2, 0.04 * k);
+    }
     const peak = bendPeak(note);
     if (peak > 0) { // bend: chevrons in the note's colour right on top of it, up (and down again for a release)
       const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < peak;
       const count = Math.min(3, Math.max(1, Math.round(peak * 2))), w = hw * k * stretch * 0.6, h = hw * k * 0.3, step = h * 1.25, edge = alpha(t.ink, 0.9);
-      let top = cy - hh * k - 0.04 * k;
+      let top = onTop - 0.04 * k;
       const stack = (dir) => {
         for (let j = 0; j < count; j++) chevron(g, cx, top - j * step - (dir > 0 ? 0 : h), w, h, dir, repeated ? ink : c, edge);
         top -= count * step + 0.08 * k;
@@ -1192,7 +1206,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3); // an accented chord's frame shows it
     const words = [
-      note.hammerOn ? 'H' : note.pullOff ? 'P' : '',
       note.tapLeft ? 'm.g.' : note.tap ? (note.tapLeft === false ? 'm.d.' : 'T') : '', // Guitar Pro says which hand taps
       TEXT_MARKS[note.harmonicType] ?? (note.harmonicPinch ? 'PH' : ''),
       note.slap ? 'slap' : note.pop ? 'pop' : '', note.golpe ? `golpe (${note.golpe})` : '', note.rasgueado ? `rasg. ${note.rasgueado}` : '',

@@ -49,7 +49,7 @@ export function tuningName(open) {
 // A spot played again by the very next strike (the same string and fret, within `gap`) is held down between the two: the
 // later note gets `heldFrom`, the time of the strike before, so its target on the board stays lit instead of flashing off
 // and on. A spot let go of in between (a mute, a slide or a bend moving off it) isn't held.
-const UNMARKED = new Set(['time', 'sustain', 'chord', 'repeat', 'heldFrom', 'slurFrom', 'tieTo', 'dynamicLabel', 'pick']);
+const UNMARKED = new Set(['time', 'sustain', 'chord', 'repeat', 'heldFrom', 'tieTo', 'dynamicLabel', 'pick']);
 const fingering = (n) => JSON.stringify(Object.entries(n).filter(([k, v]) => !UNMARKED.has(k) && v !== null && v !== undefined && v !== false && v !== 0).sort());
 export function markRepeats(notes, chords, gap = 1) {
   let before = null;
@@ -67,16 +67,14 @@ export function markRepeats(notes, chords, gap = 1) {
   }
 }
 
-// Connections the highway draws between notes, for charts from any source: a slur back to the note a hammer-on or
-// pull-off comes from, a tie to the next note for linked notes, let-ring notes sounding until the string is played
-// again (4 s at most), a dynamic only where it changes (f is where a Guitar Pro file starts), and a barre where one
-// finger holds three or more strings at the same fret.
+// Connections the highway draws between notes, for charts from any source: a tie to the next note for linked notes,
+// let-ring notes sounding until the string is played again (4 s at most), a dynamic only where it changes (f is where a
+// Guitar Pro file starts), and a barre where one finger holds three or more strings at the same fret.
 export function annotate(notes, chords) {
   const last = {};
   let dynamic = 'f';
   notes.forEach((n, i) => {
     const before = last[n.string];
-    n.slurFrom = (n.hammerOn || n.pullOff) && before !== undefined && n.time - notes[before].time < 1.5 ? before : null;
     if (before !== undefined) {
       const p = notes[before];
       if (p.letRing) p.sustain = Math.max(p.sustain, Math.min(n.time - p.time, 4));
