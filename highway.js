@@ -1150,8 +1150,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
         shine.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
         g.fillStyle = shine;
         fill();
-        g.strokeStyle = t.gem === 'solid' ? t.ink : 'rgba(255, 255, 255, 0.6)';
-        g.lineWidth = t.gem === 'solid' ? 2 : 1;
+        g.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        g.lineWidth = 1;
         stroke();
       }
       if (muted || palm) muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, open && palm ? c : null); // on an open string's thin bar, the palm mute's X keeps its colour
