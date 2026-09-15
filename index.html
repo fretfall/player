@@ -84,37 +84,33 @@
                 font: 700 15px var(--num);
                 letter-spacing: 0.22em;
             }
-            /* The falling F: an F at first, then its middle bar sags loose, drops, and bounces twice before it settles tipped */
+            /* The falling F: an F at first, then its middle bar drops in one fall, lands a little over-tipped and springs to rest */
             .wordmark .fall {
                 transform-box: fill-box;
                 transform-origin: center;
                 transform: rotate(14deg);
-                animation: fall 1.2s 0.8s both;
+                animation: fall 0.75s 0.8s both;
             }
             @keyframes fall {
                 from {
                     transform: translate(-3.5px, -1.42px) rotate(0deg);
+                    animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35); /* falls */
+                }
+                40% {
+                    transform: translate(0px, 0px) rotate(18deg); /* lands over-tipped */
+                    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+                }
+                56% {
+                    transform: translate(0px, -0.35px) rotate(11.5deg); /* springs back */
                     animation-timing-function: ease-in-out;
                 }
-                16% {
-                    transform: translate(-3.5px, -1.17px) rotate(7deg); /* comes loose */
-                    animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53); /* falls */
-                }
-                46% {
-                    transform: translate(0px, 0px) rotate(14deg);
-                    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* bounces up */
-                }
-                63% {
-                    transform: translate(0px, -2px) rotate(5deg);
-                    animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53);
-                }
-                78% {
-                    transform: translate(0px, 0px) rotate(14deg);
-                    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                74% {
+                    transform: translate(0px, 0.08px) rotate(15.2deg);
+                    animation-timing-function: ease-in-out;
                 }
                 88% {
-                    transform: translate(0px, -0.6px) rotate(11deg);
-                    animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+                    transform: translate(0px, 0px) rotate(13.6deg);
+                    animation-timing-function: ease-in-out;
                 }
                 to {
                     transform: translate(0px, 0px) rotate(14deg);
@@ -2097,6 +2093,13 @@
                 aria-labelledby="tab-audio"
                 hidden
             >
+                <label class="toggle"
+                    ><span
+                        >Autoplay<small
+                            >Start playing as soon as a song has opened</small
+                        ></span
+                    ><input id="autoplay" type="checkbox" role="switch"
+                /></label>
                 <div class="setting">
                     <div class="setting-head">
                         <label for="offset">Audio delay</label
@@ -2305,6 +2308,7 @@
                 headstock: "inline",
                 offset: 0,
                 mute: false,
+                autoplay: false,
                 metronome: false,
                 minimal: false,
                 tabView: false,
@@ -2550,7 +2554,7 @@
             $("resetSettings").onclick = () => {
                 const { volume, volumeMuted, metronome, minimal, tabView, panel } = settings;
                 Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, tabView, panel });
-                for (const key of ["guides", "notes3d", "songIntro", "mute"])
+                for (const key of ["guides", "notes3d", "songIntro", "mute", "autoplay"])
                     $(key).checked = settings[key];
                 if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
                 setOffset(settings.offset);
@@ -2621,6 +2625,11 @@
                     applyTheme();
                 };
             }
+            $("autoplay").checked = settings.autoplay;
+            $("autoplay").onchange = (e) => {
+                settings.autoplay = e.target.checked;
+                save();
+            };
             $("mute").checked = settings.mute;
             $("mute").onchange = (e) => {
                 settings.mute = e.target.checked;
@@ -4507,6 +4516,7 @@
                     );
                     setSong(next);
                     status(null);
+                    autoplay();
                 } catch (e) {
                     status(`Could not open ${file.name}: ${e.message}`);
                 }
@@ -4625,6 +4635,16 @@
                 }
                 clickedTo = until;
             }
+            // Autoplay (Settings): a song that has just opened starts playing. Not before anyone has used the page (browsers keep
+            // it silent until then, so the demo on a first visit waits), and not in the band's windows, which follow this one
+            const autoplay = () => {
+                if (!settings.autoplay || following || !player || player.playing) return;
+                if (navigator.userActivation?.hasBeenActive === false) return;
+                audioClock();
+                Promise.resolve(player.play()).catch(
+                    (e) => e.name !== "AbortError" && e.name !== "NotAllowedError" && status(e.message),
+                );
+            };
             const togglePlay = () => {
                 if (!player) return;
                 audioClock();
@@ -5136,6 +5156,7 @@
                     synth.tempo = next.tempo;
                     setSong(next);
                     resolveSong();
+                    autoplay();
                     if (api.score.backingTrack?.rawAudioFile)
                         status(
                             "Playing the recording that comes with this file",
