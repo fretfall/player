@@ -905,7 +905,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       path([...spine.map(([px, py, pz]) => [px - hw, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + hw, py, pz])]);
       fill();
       glow(t.glow && !note.letRing, c, 6);
-      g.strokeStyle = fade(c, 0.95, 0.08);
+      g.strokeStyle = fade(c, 0.95, 0.3);
       g.lineWidth = 2.5;
       g.setLineDash(note.letRing ? [7, 6] : []);
       for (const side of [-hw, hw]) {
@@ -932,13 +932,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
       glow(false);
     } else {
       glow(t.glow && !note.letRing, c, 6);
-      g.fillStyle = fade(c, note.letRing ? 0.3 : 0.6, 0.06);
+      g.fillStyle = fade(c, note.letRing ? 0.4 : 0.75, note.letRing ? 0.15 : 0.3); // plain to see from the far end, not only as it arrives
       path([...spine.map(([px, py, pz]) => [px - 0.09, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + 0.09, py, pz])]);
       fill();
       glow(false);
     }
     if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
-      g.strokeStyle = fade(note.letRing ? c : '#ffffff', 0.7, 0.1);
+      g.strokeStyle = fade(note.letRing ? c : '#ffffff', 0.75, 0.3);
       g.lineWidth = note.letRing ? 2 : 1.5;
       g.setLineDash(note.letRing ? [7, 6] : []);
       path(spine, false);
@@ -1122,7 +1122,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
 
     const ink = repeated ? t.muted : t.text; // marks on a repeated note are greyed out
-    g.globalAlpha = faded * (repeated ? 0.8 : 1) * Math.min(1, Math.max(0, (1 - dt / LOOK) / 0.4)); // fading in from the far end
+    g.globalAlpha = faded * (repeated ? 0.8 : 1) * Math.min(1, Math.max(0, (1 - dt / LOOK) / 0.15)); // fading in from the far end, a little after the note
     if (note.ghost) { // ghost note: dimmed, in brackets
       const [lx] = P(x - hw, y, z), [rx] = P(x + hw, y, z), r = hh * k * 1.5;
       g.strokeStyle = repeated ? ink : c;
