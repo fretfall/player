@@ -64,4 +64,21 @@ for (const look of Object.keys(LOOKS))
     for (const now of [0, 2, 4])
       assert.doesNotThrow(() => drawHighway(canvas, arrangement, now, { ...theme({ ...DEFAULT_STYLE, look }), headstock: 'headless', sideAngle }, {}), `${look} at ${sideAngle}°, ${now} s`);
 
+// A vibrato trail running into a chord ends at the bottom of the chord's note lying across it on the string below, not over it
+const trailTop = (string) => { // the top of the wavy spine on screen, the chord's fret 7 note on this string
+  let points = [], closed = false, top = Infinity;
+  const recorder = new Proxy({
+    beginPath: () => { points = []; closed = false; }, moveTo: (x, y) => points.push(y), lineTo: (x, y) => points.push(y), closePath: () => { closed = true; },
+    stroke: () => { if (!closed && points.length > 12) top = Math.min(top, ...points); },
+  }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+  const { arrangement: vibrato } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>10</songLength>
+    <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
+    <levels><level difficulty="0"><notes><note time="1" string="1" fret="7" sustain="0.5" vibrato="80" /></notes>
+    <chords><chord time="1.5" chordId="0"><chordNote time="1.5" string="1" fret="5" /><chordNote time="1.5" string="${string}" fret="7" /></chord></chords>
+    <anchors><anchor time="0" fret="5" width="4" /></anchors></level></levels></song>`);
+  drawHighway({ ...canvas, getContext: () => recorder }, vibrato, 0.9, { ...theme(DEFAULT_STYLE), headstock: 'headless' }, {});
+  return top;
+};
+assert.ok(trailTop(2) > trailTop(0) + 10, 'the trail stops short of the note below it');
+
 console.log('ok');

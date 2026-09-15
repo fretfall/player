@@ -892,6 +892,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
   g.globalAlpha = 1;
 
+  const across = (later, at) => { // a note lying across a trail where the trail is at along the neck
+    const over = spot(later);
+    return Math.abs(over.x - at) < (over.open ? (over.a.width - 0.2) / 2 + 0.1 : 0.45);
+  };
   for (const [i, note] of visible.entries()) {
     const dt = note.time - now, chord = chordOf(note), slide = note.slideTo ?? note.slideUnpitchTo ?? null;
     const { a, open, x, y } = spot(note), c = color(note.string), z = Z(dt);
@@ -929,8 +933,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     for (let j = i + 1; j < visible.length && visible[j].time <= note.time + tail + 0.02; j++) {
       const later = visible[j];
       if (later.time <= note.time + 0.005) continue;
-      const over = spot(later), reach = over.open ? (over.a.width - 0.2) / 2 + 0.1 : 0.45;
-      if (chordOf(later) || later.string === note.string || Math.abs(over.x - x) < reach) {
+      if (chordOf(later) || later.string === note.string || across(later, x)) {
         next = later;
         break;
       }
@@ -948,8 +951,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const rise = BEND_LIFT + (BEND_RISE - BEND_LIFT) * smooth(Math.min(1, zz / BEND_EASE));
       return [slideX(note, x, sec) + jitter, y + wave + (liftAt(note, sec) * rise) / BEND_LIFT, zz];
     };
-    if (bent && next) { // raised, the trail would show past the next note: end it where it reaches that note's bottom edge on screen
-      const at = spot(next), bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, Z(next.time - now))[1] + 3, screenY = (d) => P(...along(d))[1];
+    // Raised, or running into a note on a string below it (in a chord, the one lying across it), the trail would show past
+    // that note: end it where it reaches the note's bottom edge on screen
+    const end = next && along(d1)[0], member = next && chordOf(next)?.notes.find((j) => across(arr.notes[j], end));
+    const stop = typeof member === 'number' ? arr.notes[member] : next;
+    if (next && (bent || across(stop, end))) {
+      const at = spot(stop), bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, Z(stop.time - now))[1] + 3, screenY = (d) => P(...along(d))[1];
       if (screenY(d1) < bottom) {
         let lo = d0, hi = d1;
         for (let j = 0; j < 24; j++) [lo, hi] = screenY((lo + hi) / 2) < bottom ? [lo, (lo + hi) / 2] : [(lo + hi) / 2, hi];
