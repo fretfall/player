@@ -615,6 +615,28 @@
                 backdrop-filter: blur(10px);
                 text-align: center;
             }
+            /* Playing as a band: every part plays in its own window, and this one only keeps time and sounds: nothing to draw */
+            :root.banding :is(#highway, #phrases, #progress, #loopTools, #lyrics, #info, #intro, #time) {
+                display: none;
+            }
+            #bandNote {
+                position: fixed;
+                left: 50%;
+                top: 56%; /* under a status message, should one show */
+                transform: translate(-50%, -50%);
+                display: grid;
+                justify-items: center;
+                gap: 8px;
+                max-width: min(440px, 90vw);
+                padding: 14px 20px;
+                border-radius: 10px;
+                background: var(--chip);
+                border: 1px solid var(--chip-border);
+                text-align: center;
+            }
+            #bandNote .text-button {
+                justify-self: center;
+            }
             #status:not(.loading) .bars {
                 display: none;
             }
@@ -1654,7 +1676,7 @@
                     <circle cx="13.8" cy="7.5" r="2" />
                     <path d="M13.5 12.2a3.8 3.8 0 0 1 4 4.3" />
                 </svg>
-                <span class="tip" role="tooltip" id="bandTip"><b>Play as a band</b>Opens every other part in a window of its own, all in time with this one. Play, pause, jump and loop from any of them; the sound comes from this window</span>
+                <span class="tip" role="tooltip" id="bandTip"><b>Play as a band</b>Opens every part in a window of its own, side by side, all in time. Play, pause, jump and loop from any of them; the sound comes from this window, which stays open behind them</span>
             </button>
             <button
                 class="icon"
@@ -2181,6 +2203,10 @@
         <div id="status" role="status" class="loading">
             <span class="bars moving" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
             <span id="statusText">Loading the player…</span>
+        </div>
+        <div id="bandNote" hidden>
+            <span>Playing as a band: every part is in a window of its own, and the sound comes from this one</span>
+            <button class="text-button" id="bandBack">Close the band windows</button>
         </div>
         <div id="drop" hidden>
             Drop a .pak, a Guitar Pro file, or a tab with its recording
@@ -4833,7 +4859,7 @@
                             ["b"],
                             "B",
                             "Play as a band",
-                            "Every other part in a window of its own",
+                            "Every part in a window of its own, side by side",
                             () => !following && $("band").click(),
                         ],
                     ],
@@ -4981,15 +5007,15 @@
                     markLoop();
                 }
             };
-            // Each part in a column of the screen by its place in the header. Browsers let a click open one window unless
+            // Each part in a column of the screen by its place in the header, this one's too: a page can't resize the tab it's in,
+            // only windows it opened, so this tab stays behind them and plays the sound. Browsers let a click open one window unless
             // the page may open pop-ups, so it says when some didn't open; pressing again opens the rest
             $("band").onclick = () => {
                 leading = true;
                 const parts = song.arrangements,
                     width = Math.floor(screen.availWidth / parts.length);
                 let blocked = 0;
-                parts.forEach((part, i) => {
-                    if (part === arr) return;
+                parts.forEach((_, i) => {
                     if (bandWindows[i] && !bandWindows[i].closed)
                         return bandWindows[i].focus();
                     const url = new URL(location.href);
@@ -5005,17 +5031,6 @@
                     status(
                         `The browser blocked ${blocked} ${blocked > 1 ? "windows" : "window"}: allow pop-ups for this page, then press again`,
                     );
-                // This window takes its own column as well. Browsers only let a page move and size a window a page opened (a tab
-                // they leave as it is), so when it doesn't take, it says where to put it
-                const mine = parts.indexOf(arr);
-                moveTo((screen.availLeft ?? 0) + mine * width, screen.availTop ?? 0);
-                resizeTo(width, screen.availHeight);
-                setTimeout(() => {
-                    if (!blocked && Math.abs(outerWidth - width) > 40)
-                        status(
-                            `The browser doesn't let a page resize its own tab: drag this window into column ${mine + 1} of ${parts.length}`,
-                        );
-                }, 300);
             };
             $("band").hidden = following;
             addEventListener(
@@ -5143,9 +5158,9 @@
                 }
             }
 
-            function frame() {
-                requestAnimationFrame(frame);
-                startFrame();
+            // The song's own work, whether it's drawn or not: a Guitar Pro score built, loops and the speed trainer, the metronome,
+            // and the band's clock. → the song's time
+            function tick() {
                 if (
                     player === synthPlayer &&
                     api.tickCache &&
@@ -5180,6 +5195,13 @@
                             loop,
                         },
                     });
+                return t;
+            }
+            function frame() {
+                if (bandOpen()) return keepTime();
+                requestAnimationFrame(frame);
+                startFrame();
+                const t = tick();
                 lap("song");
                 const shown = benchTime() ?? t;
                 (settings.tabView ? drawTab : drawHighway)(canvas, arr, shown, theme, cam);
@@ -5187,6 +5209,23 @@
                 lap("overlay");
                 endFrame();
             }
+            // While the band plays, this window sits behind the parts' windows: it draws nothing and keeps time on a timer (a
+            // covered window gets no animation frames, and one playing sound keeps its timers), until the band's windows close
+            const bandOpen = () => leading && bandWindows.some((w) => w && !w.closed);
+            function keepTime() {
+                document.documentElement.classList.add("banding");
+                $("bandNote").hidden = false;
+                const timer = setInterval(() => {
+                    if (bandOpen()) return tick();
+                    clearInterval(timer);
+                    document.documentElement.classList.remove("banding");
+                    $("bandNote").hidden = true;
+                    requestAnimationFrame(frame);
+                }, 50);
+            }
+            $("bandBack").onclick = () => {
+                for (const w of bandWindows) w?.close();
+            };
 
             usePlayer(following ? bandPlayer : synthPlayer);
             setVolume();
