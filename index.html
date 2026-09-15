@@ -207,6 +207,19 @@
             #phrases div.done {
                 background: var(--done);
             }
+            #phraseTime {
+                position: absolute; /* under the progress line, at the pointer */
+                top: calc(100% + 16px);
+                transform: translateX(-50%);
+                padding: 2px 7px;
+                border-radius: 6px;
+                background: var(--ink);
+                border: 1px solid var(--chip-border);
+                font: 600 11px var(--num);
+                font-variant-numeric: tabular-nums;
+                color: var(--text);
+                pointer-events: none;
+            }
             #loopBox {
                 position: absolute;
                 top: -6px;
@@ -1398,7 +1411,7 @@
                 </div>
             </div>
         </header>
-        <div id="phrases"><span id="loopBox" hidden></span></div>
+        <div id="phrases"><span id="loopBox" hidden></span><span id="phraseTime" hidden></span></div>
         <div id="loopTools" role="group" aria-label="Loop" hidden>
             <button
                 class="icon"
@@ -3682,7 +3695,7 @@
                     b.style.height = `${Math.max(8, (p.maxDifficulty / hardest) * 100)}%`;
                     return b;
                 });
-                $("phrases").replaceChildren(...bars, $("loopBox"));
+                $("phrases").replaceChildren(...bars, $("loopBox"), $("phraseTime"));
                 markLoop();
                 // Under it, how busy each stretch of the song is: brighter = more notes per second
                 const busy = arr.phrases.map(
@@ -3725,9 +3738,16 @@
                 syncLoopTools();
             }
             addEventListener("resize", () => markLoop());
-            // Phrase bars: a click jumps to the phrase (moving a loop there, or stretching it with shift); pressing and dragging
-            // across them loops that stretch, and dragging a grip moves just that edge. Only the pointer's x counts, so a drag can
-            // stray off the bars.
+            // Phrase bars: a click jumps to that moment, whose time shows under the pointer (with a loop, a click moves the loop to
+            // the phrase, or stretches it there with shift); pressing and dragging across them loops that stretch, and dragging a
+            // grip moves just that edge. Only the pointer's x counts, so a drag can stray off the bars.
+            let phrasesBox = null; // measured as the pointer comes in: the bars don't move under it
+            const timeAt = (x) =>
+                Math.min(1, Math.max(0, (x - phrasesBox.left) / phrasesBox.width)) *
+                song.length; // the bars run by time from end to end (see selectArrangement)
+            $("phrases").onpointerenter = () =>
+                (phrasesBox = $("phrases").getBoundingClientRect());
+            $("phrases").onpointerleave = () => ($("phraseTime").hidden = true);
             const phraseAt = (x) => {
                 const i = bars.findIndex(
                     (b) => x < b.getBoundingClientRect().right,
@@ -3752,6 +3772,13 @@
                 $("phrases").setPointerCapture(e.pointerId);
             };
             $("phrases").onpointermove = (e) => {
+                if (song && phrasesBox) {
+                    Object.assign($("phraseTime"), {
+                        hidden: false,
+                        textContent: clock(timeAt(e.clientX)),
+                    });
+                    $("phraseTime").style.left = `${Math.min(phrasesBox.width, Math.max(0, e.clientX - phrasesBox.left))}px`;
+                }
                 if (!drag || (!drag.range && Math.abs(e.clientX - drag.x) < 4))
                     return; // a few pixels of wobble is still a click
                 const to = phraseAt(e.clientX);
@@ -3769,14 +3796,15 @@
                     player?.seek(loop.start);
                 } else if (drag.from === drag.at) {
                     // a click; on a grip it does nothing
-                    if (loop)
+                    if (loop) {
                         loop = e.shiftKey
                             ? {
                                   start: Math.min(loop.start, p.time),
                                   end: Math.max(loop.end, p.endTime),
                               }
                             : { start: p.time, end: p.endTime };
-                    player?.seek(p.time);
+                        player?.seek(p.time);
+                    } else player?.seek(timeAt(e.clientX));
                 }
                 drag = null;
                 markLoop();
