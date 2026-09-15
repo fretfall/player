@@ -1327,7 +1327,7 @@
                         id="play"
                         aria-describedby="playTip"
                     >
-                        <span class="tip" role="tooltip" id="playTip"><b>Play and pause <kbd>Space</kbd></b>With the count-in on, a bar of clicks comes first</span>
+                        <span class="tip" role="tooltip" id="playTip"><b>Play and pause <kbd>Space</kbd></b>Play the song from where the highway is</span>
                     </button>
                     <div class="divider"></div>
                     <button
@@ -1489,28 +1489,6 @@
                     <path d="M5.6 12.5h8.8M10 12.5l4-7" />
                 </svg>
                 <span class="tip" role="tooltip" id="metronomeTip"><b>Metronome <kbd>K</kbd></b>A click on every beat, higher on the first of each bar</span>
-            </button>
-            <button
-                class="icon"
-                id="countIn"
-                aria-pressed="false"
-                aria-label="Count-in"
-                aria-describedby="countInTip"
-            >
-                <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <circle cx="10" cy="11" r="6" />
-                    <path d="M10 11V7.8M8.3 2.8h3.4M15 5.5l1-1" />
-                </svg>
-                <span class="tip" role="tooltip" id="countInTip"><b>Count-in</b>A bar of clicks before the song plays, from the beat</span>
             </button>
             <button
                 class="icon"
@@ -1816,6 +1794,14 @@
                         ></span
                     ><input id="guides" type="checkbox" role="switch"
                 /></label>
+                <label class="toggle"
+                    ><span
+                        >Song intro<small
+                            >The title and "Get ready" before the first notes
+                            come into view</small
+                        ></span
+                    ><input id="songIntro" type="checkbox" role="switch"
+                /></label>
             </section>
 
             <section
@@ -2114,9 +2100,9 @@
                 offset: 0,
                 mute: false,
                 metronome: false,
-                countIn: false,
                 minimal: false,
                 guides: true,
+                songIntro: true,
                 noteLines: 0.5,
                 notes3d: true,
                 ...VIEW_START,
@@ -2402,7 +2388,7 @@
             $("volumeButton").onclick = () => toggleVolume();
             $("volumeMute").onclick = () =>
                 setVolume(settings.volume || 0.8, !settings.volumeMuted);
-            for (const key of ["guides", "notes3d"]) {
+            for (const key of ["guides", "notes3d", "songIntro"]) {
                 $(key).checked = settings[key];
                 $(key).onchange = (e) => {
                     settings[key] = e.target.checked;
@@ -4072,12 +4058,11 @@
             });
 
             // --- Transport
-            // --- Practice tools: a metronome on the chart's beats, a bar of clicks before playing, and a loop that speeds up
+            // --- Practice tools: a metronome on the chart's beats, and a loop that speeds up
             // each time round. Clicks go on the audio clock a little ahead of when they sound, so they keep time however the
             // frames fall; they follow the volume but not its mute, to play along with the click alone
             let clicks = null, // the audio clock, started from a press: browsers only let a page make sound after one
-                clickedTo = null, // the song time the metronome has clicked up to
-                countingIn = null; // the timer that starts playing once the count-in is done
+                clickedTo = null; // the song time the metronome has clicked up to
             const audioClock = () => {
                 clicks ??= new AudioContext();
                 clicks.resume();
@@ -4119,47 +4104,10 @@
             const togglePlay = () => {
                 if (!player) return;
                 audioClock();
-                if (countingIn !== null) {
-                    clearTimeout(countingIn); // pressed again while counting in: stay paused
-                    countingIn = null;
-                    return;
-                }
                 if (player.playing) return player.pause();
-                const playing = player,
-                    start = () =>
-                        player === playing &&
-                        Promise.resolve(player.play()).catch(
-                            (e) => e.name !== "AbortError" && status(e.message),
-                        ); // AbortError: a newer song took over
-                const beats = arr?.beats ?? [];
-                if (!settings.countIn || beats.length < 2) return start();
-                // back to the beat, then a bar of clicks at its tempo (and the speed), and the song comes in on the next one
-                const at = Math.max(
-                        0,
-                        beats.findLastIndex((b) => b.time <= songTime()),
-                    ),
-                    bar = Math.max(
-                        0,
-                        beats.findLastIndex(
-                            (b, i) => i <= at && b.measure >= 0,
-                        ),
-                    ),
-                    next = beats.findIndex(
-                        (b, i) => i > bar && b.measure >= 0,
-                    ),
-                    count = next > bar ? next - bar : 4,
-                    j = Math.min(at, beats.length - 2),
-                    gap = (beats[j + 1].time - beats[j].time) / speed;
-                player.seek(beats[at].time + settings.offset / 1000);
-                const from = clicks.currentTime + 0.05;
-                for (let i = 0; i < count; i++) click(from + i * gap, !i);
-                countingIn = setTimeout(
-                    () => {
-                        countingIn = null;
-                        start();
-                    },
-                    (0.05 + count * gap) * 1000,
-                );
+                Promise.resolve(player.play()).catch(
+                    (e) => e.name !== "AbortError" && status(e.message),
+                ); // AbortError: a newer song took over
             };
             function toggleTool(key) {
                 settings[key] = !settings[key];
@@ -4167,7 +4115,7 @@
                 audioClock();
                 $(key).setAttribute("aria-pressed", String(settings[key]));
             }
-            for (const key of ["metronome", "countIn", "minimal"]) {
+            for (const key of ["metronome", "minimal"]) {
                 $(key).setAttribute("aria-pressed", String(settings[key]));
                 $(key).onclick = () => toggleTool(key);
             }
@@ -4323,7 +4271,6 @@
                     "Practice tools",
                     [
                         [["k"], "K", "Metronome", "", () => toggleTool("metronome")],
-                        [["c"], "C", "Count-in", "", () => toggleTool("countIn")],
                         [
                             ["ArrowUp", "ArrowDown"],
                             "↑ ↓",
@@ -4615,11 +4562,12 @@
 
                 showLyrics(t);
 
-                // The intro card, until the first notes come into view (and not over a message): press play, or get ready.
+                // The intro card, until the first notes come into view (not over a message, nor with the song intro setting off):
+                // press play, or get ready.
                 // Its text changes once a second at most
                 const first = arr.notes[0]?.time ?? 0,
                     intro =
-                        first - t > lookAhead(settings) && $("status").hidden
+                        settings.songIntro && first - t > lookAhead(settings) && $("status").hidden
                             ? `${!!player?.playing}|${Math.ceil((first - t) / speed)}`
                             : "";
                 if (ui.intro !== intro) {
