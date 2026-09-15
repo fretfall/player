@@ -591,6 +591,15 @@
                 :is(.bar, #phrases, #progress, #loopTools, #info, #tools > :not(#minimal)) {
                 display: none;
             }
+            /* The 2D tab view: the settings only the 3D highway uses make way */
+            :root.tab2d .only-3d,
+            :root:not(.tab2d) .only-2d {
+                display: none;
+            }
+            :root.tab2d .only-3d + .only-3d + h3 {
+                padding-top: 0;
+                border-top: 0;
+            }
             :root.minimal #lyrics {
                 top: 24px;
             }
@@ -1132,6 +1141,12 @@
             .lw {
                 stroke: #fff;
             }
+            .fm {
+                fill: var(--muted);
+            }
+            .la {
+                stroke: var(--accent);
+            }
             .fw {
                 fill: #fff;
             }
@@ -1647,6 +1662,27 @@
             </button>
             <button
                 class="icon"
+                id="tabView"
+                aria-pressed="false"
+                aria-label="2D tab view"
+                aria-describedby="tabViewTip"
+            >
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                >
+                    <path d="M2.5 5h15M2.5 10h15M2.5 15h15" />
+                    <path d="M7 3v14" stroke-width="2.2" />
+                </svg>
+                <span class="tip" role="tooltip" id="tabViewTip"><b>2D tab view <kbd>D</kbd></b>The notes as tab: fret numbers on flat strings, coming in from the right to the play line. Press again for the 3D highway</span>
+            </button>
+            <button
+                class="icon"
                 id="minimal"
                 aria-pressed="false"
                 aria-label="Minimal view"
@@ -1744,8 +1780,8 @@
                 role="tabpanel"
                 aria-labelledby="tab-view"
             >
-                <h3>Camera</h3>
-                <div class="pair">
+                <h3 class="only-3d">Camera</h3>
+                <div class="pair only-3d">
                     <div class="setting">
                         <div class="setting-head">
                             <label for="viewAngle">View angle</label
@@ -1785,7 +1821,7 @@
                 <h3>Neck</h3>
                 <div class="pair">
                     <div
-                        class="setting"
+                        class="setting only-3d"
                         title="How wide each fret is on screen. The strings keep their spacing, and your hand position always stays in view"
                     >
                         <div class="setting-head">
@@ -1845,7 +1881,7 @@
                         </div>
                     </div>
                     <div
-                        class="setting"
+                        class="setting only-3d"
                         title="How far down the highway notes show up. Shown as the seconds of notes in view, which faster notes also shorten"
                     >
                         <div class="setting-head">
@@ -1867,7 +1903,7 @@
                         </div>
                     </div>
                 </div>
-                <button class="text-button" id="resetView">Reset view</button>
+                <button class="text-button" id="resetSettings">Reset settings</button>
             </section>
 
             <section
@@ -1877,6 +1913,20 @@
                 aria-labelledby="tab-highway"
                 hidden
             >
+                <div
+                    class="setting only-2d"
+                    title="Notes scrolling in to the play line, or a page of bars that holds still while the play line moves across it"
+                >
+                    <div class="setting-head">
+                        <span id="tabLayoutLabel">Tab</span>
+                    </div>
+                    <div
+                        class="seg"
+                        data-setting="tabLayout"
+                        role="group"
+                        aria-labelledby="tabLayoutLabel"
+                    ></div>
+                </div>
                 <div class="setting">
                     <div class="setting-head">
                         <span id="lookLabel">Notes</span>
@@ -1888,7 +1938,7 @@
                         aria-labelledby="lookLabel"
                     ></div>
                 </div>
-                <label class="toggle"
+                <label class="toggle only-3d"
                     ><span
                         >3D notes<small
                             >Notes a few pixels deep, lit on top</small
@@ -1896,7 +1946,7 @@
                     ><input id="notes3d" type="checkbox" role="switch"
                 /></label>
                 <div
-                    class="setting"
+                    class="setting only-3d"
                     title="The white line on the floor under each note and chord, where it's played"
                 >
                     <div class="setting-head">
@@ -1914,7 +1964,7 @@
                         <span>Hidden</span><span>Solid</span>
                     </div>
                 </div>
-                <div class="setting">
+                <div class="setting only-3d">
                     <div class="setting-head">
                         <span id="framesLabel">Chord frames</span>
                     </div>
@@ -1925,7 +1975,7 @@
                         aria-labelledby="framesLabel"
                     ></div>
                 </div>
-                <div class="setting">
+                <div class="setting only-3d">
                     <div class="setting-head">
                         <span id="repeatMarksLabel">Repeated chords</span>
                     </div>
@@ -1953,7 +2003,7 @@
                 <label class="toggle"
                     ><span
                         >Hand position guides<small
-                            >A band down the highway where your hand goes</small
+                            >Where your hand goes: a band down the highway, or its fret under the tab</small
                         ></span
                     ><input id="guides" type="checkbox" role="switch"
                 /></label>
@@ -2019,7 +2069,7 @@
                         aria-labelledby="fontsLabel"
                     ></div>
                 </div>
-                <div class="setting">
+                <div class="setting only-3d">
                     <div class="setting-head">
                         <span id="headstockLabel">Headstock</span>
                     </div>
@@ -2167,6 +2217,7 @@
             } from "./themes.js";
             import {
                 drawHighway,
+                drawTab,
                 lookAhead,
                 HEADSTOCKS,
                 headstockParts,
@@ -2223,6 +2274,10 @@
                 grey: { label: "Greyed marks" },
                 hide: { label: "No marks" },
             };
+            const TAB_LAYOUTS = {
+                scroll: { label: "Scroll" },
+                pages: { label: "Pages" },
+            }; // the 2D tab view: notes scrolling to the play line, or a page of bars at a time
             const MARKINGS = {
                 black: { label: "Black" },
                 white: { label: "White" },
@@ -2253,6 +2308,8 @@
                 mute: false,
                 metronome: false,
                 minimal: false,
+                tabView: false,
+                tabLayout: "scroll",
                 guides: true,
                 songIntro: true,
                 noteLines: 0.5,
@@ -2261,6 +2318,7 @@
                 viewDefaults: VIEW_DEFAULTS,
                 panel: "view",
             };
+            const DEFAULTS = { ...settings }; // before this browser's are laid over them, for Reset settings
             try {
                 const saved = JSON.parse(
                     localStorage.getItem("fretfall") ?? "{}",
@@ -2283,6 +2341,7 @@
                 ["frames", FRAMES, "gradient"],
                 ["repeatMarks", REPEAT_MARKS, "frame"],
                 ["markings", MARKINGS, "black"],
+                ["tabLayout", TAB_LAYOUTS, "scroll"],
                 ["stringOrder", STRING_ORDERS, "low"],
                 ["headstock", HEADSTOCKS, "inline"],
             ])
@@ -2305,6 +2364,7 @@
                     frames: settings.frames,
                     repeatMarks: settings.repeatMarks,
                     markings: settings.markings,
+                    tabLayout: settings.tabLayout,
                     stringOrder: settings.stringOrder,
                     headstock: settings.headstock,
                     viewAngle: settings.viewAngle,
@@ -2318,6 +2378,10 @@
                 document.documentElement.classList.toggle(
                     "minimal",
                     settings.minimal,
+                );
+                document.documentElement.classList.toggle(
+                    "tab2d",
+                    settings.tabView,
                 );
                 $("fonts").href = theme.href;
                 const vars = {
@@ -2416,6 +2480,7 @@
                         frames: FRAMES,
                         repeatMarks: REPEAT_MARKS,
                         markings: MARKINGS,
+                        tabLayout: TAB_LAYOUTS,
                         stringOrder: STRING_ORDERS,
                         headstock: HEADSTOCKS,
                     }[setting];
@@ -2486,7 +2551,17 @@
                 $(key).oninput = (e) => setView({ [key]: +e.target.value });
             }
             showView();
-            $("resetView").onclick = () => setView(VIEW_START);
+            // Everything in the settings dialog back to its default. The volume, the toolbar's switches and the open tab stay
+            $("resetSettings").onclick = () => {
+                const { volume, volumeMuted, metronome, minimal, tabView, panel } = settings;
+                Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, tabView, panel });
+                for (const key of ["guides", "notes3d", "songIntro", "mute"])
+                    $(key).checked = settings[key];
+                if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
+                setOffset(settings.offset);
+                applyTheme();
+                setView(Object.fromEntries(Object.keys(VIEW).map((key) => [key, settings[key]])));
+            };
             const setOffset = (ms) => {
                 settings.offset = $("offset").value = ms;
                 $("offsetOut").value = `${ms > 0 ? "+" : ""}${ms} ms`;
@@ -2637,7 +2712,7 @@
                 if (!e.target.closest("#menu, #menuButton")) toggleMenu(false);
             });
 
-            // --- Notation legend: what each mark on the highway means, drawn in the current theme's colours
+            // --- Notation legend: what each mark on the highway, or on the 2D tab, means, drawn in the current theme's colours
             const svg = (inner) =>
                 `<svg viewBox="0 0 56 32" aria-hidden="true">${inner}</svg>`;
             const gem = (x, y, w = 24, h = 12, c = 1, label = "") =>
@@ -3038,6 +3113,236 @@
                     ],
                 ],
             ];
+            // The same marks as they show in the 2D tab view: bars along faint strings, a fret number at their start
+            const lane = (...ys) =>
+                ys.map((y) => `<path d="M2 ${y}h52" class="lt" stroke-width=".8" opacity=".3"/>`).join("");
+            const tx = (x, y, text, size = 8, cls = "fi", extra = "") =>
+                `<text x="${x}" y="${y + 0.5}" class="${cls}" font-size="${size}" ${extra}>${text}</text>`;
+            const bar = (x, y, w, c, fret, extra = "", at = x + Math.min(w, 12) / 2) =>
+                `<rect x="${x}" y="${y - 5}" width="${w}" height="10" rx="2" class="f${c}" ${extra}/>${fret ? tx(at, y, fret) : ""}`;
+            const bracket = (y0, y1, cls = 'class="lt" stroke-width="1.5" opacity=".7"') =>
+                `<path d="M14 ${y0}h-3v${y1 - y0}h3" ${cls}/>`;
+            const over = (mark, size = 9, extra = "") =>
+                `${lane(23)}${bar(22, 23, 12, 1, "5")}${tx(28, 10, mark, size, "ft", extra)}`;
+            const barMark = (text, size = 8) =>
+                `<path d="M8 12v18" class="lt" stroke-width="1" opacity=".4"/>${tx(12, 6, "5", 7, "fm")}${tx(34, 6, text, size, "fa")}`;
+            const TAB_LEGEND = [
+                [
+                    "Notes and chords",
+                    [
+                        [
+                            "Note",
+                            "Play this string at this fret when the start of its bar reaches the play line. The small number beside the fret is the finger to use (T = thumb).",
+                            svg(`${lane(16)}${bar(10, 16, 36, 1, "7")}${tx(22, 16.5, "1", 5.5, "fi", 'opacity=".7"')}`),
+                        ],
+                        [
+                            "Play line",
+                            "Play each note as it reaches the line. Scrolling, played notes dim and fade out to the left; in pages (Settings), the page holds still and the line moves across it.",
+                            svg(`${lane(16)}${bar(4, 16, 12, 1, "3", 'opacity=".4"')}<path d="M21 3v26" class="la" stroke-width="2.5"/>${bar(26, 16, 24, 1, "5")}`),
+                        ],
+                        [
+                            "Open string",
+                            "Play the string without fretting it.",
+                            svg(`${lane(16)}${bar(22, 16, 12, 3, "0")}`),
+                        ],
+                        [
+                            "Played again",
+                            "The same chord as just before: strum it again on this beat. Its notes show as outlines, their marks greyed out.",
+                            svg(`${lane(16)}<rect x="20" y="11" width="16" height="10" rx="2" class="l1" stroke-width="1.5"/>${tx(28, 16, "5", 8, "f1")}`),
+                        ],
+                        [
+                            "Chord",
+                            "Play these notes together: a bracket runs down the side of them.",
+                            svg(`${lane(9, 23)}${bracket(3, 29)}${bar(16, 9, 14, 1, "5")}${bar(16, 23, 14, 2, "7")}`),
+                        ],
+                        [
+                            "Accented chord",
+                            "Strum it harder: its bracket is white, and thicker for a heavy accent.",
+                            svg(`${lane(9, 23)}${bracket(3, 29, 'class="lw" stroke-width="2.5"')}${bar(16, 9, 14, 1, "5")}${bar(16, 23, 14, 2, "7")}`),
+                        ],
+                        [
+                            "Arpeggio",
+                            "Hold the chord shape and play its strings one at a time, for as long as the dashed outline runs. Its name is over it.",
+                            svg(`${lane(10, 22)}<rect x="5" y="3" width="46" height="26" rx="4" class="lt" stroke-width="1" stroke-dasharray="3 2" opacity=".55"/>${bar(9, 22, 10, 2, "2")}${bar(24, 10, 10, 1, "1")}${bar(38, 22, 10, 2, "2")}`),
+                        ],
+                        [
+                            "Chord name",
+                            "The chord you are playing, over the strings where it starts. It shows when the chord changes.",
+                            svg(tx(28, 16, "G5", 16, "ft")),
+                        ],
+                        [
+                            "Barre",
+                            "Lay one finger across several strings at the fret shown. ½B is a half barre.",
+                            svg(`${lane(14, 25)}${bracket(9, 30)}${tx(21, 4.5, "½B5", 7, "ft")}${bar(16, 14, 14, 1, "5")}${bar(16, 25, 14, 2, "5")}`),
+                        ],
+                        [
+                            "Hand position",
+                            "Move your hand so your index finger is at this fret. Under the tab, where the hand moves (Hand position guides in Settings).",
+                            svg(`${lane(8)}<path d="M14 13v12" class="ll" stroke-width="1.5"/>${tx(31, 22, "fret 5", 9, "fl")}`),
+                        ],
+                        [
+                            "String number",
+                            "Play it on this string (1 is the high e).",
+                            svg(`${lane(16)}<circle cx="15" cy="16" r="6.5" class="l2" stroke-width="1.2"/>${tx(15, 16, "3", 7, "f2")}${bar(26, 16, 16, 2, "5")}`),
+                        ],
+                        [
+                            "Bar number",
+                            "Each bar line is numbered along the top of the tab.",
+                            svg(`${lane(20)}<path d="M20 9v22" class="lt" stroke-width="1" opacity=".5"/>${tx(28, 5, "12", 8, "fm")}`),
+                        ],
+                    ],
+                ],
+                [
+                    "Picking hand",
+                    [
+                        ["Palm mute", "Rest the side of your picking hand on the strings near the bridge: PM over the note.", svg(over("PM", 8))],
+                        [
+                            "Fret-hand mute",
+                            "Touch the string with your fretting hand without pressing it down, for a percussive click: a grey bar with an ×.",
+                            svg(`${lane(16)}<rect x="20" y="11" width="16" height="10" rx="2" class="ft" opacity=".22"/>${tx(28, 16, "×", 10, "ft")}`),
+                        ],
+                        [
+                            "Down and up strokes",
+                            "Pick down (⊓) or up (V).",
+                            svg(`${lane(23)}${bar(8, 23, 12, 1, "5")}${bar(36, 23, 12, 1, "5")}<path d="M10 14V6h8v8" class="lt" stroke-width="1.4"/><path d="M38 6l4 8 4-8" class="lt" stroke-width="1.4"/>`),
+                        ],
+                        ["Picking-hand fingers", "p thumb, i index, m middle, a ring, c little finger.", svg(over("i", 10, 'font-style="italic"'))],
+                        [
+                            "Strum",
+                            "Strum the chord in the direction of the arrow beside it, where a Guitar Pro file marks it.",
+                            svg(`${lane(9, 23)}<path d="M5 4v22M2.5 22.5l2.5 3.5 2.5-3.5" class="lt" stroke-width="1.4"/>${bracket(3, 29)}${bar(16, 9, 14, 1, "5")}${bar(16, 23, 14, 2, "7")}`),
+                        ],
+                        [
+                            "Rolled chord",
+                            "Roll the chord: sound the strings one after another, quickly. The arrow beside it is wavy.",
+                            svg(`${lane(9, 23)}<path d="M5 4q2 2 0 4.5t0 4.5 0 4.5 0 4.5 0 4M2.5 22.5l2.5 3.5 2.5-3.5" class="lt" stroke-width="1.3"/>${bracket(3, 29)}${bar(16, 9, 14, 1, "5")}${bar(16, 23, 14, 2, "7")}`),
+                        ],
+                        [
+                            "Tremolo picking",
+                            "Pick the note as fast as you can for its whole length: three slashes over it.",
+                            svg(`${lane(24)}${bar(22, 24, 24, 1, "5")}<path d="M23 16l10-3M23 11.5l10-3M23 7l10-3" class="lt" stroke-width="1.4"/>`),
+                        ],
+                        ["Rasgueado", "Flamenco strum: flick the fingers out one after another in the pattern shown.", svg(over("rasg.", 8))],
+                        ["Slap and pop", "Bass: hit the string with your thumb, or pull it away with a finger and let it snap back.", svg(over("slap", 8))],
+                        ["Golpe", "Tap the body of the guitar with your thumb or a finger.", svg(over("golpe", 8))],
+                    ],
+                ],
+                [
+                    "Fretting hand and legato",
+                    [
+                        [
+                            "Hammer-on",
+                            "Sound the note by hammering a finger down, without picking: an arc from the note before, with H on it.",
+                            svg(`${lane(23)}${bar(4, 23, 12, 1, "5")}${bar(38, 23, 12, 1, "7")}<path d="M10 16Q27 5 44 16" class="lt" stroke-width="1.4"/>${tx(27, 7, "H", 8, "ft")}`),
+                        ],
+                        [
+                            "Pull-off",
+                            "Pull your finger off the string to sound the lower note: an arc from the note before, with P on it.",
+                            svg(`${lane(23)}${bar(4, 23, 12, 1, "7")}${bar(38, 23, 12, 1, "5")}<path d="M10 16Q27 5 44 16" class="lt" stroke-width="1.4"/>${tx(27, 7, "P", 8, "ft")}`),
+                        ],
+                        [
+                            "Tie",
+                            "Hold the note on into the next one without playing it again: a dashed arc under them.",
+                            svg(`${lane(12)}${bar(4, 12, 12, 1, "5")}${bar(38, 12, 12, 1, "5")}<path d="M10 19Q27 30 44 19" class="lt" stroke-width="1.3" stroke-dasharray="3 2"/>`),
+                        ],
+                        [
+                            "Slide",
+                            "Slide to the next note, up or down the way the slash after the bar points. A dashed slash means slide off without a clear target.",
+                            svg(`${lane(16)}${bar(4, 16, 22, 1, "5")}<path d="M29 20l8-8" class="lt" stroke-width="1.6"/>${bar(40, 16, 12, 1, "7")}`),
+                        ],
+                        [
+                            "Slide in and out",
+                            "Slide into the note from below or above (the slash before it), or off it at the end (the slash after).",
+                            svg(`${lane(16)}<path d="M8 20l8-8" class="lt" stroke-width="1.6"/>${bar(20, 16, 16, 1, "5")}<path d="M40 12l8 8" class="lt" stroke-width="1.6"/>`),
+                        ],
+                        ["Tapping", "Tap the note with a finger of your picking hand: T over it. m.g. marks a tap with the fretting hand.", svg(over("T"))],
+                        [
+                            "Grace note",
+                            "A quick note played just before the beat: a smaller note.",
+                            svg(`${lane(16)}<rect x="8" y="12.4" width="9" height="7.2" rx="1.5" class="f2"/>${tx(12.5, 16, "5", 6)}${bar(22, 16, 24, 2, "7")}`),
+                        ],
+                        ["Trill", "Alternate quickly between the note and the fret shown.", svg(over("tr 7", 8))],
+                        ["Turn and mordent", "Ornaments: a quick flick to the neighbouring notes and back.", svg(over("turn", 8))],
+                    ],
+                ],
+                [
+                    "Sustain and pitch",
+                    [
+                        ["Sustain", "Keep the note ringing for as long as its bar.", svg(`${lane(16)}${bar(6, 16, 44, 1, "5")}`)],
+                        [
+                            "Let ring",
+                            "Let the note ring on over the notes after it: its bar runs on faint and dashed.",
+                            svg(`${lane(16)}<rect x="6" y="11" width="44" height="10" rx="2" class="f1" opacity=".3"/><path d="M22 16h24" class="l1" stroke-width="1.5" stroke-dasharray="3 3"/>${bar(6, 16, 12, 1, "5")}`),
+                        ],
+                        [
+                            "Vibrato",
+                            "Shake the note for as long as the wave over its bar. A taller wave means a wider vibrato.",
+                            svg(`${lane(22)}${bar(6, 22, 44, 1, "5")}<path d="M8 12q2.5-3 5 0t5 0 5 0 5 0 5 0 5 0 5 0 5 0" class="lt" stroke-width="1.4"/>`),
+                        ],
+                        [
+                            "Bend",
+                            "Bend the string up by the amount shown: ½ is one fret higher, full is two. The arrow rises from the note's number.",
+                            svg(`${lane(23)}${bar(6, 23, 34, 1, "7")}<path d="M14 18q4-1 5-12" class="lt" stroke-width="1.4"/><path d="M16.5 9l2.5-3.5 2 3.8" class="lt" stroke-width="1.4"/>${tx(36, 8, "full", 8, "ft")}`),
+                        ],
+                        [
+                            "Bend and release",
+                            "Bend up, then let the string back down: an arrow up, then one down.",
+                            svg(`${lane(23)}${bar(4, 23, 40, 1, "7")}<path d="M12 18q4-1 5-12M17 6q6 2 6 12" class="lt" stroke-width="1.4"/><path d="M14.5 9l2.5-3.5 2 3.8M20.5 15l2.5 3.5 2.5-3.5" class="lt" stroke-width="1.4"/>${tx(40, 8, "full", 8, "ft")}`),
+                        ],
+                        [
+                            "Pre-bend",
+                            "Bend the string before you pick it, then play: a straight arrow up.",
+                            svg(`${lane(23)}${bar(6, 23, 34, 1, "7")}<path d="M16 18V5M13.5 8l2.5-3 2.5 3" class="lt" stroke-width="1.4"/>${tx(36, 8, "pre ½", 8, "ft")}`),
+                        ],
+                        ["Whammy bar", "Push or pull the whammy bar.", svg(over("w/bar", 8))],
+                    ],
+                ],
+                [
+                    "Harmonics",
+                    [
+                        [
+                            "Natural harmonic",
+                            "Touch the string lightly right above the fret wire, without pressing, and pick: the fret in angle brackets.",
+                            svg(`${lane(16)}${bar(12, 16, 32, 4, "&lt;12&gt;", "", 28)}`),
+                        ],
+                        ["Pinch harmonic", "Catch the string with the side of your thumb just after the pick.", svg(over("PH", 8))],
+                        ["Artificial harmonic", "Fret the note and touch the string 12 frets higher while you pick.", svg(over("AH", 8))],
+                        ["Tapped harmonic", "Fret the note and tap the string 12 frets higher.", svg(over("TH", 8))],
+                        ["Semi and feedback harmonics", "SH: half harmonic, half note. FH: hold it until it feeds back.", svg(over("SH", 8))],
+                    ],
+                ],
+                [
+                    "Articulation and expression",
+                    [
+                        ["Accent", "Play it louder. ^ is a strong accent; – means hold it for its full length.", svg(over("&gt;", 11))],
+                        ["Staccato", "Short: stop the note right after you play it: a dot over it.", svg(`${lane(23)}${bar(22, 23, 12, 1, "5")}<circle cx="28" cy="12" r="1.8" class="ft"/>`)],
+                        ["Ghost note", "Barely audible: felt more than heard. Faint, in brackets.", svg(`${lane(16)}${bar(16, 16, 24, 1, "(7)", 'opacity=".55"', 28)}`)],
+                        ["Dynamics", "How loud, from very soft (pp) to very loud (ff), under the tab where it changes.", svg(`${lane(8)}${tx(28, 21, "mf", 14, "ft", 'font-style="italic"')}`)],
+                        [
+                            "Crescendo and diminuendo",
+                            "Get louder along an opening wedge, softer along a closing one, under the tab.",
+                            svg(`${lane(8)}<path d="M48 15L8 21L48 27" class="lt" stroke-width="1.5"/>`),
+                        ],
+                        ["Swell and fade", "Fade the note in with the volume knob, or fade it out.", svg(over("swell", 8))],
+                        ["Wah", "Wah pedal open (o) or closed (+).", svg(over("o  +", 9))],
+                        [
+                            "Fermata",
+                            "Hold the note longer than written.",
+                            svg(`${lane(24)}${bar(22, 24, 12, 1, "5")}<path d="M21 15a7 7 0 0 1 14 0" class="lt" stroke-width="1.5"/><circle cx="28" cy="13.5" r="1.5" class="ft"/>`),
+                        ],
+                    ],
+                ],
+                [
+                    "Along the top",
+                    [
+                        ["Tempo, time and key", "From this bar on, a new tempo, time signature, key or swing feel, beside the bar's number.", svg(barMark("♩ = 120"))],
+                        ["Repeats and endings", "Where a repeat starts, how many times, and which ending you are on.", svg(barMark("repeat ×2", 7))],
+                        ["Jumps", "Road signs to follow: segno, coda, D.C. (from the start), D.S. (from the segno), fine.", svg(barMark("D.S. al coda", 6))],
+                        ["8va and loco", "Play an octave higher, until loco.", svg(barMark("8va", 9))],
+                        ["Text", "Instructions written in the file, like pizz. or bass stop.", svg(barMark("pizz.", 9))],
+                    ],
+                ],
+            ];
             // groups: [[heading, [[name, meaning, drawing (HTML)]]]] → a heading and a row for each
             const legendRows = (groups) =>
                 groups.flatMap(([group, items]) => [
@@ -3059,14 +3364,6 @@
                         return row;
                     }),
                 ]);
-            $("legendList").replaceChildren(
-                ...legendRows(LEGEND),
-                Object.assign(document.createElement("p"), {
-                    className: "legend-empty",
-                    textContent: "Nothing matches.",
-                    hidden: true,
-                }),
-            );
             $("legendFind").oninput = (e) => {
                 // show the matching rows, and only the headings that still have some
                 const needle = e.target.value.trim().toLowerCase();
@@ -3089,6 +3386,20 @@
                 }
                 closeGroup();
                 $("legendList").lastElementChild.hidden = shown > 0;
+            };
+            // The marks as the view shows them, highway or tab, then the keyboard shortcuts (see SHORTCUTS); a search stays on
+            let shortcutRows = () => [];
+            const showLegend = () => {
+                $("legendList").replaceChildren(
+                    ...legendRows(settings.tabView ? TAB_LEGEND : LEGEND),
+                    ...shortcutRows(),
+                    Object.assign(document.createElement("p"), {
+                        className: "legend-empty",
+                        textContent: "Nothing matches.",
+                        hidden: true,
+                    }),
+                );
+                $("legendFind").oninput({ target: $("legendFind") });
             };
             applyTheme();
 
@@ -3160,19 +3471,24 @@
             });
             // paused: the tick the player was paused at. alphaTab 1.8 rewinds to the start on pause, so the position it reports
             // then is ignored and play resumes from here.
+            // heard: audio has played since the last start or seek. alphaTab says Playing before the first samples are out, so
+            // extrapolating before then runs the notes ahead and the first real position pulls them back: a stutter.
             const synth = {
                 tick: 0,
                 at: 0,
                 playing: false,
+                heard: false,
                 tempo: [],
                 paused: null,
             };
             api.playerPositionChanged.on((e) => {
-                if (synth.paused === null)
-                    [synth.tick, synth.at] = [e.currentTick, performance.now()];
+                if (synth.paused !== null) return;
+                [synth.tick, synth.at] = [e.currentTick, performance.now()];
+                if (!e.isSeek) synth.heard = true;
             });
             api.playerStateChanged.on((e) => {
                 synth.playing = e.state === alphaTab.synth.PlayerState.Playing;
+                synth.heard = false;
                 synth.at = performance.now();
                 updatePlayButton();
             });
@@ -3192,7 +3508,7 @@
                 get time() {
                     return synth.tempo.length
                         ? (tickToMs(synth.tempo, synth.tick) +
-                              (synth.playing && synth.paused === null
+                              (synth.playing && synth.heard && synth.paused === null
                                   ? Math.min(
                                         performance.now() - synth.at,
                                         100,
@@ -3220,6 +3536,7 @@
                 seek: (t) => {
                     synth.tick = msToTick(synth.tempo, Math.max(0, t) * 1000);
                     synth.at = performance.now();
+                    synth.heard = false; // the synth refills its buffers from here
                     if (synth.paused !== null) synth.paused = synth.tick;
                     api.tickPosition = synth.tick;
                 },
@@ -3372,7 +3689,7 @@
                             )
                                 beats.push({
                                     time: sec(mb.start + i * perBeat),
-                                    measure: i ? -1 : master.index,
+                                    measure: i ? -1 : master.index + 1, // counted from 1
                                 });
                             if (master.section)
                                 sections.push({
@@ -4327,7 +4644,7 @@
                 audioClock();
                 $(key).setAttribute("aria-pressed", String(settings[key]));
             }
-            for (const key of ["metronome", "minimal"]) {
+            for (const key of ["metronome", "minimal", "tabView"]) {
                 $(key).setAttribute("aria-pressed", String(settings[key]));
                 $(key).onclick = () => toggleTool(key);
             }
@@ -4337,6 +4654,12 @@
                 markLoop(); // the loop's box is measured on the phrase bars, which weren't showing
             };
             $("minimal").onclick = toggleMinimal;
+            const toggleTabView = () => {
+                toggleTool("tabView");
+                applyTheme();
+                showLegend();
+            };
+            $("tabView").onclick = toggleTabView;
             // The speed trainer works on a loop played slower than it could be: without both it switches off, which is
             // also how it stops once it has sped up to 100%. Both sit on the loop, with an X that clears it
             let training = false;
@@ -4510,6 +4833,7 @@
                             "Just the highway and the lyrics",
                             toggleMinimal,
                         ],
+                        [["d"], "D", "2D tab view", "Or back to the 3D highway", toggleTabView],
                         [["f"], "F", "Full screen", "", toggleFullscreen],
                         [["o"], "O", "Open a song", "", () => $("open").click()],
                         [["s"], "S", "Settings", "", () => toggleSheet("settings")],
@@ -4534,8 +4858,8 @@
                     ],
                 ],
             ];
-            $("legendList").lastElementChild.before(
-                ...legendRows(
+            shortcutRows = () =>
+                legendRows(
                     SHORTCUTS.map(([group, rows]) => [
                         `Keyboard shortcuts: ${group.toLowerCase()}`,
                         rows.map(([, shown, name, more]) => [
@@ -4547,8 +4871,8 @@
                                 .join("")}</div>`,
                         ]),
                     ]),
-                ),
-            );
+                );
+            showLegend();
             const SHORTCUT_KEYS = new Map(
                 SHORTCUTS.flatMap(([, rows]) =>
                     rows.flatMap(([keys, , , , run]) => keys.map((k) => [k, run])),
@@ -4831,7 +5155,7 @@
                     });
                 lap("song");
                 const shown = benchTime() ?? t;
-                drawHighway(canvas, arr, shown, theme, cam);
+                (settings.tabView ? drawTab : drawHighway)(canvas, arr, shown, theme, cam);
                 if (song && arr) updateOverlay(shown);
                 lap("overlay");
                 endFrame();

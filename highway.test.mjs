@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { moveCamera, bendAt, drawHighway } from './highway.js';
+import { moveCamera, bendAt, drawHighway, drawTab } from './highway.js';
 import { parseArrangement } from './the reference game.js';
 import { LOOKS, DEFAULT_STYLE, theme } from './themes.js';
 
@@ -80,5 +80,65 @@ const trailTop = (string) => { // the top of the wavy spine on screen, the chord
   return top;
 };
 assert.ok(trailTop(2) > trailTop(0) + 10, 'the trail stops short of the note below it');
+
+// The 2D tab view draws the fret numbers of the notes coming up, and none from long ago
+const texts = [];
+const writer = new Proxy({ fillText: (str) => texts.push(str) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+for (const stringOrder of ['low', 'high'])
+  assert.doesNotThrow(() => drawTab({ ...canvas, getContext: () => writer }, { ...arrangement, open: [40, 45, 50, 55, 59, 64] }, 2, { ...theme(DEFAULT_STYLE), stringOrder }));
+const frets = arrangement.notes.filter((note) => note.time >= 2 && note.time < 4).map((note) => String(note.fret));
+assert.ok(frets.every((f) => texts.includes(f)), 'the notes in view are numbered');
+assert.ok(texts.includes('E') && texts.includes('B'), 'the strings are named');
+texts.length = 0;
+drawTab({ ...canvas, getContext: () => writer }, arrangement, 20, theme(DEFAULT_STYLE));
+assert.equal(texts.length, 0, 'nothing left once the song has gone by');
+
+// A held note sliding into a chord, and sixteenths closer than a note is wide: on a string, each bar ends before the next
+// note begins, with room for the chord's bracket and the slide's slash in between
+const bars = new Map(); // row → [x, end]
+const boxes = new Proxy({ roundRect: (x, y, w, h) => h < 60 && (bars.get(y) ?? bars.set(y, []).get(y)).push([x, x + w]) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+const { arrangement: tight } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>10</songLength>
+  <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
+  <levels><level difficulty="0"><notes><note time="1" string="0" fret="3" sustain="0.3" slideTo="5" />
+  ${[1.8, 1.9, 2, 2.1].map((time, i) => `<note time="${time}" string="0" fret="${12 + i}" />`).join('')}</notes>
+  <chords><chord time="1.3" chordId="0"><chordNote time="1.3" string="0" fret="5" /><chordNote time="1.3" string="1" fret="7" /></chord></chords>
+  <anchors><anchor time="0" fret="3" width="4" /></anchors></level></levels></song>`);
+drawTab({ ...canvas, getContext: () => boxes }, { ...tight, open: [40, 45, 50, 55, 59, 64] }, 0.5, theme(DEFAULT_STYLE));
+const lane = [...bars.values()].find((b) => b.length === 6).sort((a, b) => a[0] - b[0]);
+assert.ok(lane.slice(1).every(([x], i) => x >= lane[i][1] + 4), `bars on a string overlap: ${JSON.stringify(lane)}`);
+assert.ok(lane[1][0] - lane[0][1] >= 24, 'room for the slide slash and the chord bracket');
+
+// In pages, the notes hold still while the play line moves across the page; scrolling, they move
+const placed = [];
+const placer = new Proxy({ fillText: (str, x) => placed.push(x) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+const numbersAt = (now, tabLayout) => {
+  placed.length = 0;
+  drawTab({ ...canvas, getContext: () => placer }, arrangement, now, { ...theme(DEFAULT_STYLE), tabLayout });
+  return placed.join();
+};
+assert.equal(numbersAt(2, 'pages'), numbersAt(2.2, 'pages'), 'a page holds still');
+assert.notEqual(numbersAt(2, 'scroll'), numbersAt(2.2, 'scroll'), 'scrolling moves');
+
+// Every notation the highway shows draws in the tab view too, in both layouts
+const marks = [
+  { hammerOn: true }, { pullOff: true }, { bendCurve: [[0, 0], [0.5, 1], [1, 0]], sustain: 1 }, { bendCurve: [[0, 1], [1, 1]], sustain: 0.5 },
+  { slideTo: 9, sustain: 0.5 }, { slideUnpitchTo: 2, slideTo: null, sustain: 0.4 }, { slideIn: 'below', slideOut: 'down' }, { tieTo: 0 },
+  { letRing: true, sustain: 1.5 }, { grace: true }, { showString: true }, { pick: 'down' }, { pick: 'up' }, { fermata: true }, { tremolo: true },
+  { staccato: true, accent: 'heavy' }, { accent: 'tenuto' }, { dynamicLabel: 'pp' }, { harmonic: true, harmonicType: 'artificial' },
+  { harmonicPinch: true }, { rightFinger: 'i', tapLeft: true }, { tap: true }, { vibrato: true, vibratoWide: true }, { mute: true },
+  { ghost: true, palmMute: true }, { slap: true }, { golpe: 'thumb', rasgueado: 'i i' }, { trill: 7, ornament: 'turn' },
+  { fade: 'swell', whammy: [[0, 0], [1, -1]], wah: 'open' }, { finger: 0 }, { repeat: true },
+];
+const notated = {
+  ...arrangement, open: [40, 45, 50, 55, 59, 64],
+  notes: arrangement.notes.map((note, i) => ({ ...note, ...marks[i % marks.length], chord: i < 2 ? 0 : null })),
+  chords: [{ time: 1, name: 'E5', notes: [0, 1], fingers: [1, 3, -1, -1, -1, -1], accent: 'heavy', strum: 'down', barre: { fret: 1, from: 0, to: 1, half: true } }],
+  handShapes: [{ startTime: 3, endTime: 5, name: 'Am', frets: [0, 2, 2, 1, 0, -1], fingers: [], arpeggio: true }],
+  markers: [{ time: 1, text: '♩ = 120' }], hairpins: [{ time: 2, endTime: 3, kind: 'cresc' }, { time: 4, endTime: 5, kind: 'dim' }],
+  beats: [0, 1, 2, 3, 4, 5, 6].map((time) => ({ time, measure: time % 2 ? -1 : time / 2 + 1 })),
+};
+for (const tabLayout of ['scroll', 'pages'])
+  for (const now of [0, 1.5, 3, 6])
+    assert.doesNotThrow(() => drawTab(canvas, notated, now, { ...theme(DEFAULT_STYLE), tabLayout, markings: 'white' }), `${tabLayout} at ${now} s`);
 
 console.log('ok');
