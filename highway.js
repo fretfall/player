@@ -24,73 +24,79 @@ const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead;
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
 
-// Headstocks in front of the nut, after the classic types rather than any maker's outline (drawn up in design/headstocks).
-// Measured in half neck widths from the middle of the nut: u runs away from the nut, v across toward the bass strings
-// (±1: the neck's edges). An outline or cover is a smooth closed curve through its points (a point given twice is a
-// corner). Posts run from `from` to `to`, lowest string nearest the nut: all on the bass side, or split, the treble strings
-// mirrored on the other side; on a classical head they are the rollers in its slots. Each post has a key on the edge
-// beside it: machine heads, blade keys, tulips or pearl buttons. A headless neck ends its strings in clamps instead
+export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
+  const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
+  const corner = (cu, cv, from) => Array.from({ length: 5 }, (_, j) => [cu + Math.cos(from + (j * Math.PI) / 8) * r, cv + Math.sin(from + (j * Math.PI) / 8) * r]);
+  return [...corner(ub - r, vb - r, 0), ...corner(ua + r, vb - r, Math.PI / 2), ...corner(ua + r, va + r, Math.PI), ...corner(ub - r, va + r, 1.5 * Math.PI)];
+};
+// Headstocks in front of the nut, named after their classic types rather than any maker, traced from photos of each and drawn
+// at about two thirds of their length so they fit beside the nut. Measured in half neck widths from the middle of the nut: u runs
+// away from the nut, v across toward the bass strings (±1: the neck's edges). An outline or cover is a smooth closed curve
+// through its points (a point given twice is a corner). Posts run from `from` to `to`, lowest string nearest the nut; with a
+// treble side, that share of the strings (the highest nearest the nut) goes to a row of its own on the other side, mirrored
+// unless it runs from and to somewhere else. Each post has a key on the head's edge on its side: machine heads or tulips. A
+// headless neck ends its strings in clamps instead
 const mirror = (half) => [...half, half.at(-1), ...half.slice(0, -1).reverse().map(([u, v]) => [u, -v])]; // a corner at the tip
 export const HEADSTOCKS = {
   inline: {
-    label: 'Six in line',
-    outline: [[0, 1], [0.35, 1], [0.9, 1.2], [1.6, 1.4], [2.6, 1.5], [3.6, 1.56], [4.4, 1.6], [4.95, 1.47], [5.2, 1.1], [5.2, 0.56], [5, 0.22], [4.6, 0.03], [4.1, 0.02], [3.3, -0.1], [2.4, -0.3], [1.5, -0.6], [0.8, -0.94], [0.35, -1], [0, -1]],
-    posts: { from: [1.25, 0.78], to: [4.45, 1.08] },
+    label: '6 in line',
+    outline: [[0, 1], [0.32, 1.05], [0.56, 1.3], [0.78, 1.53], [1.12, 1.45], [2.1, 1.08], [3.37, 0.62], [4.45, 0.17], [5.03, -0.13], [5.29, -0.35], [5.41, -0.88], [5.37, -1.56], [5.11, -2.11], [4.72, -2.38], [4.3, -2.34], [4.01, -2.05], [3.84, -1.66], [3.65, -1.39], [3.27, -1.3], [2.69, -1.39], [2, -1.6], [1.42, -1.81], [0.91, -1.75], [0.64, -1.36], [0.36, -1.06], [0, -1]],
+    posts: { from: [1.2, 0.95], to: [4.62, -0.58] },
     keys: 'machine',
-    trussNut: [0.22, 0], // where the truss rod adjusts
-    tree: 2.6, // a string tree over the top two strings, this far out
+    tree: 1.9, // a string tree over the top two strings, this far out
   },
-  split: {
-    label: 'Three a side',
-    outline: mirror([[0, 1], [0.3, 1], [0.9, 1.14], [1.8, 1.28], [2.8, 1.39], [3.7, 1.47], [4.3, 1.49], [4.56, 1.35], [4.72, 0.9], [4.62, 0.38], [4.34, 0]]),
-    posts: { from: [1.55, 0.78], to: [3.75, 1], split: true },
+  fourTwo: {
+    label: '4 + 2',
+    outline: [[0, 1], [0.37, 1.03], [0.72, 1.35], [0.93, 1.72], [1.17, 1.72], [2.3, 1.31], [3.25, 0.95], [4.25, 0.57], [4.55, 0.28], [4.67, -0.36], [4.65, -1.03], [4.45, -1.53], [4.12, -1.67], [3.81, -1.53], [3.6, -1.29], [3.35, -1.19], [3.09, -1.32], [2.82, -1.56], [2.3, -1.67], [1.6, -1.6], [1.08, -1.43], [0.72, -1.16], [0.37, -1.03], [0, -1]],
+    posts: { from: [1.39, 1.08], to: [3.8, -0.03], treble: { share: 1 / 3, from: [1.79, -1.03], to: [2.6, -0.69] } },
+    keys: 'machine',
+  },
+  openBook: {
+    label: '3 + 3 open book',
+    outline: mirror([[0, 1], [0.37, 1.07], [0.74, 1.33], [1.13, 1.53], [2.43, 1.67], [3.83, 1.76], [4.81, 1.8], [4.81, 1.8], [4.94, 0.93], [4.85, 0]]),
+    posts: { from: [1.92, 1.07], to: [3.92, 1.07], treble: { share: 1 / 2 } },
     keys: 'tulip',
-    cover: [[0.3, 0], [0.34, 0.14], [0.66, 0.21], [1, 0.32], [1.24, 0.22], [1.28, 0], [1.24, -0.22], [1, -0.32], [0.66, -0.21], [0.34, -0.14], [0.3, 0]], // a bell truss rod cover
-    screws: [[0.48, 0], [1.06, 0]],
+    cover: [[0.17, 0], [0.17, 0.4], [0.28, 0.5], [0.6, 0.4], [1, 0.25], [1.4, 0.16], [1.64, 0.1], [1.72, 0], [1.64, -0.1], [1.4, -0.16], [1, -0.25], [0.6, -0.4], [0.28, -0.5], [0.17, -0.4], [0.17, 0]], // a bell truss rod cover
+    screws: [[0.33, 0], [1.52, 0]],
   },
   pointed: {
-    label: 'Pointed',
-    outline: [[0, 1], [0.35, 1], [1, 1.15], [2, 1.28], [3, 1.4], [4, 1.5], [4.55, 1.55], [4.86, 1.36], [5.75, -0.55], [5.75, -0.55], [4.6, -0.12], [3.6, 0.02], [2.6, -0.08], [1.6, -0.4], [0.8, -0.86], [0.35, -1], [0, -1]],
-    posts: { from: [1.4, 0.72], to: [4.45, 1.03] },
-    keys: 'blade',
-    cover: [[0.52, 0.2], [0.52, 0.2], [0.98, 0.2], [1.26, 0], [1.26, 0], [0.98, -0.2], [0.52, -0.2], [0.52, -0.2], [0.52, 0.2]], // a shield
-    screws: [[0.7, 0]],
-    lockingNut: true, // clamping the strings in pairs, in place of the nut
-  },
-  classical: {
-    label: 'Classical',
-    outline: mirror([[0, 1.02], [0.3, 1.03], [1.5, 1.13], [3, 1.23], [3.72, 1.27], [3.92, 1.1], [3.88, 0.62], [4.18, 0.34], [4.36, 0]]),
-    slots: [0.95, 3.35, 0.28, 0.8], // u from, to, v from, to, round-ended (and mirrored)
-    posts: { from: [1.45, 0.54], to: [2.85, 0.54], split: true },
-    keys: 'pearl',
+    label: '3 + 3 pointed',
+    outline: [[0, 1], [0.28, 1.12], [0.58, 1.47], [0.82, 1.84], [1.06, 1.93], [1.76, 1.73], [2.51, 1.55], [3.35, 1.35], [4.19, 1.12], [4.42, 0.95], [4.51, 0.43], [4.6, -0.22], [4.84, -0.75], [5.19, -1.22], [5.19, -1.22], [4.75, -1.24], [4.1, -1.3], [3.35, -1.37], [2.51, -1.55], [1.76, -1.73], [1.06, -1.93], [0.82, -1.84], [0.58, -1.47], [0.28, -1.12], [0, -1]],
+    posts: { from: [1.59, 1], to: [3.58, 0.46], treble: { share: 1 / 2 } },
+    keys: 'machine',
+    cover: [[0.08, 0.44], [0.08, 0.44], [0.45, 0.4], [0.85, 0.28], [1.3, 0], [1.3, 0], [0.85, -0.28], [0.45, -0.4], [0.08, -0.44], [0.08, -0.44], [0.08, 0.44]], // a pointed arch truss rod cover
+    screws: [],
   },
   headless: {
     label: 'Headless',
-    outline: [[0.2, 0], [0.2, 0.9], [0.25, 1.03], [0.36, 1.06], [0.79, 1.06], [0.9, 1.03], [0.95, 0.9], [0.95, -0.9], [0.9, -1.03], [0.79, -1.06], [0.36, -1.06], [0.25, -1.03], [0.2, -0.9], [0.2, 0]],
-    clamps: 0.62,
+    outline: rounded(0.2, 0.95, -1.06, 1.06, 0.2),
+    clamps: 0.58,
   },
 };
 // A headstock's parts for strings at the given heights (half neck widths, lowest string first): its outline, where each
-// string ends (a post, roller or clamp), and the key beside each post, at the outline's edge on its side
+// string ends (a post or clamp), and the key beside each post, at the outline's edge on the side of its row
 export function headstockParts(head, strings) {
   const n = strings.length, outline = spline(head.outline, 10);
-  let ends = strings.map((v) => [head.clamps, v]);
+  let ends = strings.map((v) => [head.clamps, v]), sides = strings.map(() => 1);
   if (head.posts) {
-    const { from, to, split } = head.posts, side = split ? Math.ceil(n / 2) : n;
-    const at = (i) => from.map((a, c) => a + ((to[c] - a) * i) / Math.max(1, side - 1));
-    ends = strings.map((_, s) => (s < side ? at(s) : ((p) => [p[0], -p[1]])(at(n - 1 - s))));
+    const { from, to, treble } = head.posts, high = treble ? Math.floor(n * treble.share + 1e-9) : 0, low = n - high;
+    const row = (a, b, count) => (i) => a.map((c, k) => c + ((b[k] - c) * i) / Math.max(1, count - 1));
+    const across = ([u, v]) => [u, -v];
+    const bass = row(from, to, low), top = row(treble?.from ?? across(from), treble?.to ?? across(to), high);
+    ends = strings.map((_, s) => (s < low ? bass(s) : top(n - 1 - s)));
+    sides = strings.map((_, s) => (s < low ? 1 : -1));
   }
-  const edge = (u, side) => { // the outline's outermost crossing at u on that side
+  const edge = (u, side) => { // the outline's outermost crossing at u toward that side
     let best = null;
     for (let i = 1; i < outline.length; i++) {
       const [u0, v0] = outline[i - 1], [u1, v1] = outline[i];
       if ((u0 - u) * (u1 - u) > 0 || u0 === u1) continue;
       const v = v0 + ((v1 - v0) * (u - u0)) / (u1 - u0);
-      if (Math.sign(v) === side && (best === null || Math.abs(v) > Math.abs(best))) best = v;
+      if (best === null || v * side > best * side) best = v;
     }
     return best ?? side;
   };
-  const keys = head.keys ? ends.map(([u, v]) => ({ u, side: Math.sign(v) || 1, edge: edge(u, Math.sign(v) || 1) })) : [];
+  const keys = head.keys ? ends.map(([u], s) => ({ u, side: sides[s], edge: edge(u, sides[s]) })) : [];
   return { outline, ends, keys };
 }
 // The same shapes every frame, until the headstock or the strings' spacing changes: worked out once
@@ -108,11 +114,6 @@ const headstockShape = (key, points) => {
     shapes.set(key, points());
   }
   return shapes.get(key);
-};
-export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
-  const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
-  const corner = (cu, cv, from) => Array.from({ length: 5 }, (_, j) => [cu + Math.cos(from + (j * Math.PI) / 8) * r, cv + Math.sin(from + (j * Math.PI) / 8) * r]);
-  return [...corner(ub - r, vb - r, 0), ...corner(ua + r, vb - r, Math.PI / 2), ...corner(ua + r, va + r, Math.PI), ...corner(ub - r, va + r, 1.5 * Math.PI)];
 };
 // Points along a smooth curve through the given ones (Catmull-Rom), `steps` of them to each; a point given twice is a
 // corner the curve comes into and leaves straight
@@ -624,34 +625,21 @@ export function drawHighway(canvas, arr, now, t, cam) {
   if (parts) {
     for (const { u, side, edge } of parts.keys) { // keys, sticking out from under the plate's edge
       const span = (a, b) => [edge + side * a, edge + side * b];
-      if (head.keys === 'machine' || head.keys === 'blade') {
-        const blade = head.keys === 'blade', w = blade ? 0.09 : 0.11; // long across the neck: the view flattens them
-        box(u - w - 0.04, u + w + 0.04, ...span(-0.12, 0.08), 0.03);
+      if (head.keys === 'machine') { // long across the neck: the view flattens them
+        box(u - 0.15, u + 0.15, ...span(-0.12, 0.08), 0.03);
         paint(alpha(t.text, 0.12), alpha(t.anchorLane, 0.35));
         box(u - 0.03, u + 0.03, ...span(0.06, 0.22), 0);
         paint(alpha(t.text, 0.28));
-        box(u - w, u + w, ...span(0.2, blade ? 0.62 : 0.68), blade ? 0.04 : 0.1);
+        box(u - 0.11, u + 0.11, ...span(0.2, 0.68), 0.1);
         paint(alpha(t.text, 0.18), alpha(t.anchorLane, 0.55));
-      } else if (head.keys === 'tulip') {
+      } else { // tulips
         box(u - 0.035, u + 0.035, ...span(-0.05, 0.22), 0);
         paint(alpha(t.text, 0.28));
         oval([u, edge + side * 0.18], 0.08, 0.04);
         paint(alpha(t.text, 0.3));
         oval([u, edge + side * 0.4], 0.14, 0.2);
         paint(alpha(t.text, 0.18), alpha(t.anchorLane, 0.55));
-      } else { // pearl buttons
-        box(u - 0.03, u + 0.03, ...span(-0.05, 0.2), 0);
-        paint(alpha(t.text, 0.28));
-        oval([u, edge + side * 0.34], 0.12, 0.16);
-        paint(alpha(t.nut, 0.55), alpha(t.text, 0.35));
       }
-    }
-    for (const side of head.keys === 'pearl' ? [1, -1] : []) { // a classical head's tuner plates, just showing past its edges
-      const row = parts.keys.filter((key) => key.side === side);
-      if (!row.length) continue;
-      const us = row.map((key) => key.u), e = Math.max(...row.map((key) => key.edge * side));
-      box(Math.min(...us) - 0.4, Math.max(...us) + 0.4, side * (e - 0.1), side * (e + 0.07), 0.05);
-      paint(alpha(t.text, 0.16), alpha(t.anchorLane, 0.35));
     }
     // The plate: its finish darkening toward the treble side, a bevel inside the lit edge
     path(parts.outline.map(onHead));
@@ -666,11 +654,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
     glow(true, t.anchorLane, 8);
     paint(null, alpha(t.anchorLane, 0.6), Math.max(1.5, 0.03 * k0));
     glow(false);
-    for (const side of head.slots ? [1, -1] : []) {
-      const [u0, u1, v0, v1] = head.slots;
-      box(u0, u1, v0 * side, v1 * side, (v1 - v0) / 2);
-      paint(alpha(t.ink, 0.92), alpha(t.text, 0.12));
-    }
     if (head.cover) { // the truss rod cover and its screws
       path(headstockShape(head.cover, () => spline(head.cover)).map(onHead));
       paint(alpha(t.text, 0.09), alpha(t.text, 0.4));
@@ -678,12 +661,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
         oval(screw, 0.04, 0.04);
         paint(alpha(t.nut, 0.85));
       }
-    }
-    if (head.trussNut) { // or where the truss rod adjusts, a recess at the heel
-      oval(head.trussNut, 0.12, 0.12);
-      paint(alpha(t.ink, 0.8), alpha(t.text, 0.28));
-      oval(head.trussNut, 0.055, 0.055);
-      paint(alpha(t.ink, 0.95));
     }
   }
   lap('headstock');
@@ -739,11 +716,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
   g.strokeStyle = metal;
   g.lineWidth = Math.max(1.5, 0.05 * k0);
   for (let w = 1; w <= LAST_FRET; w++) line3([w, boardLo - 0.04, 0], [w, boardHi + 0.04, 0]);
-  if (!head?.lockingNut) {
-    g.strokeStyle = t.nut;
-    g.lineWidth = Math.max(3, 0.12 * k0);
-    line3([0, boardLo - 0.06, 0], [0, boardHi + 0.06, 0]);
-  }
+  g.strokeStyle = t.nut;
+  g.lineWidth = Math.max(3, 0.12 * k0);
+  line3([0, boardLo - 0.06, 0], [0, boardHi + 0.06, 0]);
   glow(true, t.anchorPost, 12);
   g.strokeStyle = t.anchorPost;
   g.lineWidth = Math.max(3, 0.07 * k0);
@@ -765,14 +740,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
     stringPath(s, 0.012);
     stroke();
   }
-  if (parts) { // over the string ends: what they wind onto, a string tree, a locking nut
+  if (parts) { // over the string ends: what they wind onto, and a string tree
     parts.ends.forEach(([u, v], s) => {
-      if (head.slots) { // a roller across the slot, the string wound round it
-        box(u - 0.07, u + 0.07, v - 0.26, v + 0.26, 0.05);
-        paint(alpha(t.nut, 0.85));
-        box(u - 0.08, u + 0.08, v - 0.035, v + 0.035, 0.03);
-        paint(color(s));
-      } else if (head.clamps) {
+      if (head.clamps) {
         box(u - 0.1, u + 0.1, v - 0.1, v + 0.1, 0.04);
         paint(alpha(t.text, 0.22), alpha(t.text, 0.45));
         oval([u, v], 0.05, 0.05);
@@ -794,16 +764,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const vs = [n - 2, n - 1].map((s) => { const [pu, pv] = parts.ends[s]; return headV(s) + ((pv - headV(s)) * head.tree) / pu; });
       box(head.tree - 0.05, head.tree + 0.05, Math.min(...vs) - 0.08, Math.max(...vs) + 0.08, 0.04);
       paint(alpha(t.nut, 0.7), alpha(t.ink, 0.6));
-    }
-    if (head.lockingNut) { // a metal block over the nut, clamping the strings in pairs
-      path([[-0.06, 1.07], [0.36, 1.07], [0.36, -1.07], [-0.06, -1.07]].map(onHead));
-      paint(alpha(t.text, 0.14), alpha(t.text, 0.4));
-      for (const v of [0.56, 0, -0.56]) {
-        box(0, 0.3, v - 0.21, v + 0.21, 0.05);
-        paint(alpha(t.text, 0.28), alpha(t.text, 0.45));
-        oval([0.15, v], 0.06, 0.06);
-        paint(t.nut);
-      }
     }
   }
 

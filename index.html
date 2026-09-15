@@ -2221,7 +2221,6 @@
                 lookAhead,
                 HEADSTOCKS,
                 headstockParts,
-                rounded,
                 spline,
             } from "./highway.js";
             import { onsetEnvelope, align } from "./sync.js";
@@ -2424,7 +2423,7 @@
                             );
                     }
             }
-            // A headstock's card draws it as on the fretboard: its keys and outline, slots and truss rod cover, the strings
+            // A headstock's card draws it as on the fretboard: its keys and outline, truss rod cover, the strings
             // running from where they end over the nut and on along the neck to the right
             const headstockCard = (id) => {
                 const head = HEADSTOCKS[id],
@@ -2434,16 +2433,12 @@
                     y = (v) => (28 - v * 12).toFixed(1),
                     d = (points) =>
                         `M${points.map(([u, v]) => `${x(u)} ${y(v)}`).join("L")}`;
-                return `<svg class="headstock" viewBox="24 0 98 56" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
+                return `<svg class="headstock" viewBox="24 -2 98 60" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
                     ...keys.map(
                         ({ u, side, edge }) =>
                             `<ellipse cx="${x(u)}" cy="${y(edge + side * 0.36)}" rx="1.5" ry="2.6" fill-opacity=".35" stroke="none"/>`,
                     ),
                     `<path d="${d(outline)}Z" fill-opacity=".1" stroke-width="1.2"/>`,
-                    ...(head.slots ? [1, -1] : []).map(
-                        (side) =>
-                            `<path d="${d(rounded(head.slots[0], head.slots[1], head.slots[2] * side, head.slots[3] * side, (head.slots[3] - head.slots[2]) / 2))}Z" fill-opacity=".4" stroke="none"/>`,
-                    ),
                     head.cover &&
                         `<path d="${d(spline(head.cover))}Z" fill="none" stroke-width=".6"/>`,
                     `<path d="${d([[0, 1], [-2.1, 1]])} ${d([[0, -1], [-2.1, -1]])}" fill="none" stroke-width="1.2"/>`,

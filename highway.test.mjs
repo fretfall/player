@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { moveCamera, bendAt, drawHighway, drawTab } from './highway.js';
+import { moveCamera, bendAt, drawHighway, drawTab, HEADSTOCKS, headstockParts } from './highway.js';
 import { parseArrangement } from './the reference game.js';
 import { LOOKS, DEFAULT_STYLE, theme } from './themes.js';
 
@@ -63,6 +63,18 @@ for (const look of Object.keys(LOOKS))
   for (let sideAngle = -20; sideAngle <= 20; sideAngle += 5)
     for (const now of [0, 2, 4])
       assert.doesNotThrow(() => drawHighway(canvas, arrangement, now, { ...theme({ ...DEFAULT_STYLE, look }), headstock: 'headless', sideAngle }, {}), `${look} at ${sideAngle}°, ${now} s`);
+
+// Headstocks: keys on the side of their row of posts (a 6 in line's far posts cross the middle, their keys stay on the bass
+// side), 4 + 2 and 3 + 3 splits for any number of strings, and every one draws, in either string order
+const sidesOf = (id, n) => headstockParts(HEADSTOCKS[id], Array.from({ length: n }, (_, s) => 0.8 * (1 - (2 * s) / (n - 1)))).keys.map((k) => k.side).join();
+assert.equal(sidesOf('inline', 6), '1,1,1,1,1,1');
+assert.equal(sidesOf('fourTwo', 6), '1,1,1,1,-1,-1');
+assert.equal(sidesOf('fourTwo', 4), '1,1,1,-1');
+assert.equal(sidesOf('openBook', 7), '1,1,1,1,-1,-1,-1');
+assert.equal(sidesOf('pointed', 6), '1,1,1,-1,-1,-1');
+for (const headstock of Object.keys(HEADSTOCKS))
+  for (const stringOrder of ['low', 'high'])
+    assert.doesNotThrow(() => drawHighway(canvas, arrangement, 2, { ...theme(DEFAULT_STYLE), headstock, stringOrder }, {}), `${headstock}, ${stringOrder}`);
 
 // A vibrato trail running into a chord ends at the bottom of the chord's note lying across it on the string below, not over it
 const trailTop = (string) => { // the top of the wavy spine on screen, the chord's fret 7 note on this string
