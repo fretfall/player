@@ -965,11 +965,19 @@ export function drawHighway(canvas, arr, now, t, cam) {
     // that note: end it where it reaches the note's bottom edge on screen
     const end = next && along(d1)[0], member = next && chordOf(next)?.notes.find((j) => across(arr.notes[j], end));
     const stop = typeof member === 'number' ? arr.notes[member] : next;
+    // Past that note on screen means above its bottom edge while over it from side to side: a trail beside it (a slide on its
+    // way there, a bend beside a chord's other notes) shows in full. A trail that starts past it, the two a few pixels apart
+    // in the distance, isn't cut either: cut to nothing, it would vanish until they came close and then grow back
     if (next && (bent || across(stop, end))) {
-      const at = spot(stop), bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, Z(stop.time - now))[1] + 3, screenY = (d) => P(...along(d))[1];
-      if (screenY(d1) < bottom) {
+      const at = spot(stop), zs = Z(stop.time - now), half = at.open ? (at.a.width - 0.2) / 2 : 0.34;
+      const bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, zs)[1] + 3, [l] = P(at.x - half, at.y, zs), [r] = P(at.x + half, at.y, zs);
+      const past = (d) => {
+        const [px, py] = P(...along(d));
+        return py < bottom && px > Math.min(l, r) - 2 && px < Math.max(l, r) + 2;
+      };
+      if (past(d1) && !past(d0)) {
         let lo = d0, hi = d1;
-        for (let j = 0; j < 24; j++) [lo, hi] = screenY((lo + hi) / 2) < bottom ? [lo, (lo + hi) / 2] : [(lo + hi) / 2, hi];
+        for (let j = 0; j < 24; j++) [lo, hi] = past((lo + hi) / 2) ? [lo, (lo + hi) / 2] : [(lo + hi) / 2, hi];
         d1 = lo;
       }
       if (d1 <= d0 + 0.001) continue;

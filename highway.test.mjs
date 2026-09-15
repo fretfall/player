@@ -81,6 +81,27 @@ const trailTop = (string) => { // the top of the wavy spine on screen, the chord
 };
 assert.ok(trailTop(2) > trailTop(0) + 10, 'the trail stops short of the note below it');
 
+// A slide off fret 12 into a chord on the same string (The Hell Song at 0:51): once its trail comes into view it stays, all the
+// way in. Cut against the chord's note however far across the neck it was, it vanished while both were in the distance
+const { arrangement: sliding } = parseArrangement(`<song><arrangement>Rhythm</arrangement><songLength>10</songLength>
+  <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
+  <levels><level difficulty="0"><notes><note time="5" string="0" fret="12" sustain="0.22" slideUnpitchTo="4" /></notes>
+  <chords><chord time="5.26" chordId="0"><chordNote time="5.26" string="0" fret="4" /><chordNote time="5.26" string="1" fret="6" /></chord></chords>
+  <anchors><anchor time="0" fret="2" width="4" /><anchor time="5.26" fret="4" width="4" /></anchors></level></levels></song>`);
+let spines = 0, points = 0, closed = false;
+const spineCounter = new Proxy({
+  beginPath: () => { points = 0; closed = false; }, moveTo: () => points++, lineTo: () => points++, closePath: () => { closed = true; },
+  stroke: () => { if (!closed && points > 12) spines++; },
+}, { get: (target, key) => (key in target ? target[key] : context[key]) });
+const trailFrames = [], slideCam = {};
+for (let now = 1.5; now < 4.9; now += 1 / 30) {
+  spines = 0;
+  drawHighway({ ...canvas, getContext: () => spineCounter }, sliding, now, { ...theme(DEFAULT_STYLE), headstock: 'headless' }, slideCam);
+  trailFrames.push(spines > 0);
+}
+const firstShown = trailFrames.indexOf(true);
+assert.ok(firstShown >= 0 && trailFrames.slice(firstShown).every(Boolean), `the slide's trail stays once it shows: ${trailFrames.map(Number).join('')}`);
+
 // The 2D tab view draws the fret numbers of the notes coming up, and none from long ago
 const texts = [];
 const writer = new Proxy({ fillText: (str) => texts.push(str) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
