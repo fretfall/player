@@ -171,7 +171,8 @@
                 border: 1px solid var(--chip-border);
                 color: var(--text);
             }
-            .icon[aria-pressed="true"] {
+            .icon[aria-pressed="true"],
+            .icon[aria-expanded="true"] {
                 background: var(--accent);
                 border-color: var(--accent);
                 color: var(--ink);
@@ -1171,10 +1172,6 @@
             .volume {
                 position: relative;
             }
-            .volume .icon[aria-expanded="true"],
-            #menuButton[aria-expanded="true"] {
-                border-color: var(--accent);
-            }
             .volume .icon.muted {
                 color: var(--muted);
             }
@@ -1290,7 +1287,8 @@
                 .menu .icon:hover {
                     background: var(--chip);
                 }
-                .menu .icon[aria-pressed="true"] {
+                .menu .icon[aria-pressed="true"],
+                .menu .icon[aria-expanded="true"] {
                     background: none;
                     color: var(--accent);
                 }
