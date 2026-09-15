@@ -313,7 +313,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const span = cam.span, focus = [cam.center, (spacing * (n - 1)) / 2, 0], angle = ((t.viewAngle ?? 30) * Math.PI) / 180, reach = 0.6 * Math.SQRT2 * span;
   const eye = [focus[0], stack + reach * Math.sin(angle), -reach * Math.cos(angle)];
   const fwd = unit(sub([focus[0], 0, 2.2 * span], eye)), right = unit(cross([0, 1, 0], fwd)), up = cross(fwd, right);
-  const budget = Math.min(W * 0.88, VH * 1.05), focal = (budget * dot(sub(focus, eye), fwd)) / span; // wide screens show more neck, not bigger frets
+  const budget = Math.min(W * 0.88, VH * (t.fill ? 1.3 : 1.05)), focal = (budget * dot(sub(focus, eye), fwd)) / span; // wide screens show more neck, not bigger frets
   // The fret width setting stretches the neck sideways around the camera: wider frets, strings and depth as they are. The
   // camera never looks sideways, so this only moves things across the screen. Capped so the framed hand positions fit
   const stretch = Math.min(FRET_WIDTH * (t.fretWidth ?? 1), (W * span) / (budget * Math.max(1, span - 2.5)));
@@ -323,7 +323,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     return [W / 2 + dot(d, right) * k + shiftX, VH / 2 - dot(d, up) * k + shiftY, k];
   };
   const [fx, fy, k0] = P(...focus);
-  [shiftX, shiftY] = [W / 2 - fx, VH * 0.81 - fy]; // the board low on screen, the highway's far end still under the header
+  [shiftX, shiftY] = [W / 2 - fx, VH * (t.fill ? 0.83 : 0.81) - fy]; // the board low on screen, the highway's far end under the header (t.fill: no header, so bigger and up to near the top)
   lap('setup');
 
   const glow = (on, c, blur = 10) => {

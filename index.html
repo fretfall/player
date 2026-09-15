@@ -289,7 +289,7 @@
             #info {
                 position: fixed;
                 left: 40px;
-                right: 180px; /* clear of the tools */
+                right: 226px; /* clear of the tools */
                 bottom: 14px;
                 font-size: 13px;
                 color: var(--muted);
@@ -400,11 +400,24 @@
                 color: var(--muted);
                 font: inherit;
             }
-            .icon:hover > .tip,
-            .icon:focus-visible > .tip {
+            :is(.icon, .speed):hover > .tip,
+            .icon:focus-visible > .tip,
+            .speed:focus-within > .tip {
                 opacity: 1;
                 visibility: visible;
                 transform: none;
+            }
+            /* In the header they open underneath, and not over the panel a button has opened there */
+            .bar :is(.icon, .speed) {
+                position: relative;
+            }
+            .bar .tip {
+                top: calc(100% + 10px);
+                bottom: auto;
+                transform: translateY(-4px);
+            }
+            .bar [aria-expanded="true"] > .tip {
+                display: none;
             }
             #loopTools .tip {
                 top: calc(100% + 10px);
@@ -417,9 +430,16 @@
             #loopTools .icon:focus-visible > .tip {
                 transform: translate(calc(-1 * var(--tip, 50%)), 0);
             }
-            :root:fullscreen #info,
-            :root:fullscreen #tools {
+            :root:fullscreen :is(#info, #tools > :not(#minimal)) {
                 display: none;
+            }
+            /* Minimal view: the highway and the lyrics, and the button that brings the rest back */
+            :root.minimal
+                :is(.bar, #phrases, #progress, #loopTools, #info, #tools > :not(#minimal)) {
+                display: none;
+            }
+            :root.minimal #lyrics {
+                top: 24px;
             }
             #status {
                 position: fixed;
@@ -440,7 +460,7 @@
                 top: 66px;
                 z-index: 2;
                 width: min(352px, calc(100vw - 32px));
-                max-height: calc(100vh - 82px);
+                max-height: calc(100vh - 118px); /* clear of the tools */
                 display: flex;
                 flex-direction: column;
                 border-radius: 14px;
@@ -763,6 +783,22 @@
                 line-height: 1.4;
                 color: var(--muted);
             }
+            .legend-item .keys {
+                display: flex;
+                justify-content: center;
+                gap: 4px;
+            }
+            .legend-item kbd {
+                min-width: 22px;
+                padding: 2px 6px;
+                border: 1px solid var(--chip-border);
+                border-bottom-width: 2px;
+                border-radius: 5px;
+                background: var(--chip);
+                font: 600 12px var(--num);
+                text-align: center;
+                white-space: nowrap;
+            }
             .legend-item svg {
                 width: 64px;
                 height: 36px;
@@ -972,6 +1008,9 @@
                     background: none;
                     color: var(--accent);
                 }
+                .menu .tip {
+                    display: none;
+                } /* the menu names them */
                 .menu .divider {
                     width: auto;
                     height: 1px;
@@ -1012,7 +1051,7 @@
                 }
                 .sheet {
                     top: 114px;
-                    max-height: calc(100vh - 130px);
+                    max-height: calc(100vh - 166px);
                 }
             }
             @media (max-width: 520px) {
@@ -1037,7 +1076,7 @@
             <div class="group">
                 <span class="time" id="time">0:00 / 0:00</span>
                 <div class="speed">
-                    <button id="slower" aria-label="Slower">
+                    <button id="slower" aria-label="Slower" aria-describedby="speedTip">
                         <svg
                             width="16"
                             height="16"
@@ -1050,8 +1089,8 @@
                             <path d="M5 10h10" />
                         </svg>
                     </button>
-                    <button id="speed" title="Back to 100%">100%</button>
-                    <button id="faster" aria-label="Faster">
+                    <button id="speed" aria-describedby="speedTip">100%</button>
+                    <button id="faster" aria-label="Faster" aria-describedby="speedTip">
                         <svg
                             width="16"
                             height="16"
@@ -1064,6 +1103,7 @@
                             <path d="M10 5v10M5 10h10" />
                         </svg>
                     </button>
+                    <span class="tip" role="tooltip" id="speedTip"><b>Speed <span><kbd>−</kbd> <kbd>+</kbd></span></b>Slow the song down to practise it, or speed it up, in 10% steps. The number goes back to 100% <kbd>0</kbd></span>
                 </div>
                 <div class="volume">
                     <button
@@ -1072,8 +1112,10 @@
                         aria-expanded="false"
                         aria-controls="volumePanel"
                         aria-label="Volume"
-                        title="Volume (M mutes)"
-                    ></button>
+                        aria-describedby="volumeTip"
+                    >
+                        <span class="tip" role="tooltip" id="volumeTip"><b>Volume <span><kbd>↑</kbd> <kbd>↓</kbd></span></b>Opens a slider. <kbd>M</kbd> mutes</span>
+                    </button>
                     <div class="volume-panel" id="volumePanel" hidden>
                         <button
                             class="volume-mute"
@@ -1116,7 +1158,8 @@
                         id="loop"
                         data-label="Loop"
                         aria-pressed="false"
-                        title="Loop this phrase (L). Drag across the phrase bar to loop a stretch, or shift-click it to extend the loop."
+                        aria-label="Loop"
+                        aria-describedby="loopTip"
                     >
                         <svg
                             width="18"
@@ -1133,18 +1176,22 @@
                             <path d="M6.5 16.5L4 14l2.5-2.5" />
                             <path d="M16 10v1a3 3 0 0 1-3 3H4" />
                         </svg>
+                        <span class="tip" role="tooltip" id="loopTip"><b>Loop <kbd>L</kbd></b>Loop the phrase you are in. Drag across the phrase bars to loop a stretch, or shift-click one to stretch the loop to it</span>
                     </button>
                     <button
                         class="icon"
                         id="play"
-                        title="Play / pause (Space)"
-                    ></button>
+                        aria-describedby="playTip"
+                    >
+                        <span class="tip" role="tooltip" id="playTip"><b>Play and pause <kbd>Space</kbd></b>With the count-in on, a bar of clicks comes first</span>
+                    </button>
                     <div class="divider"></div>
                     <button
                         class="icon"
                         id="open"
                         data-label="Open file"
-                        title="Open a .pak, a Guitar Pro file, or a tab with its recording (or drop them anywhere)"
+                        aria-label="Open file"
+                        aria-describedby="openTip"
                     >
                         <svg
                             width="18"
@@ -1160,14 +1207,16 @@
                                 d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"
                             />
                         </svg>
+                        <span class="tip" role="tooltip" id="openTip"><b>Open a song <kbd>O</kbd></b>A .pak, a Guitar Pro file, or a tab with its recording. You can also drop them anywhere</span>
                     </button>
                     <button
                         class="icon"
                         id="legendButton"
-                        data-label="Notation"
+                        data-label="Notation and shortcuts"
                         aria-expanded="false"
                         aria-controls="legend"
-                        title="What the notation means (?)"
+                        aria-label="Notation and shortcuts"
+                        aria-describedby="legendTip"
                     >
                         <svg
                             width="18"
@@ -1185,6 +1234,7 @@
                             />
                             <path d="M10 14.4h.01" />
                         </svg>
+                        <span class="tip" role="tooltip" id="legendTip"><b>Notation and shortcuts <kbd>?</kbd></b>What every mark on the highway means, and the keyboard shortcuts</span>
                     </button>
                     <button
                         class="icon"
@@ -1192,7 +1242,8 @@
                         data-label="Settings"
                         aria-expanded="false"
                         aria-controls="settings"
-                        title="Settings"
+                        aria-label="Settings"
+                        aria-describedby="settingsTip"
                     >
                         <svg
                             width="18"
@@ -1207,13 +1258,17 @@
                             <circle cx="13.5" cy="6" r="2" />
                             <circle cx="7.5" cy="14" r="2" />
                         </svg>
+                        <span class="tip" role="tooltip" id="settingsTip"><b>Settings <kbd>S</kbd></b>How the highway looks and moves, the strings' colours and order, and the audio delay</span>
                     </button>
                     <button
                         class="icon"
                         id="fullscreen"
                         data-label="Full screen"
-                        title="Full screen (F)"
-                    ></button>
+                        aria-label="Full screen"
+                        aria-describedby="fullscreenTip"
+                    >
+                        <span class="tip" role="tooltip" id="fullscreenTip"><b>Full screen <kbd>F</kbd></b>The highway, the phrase bars and the lyrics. Point at the phrase bars to bring the header back</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -1337,6 +1392,28 @@
                     <path d="M13.5 12.2a3.8 3.8 0 0 1 4 4.3" />
                 </svg>
                 <span class="tip" role="tooltip" id="bandTip"><b>Play as a band</b>Opens every other part in a window of its own, all in time with this one. Play, pause, jump and loop from any of them; the sound comes from this window</span>
+            </button>
+            <button
+                class="icon"
+                id="minimal"
+                aria-pressed="false"
+                aria-label="Minimal view"
+                aria-describedby="minimalTip"
+            >
+                <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M2.5 10s2.8-5 7.5-5 7.5 5 7.5 5-2.8 5-7.5 5-7.5-5-7.5-5z" />
+                    <circle cx="10" cy="10" r="2.2" />
+                </svg>
+                <span class="tip" role="tooltip" id="minimalTip"><b>Minimal view <kbd>H</kbd></b>Just the highway and the lyrics: the header, phrase bars and song info make way. Press again to bring them back</span>
             </button>
         </div>
         <div
@@ -1662,7 +1739,7 @@
             hidden
         >
             <div class="sheet-head">
-                <h2 id="legendTitle">Notation</h2>
+                <h2 id="legendTitle">Notation and shortcuts</h2>
                 <button
                     class="close"
                     id="legendClose"
@@ -1685,8 +1762,8 @@
                 <input
                     id="legendFind"
                     type="search"
-                    placeholder="Find a notation, like bend or mute"
-                    aria-label="Find a notation"
+                    placeholder="Find a notation or shortcut, like bend or loop"
+                    aria-label="Find a notation or shortcut"
                 />
             </div>
             <div class="pane legend" id="legendList"></div>
@@ -1759,6 +1836,10 @@
                 '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4"/></svg>';
             const EXIT_FULLSCREEN =
                 '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3.5v4h-4M16.5 7.5h-4v-4M12.5 16.5v-4h4M3.5 12.5h4v4"/></svg>';
+            const setIcon = (button, svg) => {
+                button.querySelector("svg")?.remove();
+                button.insertAdjacentHTML("afterbegin", svg);
+            }; // swaps the drawing, keeping the button's tooltip
             const clock = (s) =>
                 `${s < 0 ? "-" : ""}${Math.floor(Math.abs(s) / 60)}:${String(Math.floor(Math.abs(s) % 60)).padStart(2, "0")}`; // negative: the recording's intro before the tab starts
             const paint = () =>
@@ -1772,7 +1853,8 @@
             // (pre-bend, release), whammy bar, vibrato (wide too), ties, let ring, tremolo picking, tapping with either hand, every
             // harmonic type, accents, staccato, ghost and grace notes, trills and ornaments, dynamics and hairpins, fades, wah,
             // fermata, ottava, pick strokes, picking-hand fingers, strums and rolled chords, barres, slap, pop, golpe, rasgueado,
-            // string numbers, free text, and at the bar lines: repeats with endings, segno and coda, key, tempo, meter and feel.
+            // string numbers, free text, lyrics, and at the bar lines: repeats with endings, segno and coda, key, tempo, meter
+            // and feel.
             const DEMO = `
 \\title "Fretfall Demo"
 \\subtitle "Original practice piece"
@@ -1781,25 +1863,25 @@
 \\track "Guitar"
 \\staff {tabs}
 \\instrument distortionguitar
-\\section "Chugs" \\ro :8 (0.6{pm} 2.5{pm}){ch "E5"} (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (0.6{pm} 2.5{pm}) (3.6{sl} 5.5{sl}){ch "G5"} (5.6{ac} 7.5{ac}){ch "A5"} (x.6 x.5) (x.6 x.5) |
-\\rc 2 :8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} (7.6{hac} 9.5{hac}){ch "B5"} (7.6 9.5) (5.5{pm} 7.4{pm}){ch "D5"} (5.5{pm} 7.4{pm}) |
-:16 0.6{pm} 0.6{pm} :8 0.6{pm} :16 0.6{pm} 0.6{pm} :8 0.6{pm} :4 (5.6 7.5 7.4){ch "A5"} (5.6 7.5 7.4) |
-:8 (x.6 x.5 x.4) (x.6 x.5 x.4) :4 (3.6 5.5 5.4){ch "G5"} :2 (5.6 7.5 7.4){ch "A5"} |
+\\section "Chugs" \\ro :8 (0.6{pm} 2.5{pm}){ch "E5" lyrics "Plug"} (0.6{pm} 2.5{pm}){lyrics "it"} (0.6{pm} 2.5{pm}){lyrics "in"} (0.6{pm} 2.5{pm}){lyrics "and"} (3.6{sl} 5.5{sl}){ch "G5" lyrics "turn"} (5.6{ac} 7.5{ac}){ch "A5" lyrics "it"} (x.6 x.5){lyrics "up+"} (x.6 x.5) |
+\\rc 2 :8 0.6{pm lyrics "watch"} 0.6{pm lyrics "the"} 0.6{pm lyrics "high-"} 0.6{pm lyrics "way"} (7.6{hac} 9.5{hac}){ch "B5" lyrics "come"} (7.6 9.5){lyrics "a-"} (5.5{pm} 7.4{pm}){ch "D5" lyrics "live+"} (5.5{pm} 7.4{pm}) |
+:16 0.6{pm} 0.6{pm} :8 0.6{pm} :16 0.6{pm} 0.6{pm} :8 0.6{pm} :4 (5.6 7.5 7.4){ch "A5" lyrics "Rea-"} (5.6 7.5 7.4){lyrics "dy,"} |
+:8 (x.6 x.5 x.4) (x.6 x.5 x.4) :4 (3.6 5.5 5.4){ch "G5" lyrics "set,"} :2 (5.6 7.5 7.4){ch "A5" lyrics "go!+"} |
 \\section "Riff" :16 5.6{h lf 2} 7.6{lf 4} 5.5{h lf 2} 7.5{lf 4} 7.4{h lf 4} 5.4{lf 2} 7.4{h lf 4} 5.4{lf 2} :8 7.3{sl lf 4} 9.3{lf 5} 7.4{lf 3} 5.4{lf 2} |
 :8 5.3{ss lf 2} 12.3{lf 2} :16 12.2{h lf 2} 15.2{lf 5} 12.1{h lf 2} 15.1{lf 5} 15.1{h lf 5} 12.1{lf 2} 14.2{h lf 4} 12.2{lf 2} :4 14.3{lf 4} |
 \\section "Lead" :4 14.3{b (0 4) lf 4} 14.3{b (0 2) lf 4} :8 12.2{lf 2} 15.2{b (0 4 4 0) lf 5} :4 14.2{v lf 4} |
 :2 17.1{v lf 4} :4 -.1 12.1{tp 16 lf 2} |
 :16 19.1{tt h} 12.1{h} 15.1{h} 12.1 19.1{tt h} 12.1{h} 15.1{h} 12.1 19.2{tt h} 12.2{h} 15.2{h} 12.2 19.2{tt h} 12.2{h} 15.2{h} 12.2 |
 \\section "Harmonics" :4 (12.3{nh} 12.2{nh} 12.1{nh}) 7.3{nh} :8 5.2{nh} 5.1{nh} :4 5.3{ph lf 2} |
-\\section "Chords" :2 (3.6 2.5 0.4 0.3 0.2 3.1){ch "G"} (0.5 2.4 2.3 1.2 0.1){ch "Am"} |
-:2 (3.5 2.4 0.3 1.2 0.1){ch "C"} (0.4 2.3 3.2 2.1){ch "D"} |
-:4 (1.6{lf 2} 3.5{lf 4} 3.4{lf 5} 2.3{lf 3} 1.2{lf 2} 1.1{lf 2}){ch "F"} (1.6 3.5 3.4 2.3 1.2 1.1) (1.6 3.5 3.4 2.3 1.2 1.1) (1.6 3.5 3.4 2.3 1.2 1.1) |
-:8 (2.5 4.4 4.3 3.2 2.1){ch "Bm"} (2.5 4.4 4.3 3.2 2.1) (2.5 4.4 4.3 3.2 2.1) (2.5 4.4 4.3 3.2 2.1) :2 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E"} |
+\\section "Chords" :2 (3.6 2.5 0.4 0.3 0.2 3.1){ch "G" lyrics "Watch"} (0.5 2.4 2.3 1.2 0.1){ch "Am" lyrics "the"} |
+:2 (3.5 2.4 0.3 1.2 0.1){ch "C" lyrics "notes"} (0.4 2.3 3.2 2.1){ch "D" lyrics "fall+"} |
+:4 (1.6{lf 2} 3.5{lf 4} 3.4{lf 5} 2.3{lf 3} 1.2{lf 2} 1.1{lf 2}){ch "F" lyrics "Play"} (1.6 3.5 3.4 2.3 1.2 1.1){lyrics "them"} (1.6 3.5 3.4 2.3 1.2 1.1){lyrics "on"} (1.6 3.5 3.4 2.3 1.2 1.1){lyrics "time+"} |
+:8 (2.5 4.4 4.3 3.2 2.1){ch "Bm" lyrics "let"} (2.5 4.4 4.3 3.2 2.1){lyrics "the"} (2.5 4.4 4.3 3.2 2.1){lyrics "strings"} (2.5 4.4 4.3 3.2 2.1){lyrics "ring"} :2 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E" lyrics "out+"} |
 \\section "Double stops" :8 (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (4.3{sl} 5.2{sl}) (6.3 7.2) :4 (8.3 10.2) |
 :16 (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) :8 (4.3 5.2) (4.3 5.2) :4 (6.3 7.2) |
-\\ts 3 4 \\tempo 120 \\section "Waltz" :4 0.5 (2.4 2.3 1.2){ch "Am"} (2.4 2.3 1.2) |
-:4 3.6 (0.4 0.3 3.1){ch "G"} (0.4 0.3 3.1) |
-:4 0.4 (2.3 3.2 2.1){ch "D"} (2.3 3.2 2.1) |
+\\ts 3 4 \\tempo 120 \\section "Waltz" :4 0.5{lyrics "Waltz"} (2.4 2.3 1.2){ch "Am" lyrics "a-"} (2.4 2.3 1.2){lyrics "long"} |
+:4 3.6{lyrics "in"} (0.4 0.3 3.1){ch "G" lyrics "three,+"} (0.4 0.3 3.1){lyrics "and"} |
+:4 0.4{lyrics "round"} (2.3 3.2 2.1){ch "D" lyrics "and"} (2.3 3.2 2.1){lyrics "round+"} |
 \\ts 4 4 \\tempo 100 \\section "Solo" :8 12.3{h lf 2} 14.3{lf 4} 12.2{lf 2} 15.2{b (0 4) lf 5} 15.2{lf 5} 12.2{lf 2} 14.3{lf 4} 12.3{lf 2} |
 :16 17.1{sl lf 3} 19.1{lf 5} 17.1{h lf 3} 15.1{lf 2} 17.2{h lf 4} 15.2{lf 2} 16.3{h lf 3} 14.3{lf 2} :4 17.2{b (0 4) v lf 4} 15.1{v lf 2} |
 :4 12.2{tp 32 lf 2} 12.2{tp 32 lf 2} :2 7.3{ph v lf 2} |
@@ -1819,12 +1901,12 @@
 \\section "Colour" :4 5.3{f} 7.3{vs} 5.3{fo} 7.3{waho} |
 :4 5.3{wahc} 7.3{fermata medium} 12.2{ot 8va} 12.2{ot regular} |
 :4 3.5{txt "pizz."} 3.5 3.5{txt "bass stop"} r |
-\\ks g \\tf triplet8th \\jump segno \\section "Swing" \\ro :8 3.6 5.6 3.6 5.6 7.6 5.6 3.6 5.6 |
-\\ae 1 \\rc 2 :4 (3.6 5.5 5.4){ch "G5"} (5.6 7.5 7.4){ch "A5"} :2 (7.6 9.5 9.4){ch "B5"} |
-\\ae 2 \\tf none \\ks c \\jump coda :4 (8.6 10.5 10.4){ch "C5"} (10.6 12.5 12.4){ch "D5"} :2 (0.6 2.5 2.4){ch "E5"} |
+\\ks g \\tf triplet8th \\jump segno \\section "Swing" \\ro :8 3.6{lyrics "Swing"} 5.6{lyrics "it,"} 3.6{lyrics "swing"} 5.6{lyrics "it,"} 7.6{lyrics "let"} 5.6{lyrics "the"} 3.6{lyrics "notes"} 5.6{lyrics "roll+"} |
+\\ae 1 \\rc 2 :4 (3.6 5.5 5.4){ch "G5" lyrics "Once"} (5.6 7.5 7.4){ch "A5" lyrics "a-"} :2 (7.6 9.5 9.4){ch "B5" lyrics "gain+"} |
+\\ae 2 \\tf none \\ks c \\jump coda :4 (8.6 10.5 10.4){ch "C5" lyrics "Take"} (10.6 12.5 12.4){ch "D5" lyrics "it"} :2 (0.6 2.5 2.4){ch "E5" lyrics "home+"} |
 \\section "Outro" :8 0.6{pm} x.6 0.6{pm} x.6 (0.6{ac} 2.5{ac} 2.4{ac}){ch "E5"} (x.6 x.5 x.4) (3.6 5.5){ch "G5"} (x.6 x.5) |
-:8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} :4 (5.6{ac} 7.5{ac}){ch "A5"} (7.6{hac} 9.5{hac}){ch "B5"} |
-:1 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E"} |
+:8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} :4 (5.6{ac} 7.5{ac}){ch "A5" lyrics "That's"} (7.6{hac} 9.5{hac}){ch "B5" lyrics "a"} |
+:1 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E" lyrics "wrap+"} |
 :2 (-.6 -.5 -.4 -.3 -.2 -.1) r |
 \\track "Bass"
 \\staff {tabs}
@@ -1911,6 +1993,7 @@
                 mute: false,
                 metronome: false,
                 countIn: false,
+                minimal: false,
                 guides: true,
                 ...VIEW_START,
                 viewDefaults: VIEW_DEFAULTS,
@@ -1961,7 +2044,12 @@
                     drawDistance: settings.drawDistance,
                     fretWidth: settings.fretWidth,
                     boardHeight: settings.boardHeight,
+                    fill: settings.minimal, // nothing over the highway: it grows into the room
                 };
+                document.documentElement.classList.toggle(
+                    "minimal",
+                    settings.minimal,
+                );
                 $("fonts").href = theme.href;
                 const vars = {
                     bg: theme.bg,
@@ -2151,14 +2239,15 @@
                 $("volume").value = loudness();
                 $("volumeOut").value = `${Math.round(loudness() * 100)}%`;
                 fill($("volume"));
-                $("volumeButton").innerHTML = $("volumeMute").innerHTML =
-                    SPEAKER(
-                        settings.volumeMuted
-                            ? '<path d="M13.5 8l4 4M17.5 8l-4 4"/>'
-                            : volume < 0.5
-                              ? '<path d="M13.5 8a3 3 0 0 1 0 4"/>'
-                              : '<path d="M13.5 8a3 3 0 0 1 0 4M15.5 5.5a6.5 6.5 0 0 1 0 9"/>',
-                    );
+                const speaker = SPEAKER(
+                    settings.volumeMuted
+                        ? '<path d="M13.5 8l4 4M17.5 8l-4 4"/>'
+                        : volume < 0.5
+                          ? '<path d="M13.5 8a3 3 0 0 1 0 4"/>'
+                          : '<path d="M13.5 8a3 3 0 0 1 0 4M15.5 5.5a6.5 6.5 0 0 1 0 9"/>',
+                );
+                setIcon($("volumeButton"), speaker);
+                $("volumeMute").innerHTML = speaker;
                 $("volumeButton").classList.toggle(
                     "muted",
                     settings.volumeMuted,
@@ -2664,8 +2753,9 @@
                     ],
                 ],
             ];
-            $("legendList").replaceChildren(
-                ...LEGEND.flatMap(([group, items]) => [
+            // groups: [[heading, [[name, meaning, drawing (HTML)]]]] → a heading and a row for each
+            const legendRows = (groups) =>
+                groups.flatMap(([group, items]) => [
                     Object.assign(document.createElement("h3"), {
                         textContent: group,
                     }),
@@ -2683,7 +2773,9 @@
                         row.querySelector("span").textContent = meaning;
                         return row;
                     }),
-                ]),
+                ]);
+            $("legendList").replaceChildren(
+                ...legendRows(LEGEND),
                 Object.assign(document.createElement("p"), {
                     className: "legend-empty",
                     textContent: "Nothing matches.",
@@ -2864,8 +2956,10 @@
                 updatePlayButton();
             }
             function updatePlayButton() {
-                $("play").innerHTML = player?.playing ? PAUSE : PLAY;
-                $("play").dataset.label = player?.playing ? "Pause" : "Play"; // its name in the small-screen menu
+                setIcon($("play"), player?.playing ? PAUSE : PLAY);
+                $("play").dataset.label = $("play").ariaLabel = player?.playing
+                    ? "Pause"
+                    : "Play"; // data-label: its name in the small-screen menu
             }
 
             // alphaTab score → the same model the reference game.js produces (seconds, string 0 = lowest), with Guitar Pro's notation
@@ -3373,13 +3467,35 @@
                             track,
                         };
                     });
+                // Lyrics from the first track that has any, a syllable a beat: usually a vocal line, which gets no part of its
+                // own. They read like this: "-" joins a syllable to the next, a "+" at its end ends the line.
+                const lyrics = [];
+                for (const track of score.tracks) {
+                    for (const mb of cache.masterBars)
+                        for (const beat of track.staves[0].bars[mb.masterBar.index]
+                            .voices[0].beats) {
+                            if (!beat.lyrics?.[0]) continue;
+                            const time = sec(mb.start + beat.playbackStart);
+                            lyrics.push({
+                                time,
+                                length:
+                                    sec(
+                                        mb.start +
+                                            beat.playbackStart +
+                                            beat.playbackDuration,
+                                    ) - time,
+                                text: beat.lyrics[0],
+                            });
+                        }
+                    if (lyrics.length) break;
+                }
                 return {
                     title: score.title,
                     artist: score.artist,
                     bpm: score.tempo,
                     length: sec(cache.masterBars.at(-1)?.end ?? 0),
                     arrangements,
-                    lyrics: [],
+                    lyrics,
                     tempo,
                 };
             }
@@ -3881,10 +3997,16 @@
                 audioClock();
                 $(key).setAttribute("aria-pressed", String(settings[key]));
             }
-            for (const key of ["metronome", "countIn"]) {
+            for (const key of ["metronome", "countIn", "minimal"]) {
                 $(key).setAttribute("aria-pressed", String(settings[key]));
                 $(key).onclick = () => toggleTool(key);
             }
+            const toggleMinimal = () => {
+                toggleTool("minimal");
+                applyTheme();
+                markLoop(); // the loop's box is measured on the phrase bars, which weren't showing
+            };
+            $("minimal").onclick = toggleMinimal;
             // The speed trainer works on a loop played slower than it could be: without both it switches off, which is
             // also how it stops once it has sped up to 100%. Both sit on the loop, with an X that clears it
             let training = false;
@@ -3945,39 +4067,177 @@
                     ? document.exitFullscreen()
                     : document.documentElement.requestFullscreen();
             const updateFullscreenButton = () => {
-                $("fullscreen").innerHTML = document.fullscreenElement
-                    ? EXIT_FULLSCREEN
-                    : ENTER_FULLSCREEN;
+                setIcon(
+                    $("fullscreen"),
+                    document.fullscreenElement
+                        ? EXIT_FULLSCREEN
+                        : ENTER_FULLSCREEN,
+                );
             };
             $("fullscreen").onclick = toggleFullscreen;
             $("fullscreen").hidden = !document.fullscreenEnabled; // iPhones can't take a page full screen
             document.onfullscreenchange = updateFullscreenButton;
             updateFullscreenButton();
+            // --- Keyboard shortcuts, listed at the end of the notation sheet too: [heading, [[keys as e.key names them (letters
+            // in lower case), the keys as shown, what they do, more about it, what happens]]]
+            const skip = (e) => {
+                // 5 seconds, or with shift to the next phrase, or back to the start of this one (the one before, just past its start)
+                const t = player?.time ?? 0,
+                    ahead = e.key === "ArrowRight";
+                if (!e.shiftKey) return player?.seek(songTime() + (ahead ? 5 : -5));
+                const phrases = arr?.phrases ?? [],
+                    i = phrases.findLastIndex((p) => p.time <= t + 0.05),
+                    to = ahead
+                        ? phrases[i + 1]
+                        : phrases[t - (phrases[i]?.time ?? 0) > 1 ? i : i - 1];
+                player?.seek(to?.time ?? (ahead ? t : 0));
+            };
+            const nudgeVolume = (step) =>
+                setVolume(
+                    Math.min(1, Math.max(0, Math.round((loudness() + step) * 10) / 10)),
+                    false,
+                );
+            const SHORTCUTS = [
+                [
+                    "Playing",
+                    [
+                        [[" "], "Space", "Play or pause", "", togglePlay],
+                        [
+                            ["ArrowLeft", "ArrowRight"],
+                            "← →",
+                            "Back or ahead 5 seconds",
+                            "With Shift, a phrase at a time",
+                            skip,
+                        ],
+                        [
+                            ["Home"],
+                            "Home",
+                            "Back to the start",
+                            "Of the loop, when there is one",
+                            () => player?.seek(loop?.start ?? 0),
+                        ],
+                        [
+                            ["-", "+", "="],
+                            "− +",
+                            "Slower or faster",
+                            "In 10% steps",
+                            (e) => setSpeed(speed + (e.key === "-" ? -0.1 : 0.1)),
+                        ],
+                        [["0"], "0", "Back to 100% speed", "", () => setSpeed(1)],
+                        [
+                            ["l"],
+                            "L",
+                            "Loop the phrase you are in",
+                            "Or clear the loop",
+                            toggleLoop,
+                        ],
+                        [
+                            ["t"],
+                            "T",
+                            "Speed trainer",
+                            "On a loop at 90% or slower: 10% faster each time round",
+                            () => $("trainer").click(),
+                        ],
+                        [
+                            [..."123456789"],
+                            "1–9",
+                            "Switch part",
+                            "In the order they are in the header",
+                            (e) =>
+                                song?.arrangements[e.key - 1] &&
+                                selectArrangement(e.key - 1),
+                        ],
+                    ],
+                ],
+                [
+                    "Practice tools",
+                    [
+                        [["k"], "K", "Metronome", "", () => toggleTool("metronome")],
+                        [["c"], "C", "Count-in", "", () => toggleTool("countIn")],
+                        [
+                            ["ArrowUp", "ArrowDown"],
+                            "↑ ↓",
+                            "Volume up or down",
+                            "",
+                            (e) => nudgeVolume(e.key === "ArrowUp" ? 0.1 : -0.1),
+                        ],
+                        [["m"], "M", "Mute or unmute", "", () => $("volumeMute").click()],
+                        [
+                            ["b"],
+                            "B",
+                            "Play as a band",
+                            "Every other part in a window of its own",
+                            () => !following && $("band").click(),
+                        ],
+                    ],
+                ],
+                [
+                    "View",
+                    [
+                        [
+                            ["h"],
+                            "H",
+                            "Minimal view",
+                            "Just the highway and the lyrics",
+                            toggleMinimal,
+                        ],
+                        [["f"], "F", "Full screen", "", toggleFullscreen],
+                        [["o"], "O", "Open a song", "", () => $("open").click()],
+                        [["s"], "S", "Settings", "", () => toggleSheet("settings")],
+                        [
+                            ["?"],
+                            "?",
+                            "Notation and shortcuts",
+                            "This sheet",
+                            () => toggleSheet("legend"),
+                        ],
+                        [
+                            ["Escape"],
+                            "Esc",
+                            "Close what is open",
+                            "Settings, this sheet, the volume or the menu",
+                            () => {
+                                toggleSheet("settings", false);
+                                toggleVolume(false);
+                                toggleMenu(false);
+                            },
+                        ],
+                    ],
+                ],
+            ];
+            $("legendList").lastElementChild.before(
+                ...legendRows(
+                    SHORTCUTS.map(([group, rows]) => [
+                        `Keyboard shortcuts: ${group.toLowerCase()}`,
+                        rows.map(([, shown, name, more]) => [
+                            name,
+                            more,
+                            `<div class="keys">${shown
+                                .split(" ")
+                                .map((k) => `<kbd>${k}</kbd>`)
+                                .join("")}</div>`,
+                        ]),
+                    ]),
+                ),
+            );
+            const SHORTCUT_KEYS = new Map(
+                SHORTCUTS.flatMap(([, rows]) =>
+                    rows.flatMap(([keys, , , , run]) => keys.map((k) => [k, run])),
+                ),
+            );
             addEventListener("keydown", (e) => {
-                if (e.key === "Escape") {
-                    toggleSheet("settings", false);
-                    toggleVolume(false);
-                    toggleMenu(false);
-                }
                 if (
-                    e.target.tagName === "INPUT" ||
-                    e.target.closest?.(".sheet")
+                    e.key !== "Escape" &&
+                    (e.target.tagName === "INPUT" || e.target.closest?.(".sheet"))
                 )
-                    return; // space and arrows belong to the controls there
+                    return; // typing, and space and arrows, belong to the controls there
                 if (e.metaKey || e.ctrlKey || e.altKey) return; // the browser's own shortcuts, like Cmd+F to find
-                const action = {
-                    " ": togglePlay,
-                    l: toggleLoop,
-                    k: () => toggleTool("metronome"),
-                    m: () => $("volumeMute").click(),
-                    f: toggleFullscreen,
-                    "?": () => toggleSheet("legend"),
-                    ArrowLeft: () => player?.seek(songTime() - 5),
-                    ArrowRight: () => player?.seek(songTime() + 5),
-                }[e.key];
-                if (!action) return;
+                const run = SHORTCUT_KEYS.get(
+                    e.key.length === 1 ? e.key.toLowerCase() : e.key,
+                );
+                if (!run) return;
                 e.preventDefault();
-                action();
+                run(e);
             });
 
             // --- Band: every other part in a window of its own, all in time. The window that opened them plays the song and
