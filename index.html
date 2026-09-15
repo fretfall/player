@@ -2773,8 +2773,10 @@
                         ],
                         [
                             "Tapping",
-                            "Tap the note with a finger of your picking hand. m.d. and m.g. say which hand taps.",
-                            svg(above("T")),
+                            "Tap the note with a finger of your picking hand: an arrow in its colour on the note, pointing down. m.g. marks a tap with the fretting hand.",
+                            svg(
+                                `${gem(16, 17, 24, 11)}<path d="M20 4L28 16L36 4L28 8.5Z" class="f1" opacity=".45"/><path d="M20 4L28 16L36 4L28 8.5Z" class="l1" stroke-width="1.6"/>`,
+                            ),
                         ],
                         [
                             "Grace note",

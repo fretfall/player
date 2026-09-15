@@ -1229,7 +1229,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       above -= (size + 0.04) * k;
     };
     let onTop = cy - hh * k; // the top of the gem, and then of what sits on it
-    if (note.hammerOn || note.pullOff) { // a white triangle on the note, pointing down to hammer on and up to pull off
+    const tapped = note.tap && !note.tapLeft; // with the picking hand: its arrow stands for the legato too
+    if ((note.hammerOn || note.pullOff) && !tapped) { // a white triangle on the note, pointing down to hammer on and up to pull off
       const scale = note.grace ? 0.6 : 1, w = 0.2 * k * stretch * scale, h = 0.38 * gap * k * scale, [tip, base] = note.hammerOn ? [onTop + 0.4 * h, onTop - 0.6 * h] : [onTop - 0.6 * h, onTop + 0.4 * h];
       g.beginPath();
       g.moveTo(cx - w, base);
@@ -1242,6 +1243,27 @@ export function drawHighway(canvas, arr, now, t, cam) {
       stroke();
       fill();
       onTop -= 0.6 * h;
+      above = Math.min(above, onTop - 0.14 * k);
+      g.strokeStyle = g.fillStyle = ink;
+      g.lineWidth = Math.max(1.2, 0.04 * k);
+    }
+    if (tapped) { // tapped with the picking hand: an arrowhead in the note's colour pointing down onto it
+      const scale = note.grace ? 0.6 : 1, w = 0.28 * k * stretch * scale, h = 0.62 * gap * k * scale, tip = onTop + 0.15 * h, top = tip - h;
+      g.beginPath();
+      g.moveTo(cx, tip);
+      g.lineTo(cx + w, top);
+      g.lineTo(cx, top + 0.38 * h); // notched at the back
+      g.lineTo(cx - w, top);
+      g.closePath();
+      g.strokeStyle = alpha(t.ink, 0.9);
+      g.lineWidth = Math.max(3.5, 0.1 * k);
+      stroke();
+      g.fillStyle = repeated ? alpha(ink, 0.4) : alpha(shade(c, 0.55), 0.85);
+      fill();
+      g.strokeStyle = repeated ? ink : c;
+      g.lineWidth = Math.max(1.8, 0.05 * k);
+      stroke();
+      onTop = top;
       above = Math.min(above, onTop - 0.14 * k);
       g.strokeStyle = g.fillStyle = ink;
       g.lineWidth = Math.max(1.2, 0.04 * k);
@@ -1272,7 +1294,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3); // an accented chord's frame shows it
     const words = [
-      note.tapLeft ? 'm.g.' : note.tap ? (note.tapLeft === false ? 'm.d.' : 'T') : '', // Guitar Pro says which hand taps
+      note.tapLeft ? 'm.g.' : '', // a tap with the fretting hand, which Guitar Pro tells apart (the picking hand's has its arrow)
       TEXT_MARKS[note.harmonicType] ?? (note.harmonicPinch ? 'PH' : ''),
       note.slap ? 'slap' : note.pop ? 'pop' : '', note.golpe ? `golpe (${note.golpe})` : '', note.rasgueado ? `rasg. ${note.rasgueado}` : '',
       typeof note.trill === 'number' ? `tr ${note.trill}` : '', note.ornament ?? '', note.fade ?? '', note.whammy ? 'w/bar' : '',
