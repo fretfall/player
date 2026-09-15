@@ -388,30 +388,32 @@ export function drawHighway(canvas, arr, now, t, cam) {
   };
   // Mutes: a palm mute is a big dark X across the note, a fret-hand mute a small white X in its middle. hw
   // and hh: the gem's half size; color: the X's own colour instead (greyed out on a repeat)
+  // Marks on a gem (its mute's X, its finger number) are black, or white with a dark edge (the markings setting)
+  const white = t.markings === 'white', marks = white ? '#ffffff' : t.ink;
   const muteMark = (x, y, z, k, hw, hh, palm, color = null) => {
     const [w, h] = palm ? [hw * 0.85, hh * 0.8] : [Math.min(hw, 0.34) * 0.4, hh * 0.55];
-    if (!color) { // a dark edge under a white X
-      g.strokeStyle = palm ? alpha(t.ink, 0.85) : alpha(t.ink, 0.7);
-      g.lineWidth = Math.max(palm ? 2 : 3.5, (palm ? 0.06 : 0.1) * k);
+    const dark = palm && !white && !color; // a black palm mute's X; a fret-hand mute's is white on its dark edge either way
+    if (!color) { // the dark edge
+      g.strokeStyle = alpha(t.ink, dark ? 0.85 : 0.7);
+      g.lineWidth = dark ? Math.max(2, 0.06 * k) : Math.max(3.5, 0.1 * k);
       xMark(x, y, z, w, h);
     }
-    if (palm && !color) return;
+    if (dark) return;
     g.strokeStyle = color ?? '#ffffff';
     g.lineWidth = Math.max(color ? 2 : 1.8, 0.05 * k);
     xMark(x, y, z, w, h);
   };
   // size in world units at the strike line. Text on the floor shrinks with distance far more gently than the
-  // highway (as in Tabizera), so the numbers of notes a few seconds away stay readable; ink text sits on a gem
-  // and keeps to its size
-  const label = (str, x, y, z, size, fill, weight = 700, align = 'center', halo = fill !== t.ink) => {
-    const onGem = fill === t.ink, [px, py, k] = P(x, y, z), px2 = fontSize(size * (onGem ? k : Math.sqrt(k * k0)));
+  // highway (as in Tabizera), so the numbers of notes a few seconds away stay readable; text on a gem keeps to its size
+  const label = (str, x, y, z, size, fill, weight = 700, align = 'center', halo = true, onGem = false) => {
+    const [px, py, k] = P(x, y, z), px2 = fontSize(size * (onGem ? k : Math.sqrt(k * k0)));
     if (px2 < (onGem ? 1 : 8) || px < -60 || px > W + 60) return; // numbers on gems fade in from the far end, however small
     const font = `${weight} ${px2}px ${t.num}`;
     g.font = font;
     g.textAlign = align;
     g.textBaseline = 'alphabetic';
     const cy = py + measure(g, font, str).middle; // centre the digits themselves, not the font's em box
-    if (halo) { // a dark halo lifts numbers off the lines behind them
+    if (halo) { // a dark halo lifts numbers off the lines and gems behind them
       g.lineWidth = px2 * 0.2;
       g.strokeStyle = alpha(t.ink, 0.9);
       g.strokeText(str, px, cy);
@@ -1185,7 +1187,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
         if (onGem) { // shown from the far end, fading in until 40% of the way along the drawing distance
           const shown = g.globalAlpha;
           g.globalAlpha = shown * Math.min(1, Math.max(0, (1 - dt / LOOK) / 0.4));
-          label(onGem, x, y, z - 0.01, gap * 0.62, t.ink, 700);
+          label(onGem, x, y, z - 0.01, gap * 0.62, marks, 700, 'center', white, true);
           g.globalAlpha = shown;
         }
       }
@@ -1396,7 +1398,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       stroke();
     }
     const finger = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
-    if (!open && finger !== null) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, pressed ? t.ink : t.text, 800);
+    if (!open && finger !== null) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, pressed ? marks : t.text, 800, 'center', !pressed || white);
     if (!open && bendPeak(note) > 0) { // a bend: a chevron on top of its target, down for a pre-bend let down
       const [px, py] = P(x, y + hh, 0), letDown = note.bendCurve?.[0]?.[1] > 0 && note.bendCurve.at(-1)[1] < bendPeak(note);
       chevron(g, px, py - (letDown ? 0.14 : 0.05) * k0, 0.17 * k0 * stretch, 0.085 * k0, letDown ? 1 : -1, '#ffffff', alpha(t.ink, 0.9));

@@ -1901,6 +1901,20 @@
                 </div>
                 <div
                     class="setting"
+                    title="The mute crosses and finger numbers on the notes"
+                >
+                    <div class="setting-head">
+                        <span id="markingsLabel">Markings on notes</span>
+                    </div>
+                    <div
+                        class="seg"
+                        data-setting="markings"
+                        role="group"
+                        aria-labelledby="markingsLabel"
+                    ></div>
+                </div>
+                <div
+                    class="setting"
                     title="The white line on the floor under each note and chord, where it's played"
                 >
                     <div class="setting-head">
@@ -2209,6 +2223,10 @@
                 grey: { label: "Greyed marks" },
                 hide: { label: "No marks" },
             };
+            const MARKINGS = {
+                black: { label: "Black" },
+                white: { label: "White" },
+            };
             const STRING_ORDERS = {
                 low: { label: "Low E on top" },
                 high: { label: "High e on top" },
@@ -2228,6 +2246,7 @@
                 volumeMuted: false,
                 frames: "gradient",
                 repeatMarks: "frame",
+                markings: "black",
                 stringOrder: "low",
                 headstock: "inline",
                 offset: 0,
@@ -2263,6 +2282,7 @@
                 ["strings", STRINGS],
                 ["frames", FRAMES, "gradient"],
                 ["repeatMarks", REPEAT_MARKS, "frame"],
+                ["markings", MARKINGS, "black"],
                 ["stringOrder", STRING_ORDERS, "low"],
                 ["headstock", HEADSTOCKS, "inline"],
             ])
@@ -2284,6 +2304,7 @@
                     notes3d: settings.notes3d,
                     frames: settings.frames,
                     repeatMarks: settings.repeatMarks,
+                    markings: settings.markings,
                     stringOrder: settings.stringOrder,
                     headstock: settings.headstock,
                     viewAngle: settings.viewAngle,
@@ -2394,6 +2415,7 @@
                         strings: STRINGS,
                         frames: FRAMES,
                         repeatMarks: REPEAT_MARKS,
+                        markings: MARKINGS,
                         stringOrder: STRING_ORDERS,
                         headstock: HEADSTOCKS,
                     }[setting];
