@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": { "correctness": "error", "perf": "error" },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "rules": {
+    "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
+    "no-unused-expressions": ["error", { "allowShortCircuit": true, "allowTernary": true }],
+    "unicorn/no-new-array": "off"
+  },
+  "overrides": [{ "files": ["*.test.mjs", "scripts/**"], "rules": { "oxc/no-map-spread": "off" } }],
+  "ignorePatterns": ["dist/**", "base/**"]
+}

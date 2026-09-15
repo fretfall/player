@@ -1943,8 +1943,13 @@ export function drawTab(canvas, arr, now, t) {
           const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < peak;
           const bx = x0 + w - 2, base = y - nh / 2, tip = base - 16;
           g.beginPath();
-          if (pre) g.moveTo(bx, base), g.lineTo(bx, tip);
-          else g.moveTo(bx - 4, base + 2), g.quadraticCurveTo(bx + 4, base, bx + 6, tip);
+          if (pre) {
+            g.moveTo(bx, base);
+            g.lineTo(bx, tip);
+          } else {
+            g.moveTo(bx - 4, base + 2);
+            g.quadraticCurveTo(bx + 4, base, bx + 6, tip);
+          }
           g.stroke();
           arrowhead(pre ? bx : bx + 6, tip, pre ? 0 : 0.3, -1);
           if (release) {

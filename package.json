@@ -1,0 +1,23 @@
+{
+  "name": "fretfall-player",
+  "version": "0.1.0",
+  "description": "An arcade-style 3D note highway for Guitar Pro and MusicXML tabs, in the browser. Plays along with the synth or the band's recording.",
+  "keywords": ["guitar", "bass", "tab", "guitar-pro", "musicxml", "note-highway", "alphatab", "practice"],
+  "license": "MIT",
+  "author": "Angelo Dini",
+  "homepage": "https://github.com/FinalAngel/fretfall-player#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/FinalAngel/fretfall-player.git" },
+  "bugs": "https://github.com/FinalAngel/fretfall-player/issues",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "oxlint --deny-warnings",
+    "test": "node --test",
+    "bench": "node scripts/bench.mjs dist"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "oxlint": "1.83.0"
+  }
+}
