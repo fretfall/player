@@ -90,6 +90,22 @@ export function headstockParts(head, strings) {
   const keys = head.keys ? ends.map(([u, v]) => ({ u, side: Math.sign(v) || 1, edge: edge(u, Math.sign(v) || 1) })) : [];
   return { outline, ends, keys };
 }
+// The same shapes every frame, until the headstock or the strings' spacing changes: worked out once
+const headstocks = new WeakMap(), shapes = new Map();
+const headstockFor = (head, strings) => {
+  const key = strings.join(), known = headstocks.get(head);
+  if (known?.key === key) return known.parts;
+  const parts = headstockParts(head, strings);
+  headstocks.set(head, { key, parts });
+  return parts;
+};
+const headstockShape = (key, points) => {
+  if (!shapes.has(key)) {
+    if (shapes.size > 500) shapes.clear(); // the fretboard height slider makes new ones as it moves
+    shapes.set(key, points());
+  }
+  return shapes.get(key);
+};
 export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
   const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
   const corner = (cu, cv, from) => Array.from({ length: 5 }, (_, j) => [cu + Math.cos(from + (j * Math.PI) / 8) * r, cv + Math.sin(from + (j * Math.PI) / 8) * r]);
@@ -120,11 +136,12 @@ const shade = (color, amount) => { // a hex colour mixed toward white (amount > 
 const alpha = (color, a) =>
   color.startsWith('#') ? `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${a})` : color;
 // Short text is set at quarter-pixel sizes and measured once per font and string: it shrinks smoothly with distance, and a
-// font at a size not seen before is slow to set up
+// font at a size not seen before is slow to set up. font: what g.font was just set to (reading g.font back is slow)
 const fontSize = (px) => Math.round(px * 4) / 4;
+const MARK_PX = 32; // the size floor markings are set in, before they're scaled
 const metrics = new Map();
-const measure = (g, str) => { // → { width, middle: how far the ink's middle is above the baseline }
-  const key = `${g.font}|${str}`;
+const measure = (g, font, str) => { // → { width, middle: how far the ink's middle is above the baseline }
+  const key = `${font}|${str}`;
   let m = metrics.get(key);
   if (!m) {
     if (metrics.size > 5000) metrics.clear(); // every song brings its own chord names: start over now and then
@@ -355,10 +372,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const label = (str, x, y, z, size, fill, weight = 700, align = 'center', halo = fill !== t.ink) => {
     const onGem = fill === t.ink, [px, py, k] = P(x, y, z), px2 = fontSize(size * (onGem ? k : Math.sqrt(k * k0)));
     if (px2 < (onGem ? 1 : 8) || px < -60 || px > W + 60) return; // numbers on gems fade in from the far end, however small
-    g.font = `${weight} ${px2}px ${t.num}`;
+    const font = `${weight} ${px2}px ${t.num}`;
+    g.font = font;
     g.textAlign = align;
     g.textBaseline = 'alphabetic';
-    const cy = py + measure(g, str).middle; // centre the digits themselves, not the font's em box
+    const cy = py + measure(g, font, str).middle; // centre the digits themselves, not the font's em box
     if (halo) { // a dark halo lifts numbers off the lines behind them
       g.lineWidth = px2 * 0.2;
       g.strokeStyle = alpha(t.ink, 0.9);
@@ -466,18 +484,25 @@ export function drawHighway(canvas, arr, now, t, cam) {
   for (const h of arr.hairpins ?? []) if (h.time >= now && h.time <= now + LOOK) moment(h.time).pins.push(h.kind);
   const markLine = cam.center - (cam.span / 2 + 0.5) / stretch; // the same place on screen at any fret width
   for (const { dt, texts, pins } of moments.values()) { // right-aligned against the line at the depth of their bar, in perspective
-    const [px, py, k] = P(markLine, floor, Z(dt)), scale = Math.sqrt(k * k0), size = 0.3 * scale, text = texts.join('  ·  '), space = 0.25 * scale;
-    g.font = `700 ${size}px ${t.num}`;
-    const textWidth = text ? g.measureText(text).width : 0, width = textWidth + pins.length * (0.9 * scale + space); // measured at its own size: a long line of text, right-aligned, would jump at quarter pixels (see fontSize)
+    // Set in one font size and scaled to its depth: a size of its own every frame would set up a new font every frame, and
+    // quarter-pixel sizes (see fontSize) would make a long line of right-aligned text jump
+    const [px, py, k] = P(markLine, floor, Z(dt)), scale = Math.sqrt(k * k0), text = texts.join('  ·  '), space = 0.25 * scale;
+    const font = `700 ${MARK_PX}px ${t.num}`, shrink = (0.3 * scale) / MARK_PX;
+    g.font = font;
+    const textWidth = text ? measure(g, font, text).width * shrink : 0, width = textWidth + pins.length * (0.9 * scale + space);
     let right = Math.max(px - 0.3 * scale, 16 + width); // a little padding from the line, kept on screen
     g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
-    g.lineWidth = size * 0.2;
-    g.strokeStyle = alpha(t.ink, 0.9);
     if (text) {
+      g.save();
+      g.translate(right, py);
+      g.scale(shrink, shrink);
       g.textAlign = 'right';
-      g.strokeText(text, right, py);
+      g.lineWidth = MARK_PX * 0.2;
+      g.strokeStyle = alpha(t.ink, 0.9);
+      g.strokeText(text, 0, 0);
       g.fillStyle = t.accent;
-      g.fillText(text, right, py);
+      g.fillText(text, 0, 0);
+      g.restore();
       right -= textWidth + space;
     }
     for (const kind of pins) { // a hairpin, as in notation, where it starts: opening for a crescendo, closing for a diminuendo
@@ -519,7 +544,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const head = HEADSTOCKS[t.headstock], half = (boardHi - boardLo) / 2, flip = t.stringOrder === 'high' ? -1 : 1;
   const onHead = ([u, v]) => [(-u * half) / stretch, stack / 2 + v * half * flip, 0];
   const headV = (s) => ((ys(s) - stack / 2) * flip) / half; // a string's height, in the headstock's terms
-  const parts = head && headstockParts(head, Array.from({ length: n }, (_, s) => headV(s)));
+  const parts = head && headstockFor(head, Array.from({ length: n }, (_, s) => headV(s)));
   const ends = parts?.ends.map(onHead);
   const paint = (fillStyle, strokeStyle, width = 1) => { // fill and outline the current path
     if (fillStyle) { g.fillStyle = fillStyle; fill(); }
@@ -530,7 +555,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.beginPath();
     g.ellipse(px, py, Math.abs(ex - px), Math.abs(ey - py), 0, 0, Math.PI * 2);
   };
-  const box = (u0, u1, v0, v1, round) => path(rounded(u0, u1, v0, v1, round).map(onHead)); // a small part on the headstock, leaning with the board
+  const box = (u0, u1, v0, v1, round) => path(headstockShape(`${u0},${u1},${v0},${v1},${round}`, () => rounded(u0, u1, v0, v1, round)).map(onHead)); // a small part on the headstock, leaning with the board
   if (parts) {
     for (const { u, side, edge } of parts.keys) { // keys, sticking out from under the plate's edge
       const span = (a, b) => [edge + side * a, edge + side * b];
@@ -582,7 +607,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       paint(alpha(t.ink, 0.92), alpha(t.text, 0.12));
     }
     if (head.cover) { // the truss rod cover and its screws
-      path(spline(head.cover).map(onHead));
+      path(headstockShape(head.cover, () => spline(head.cover)).map(onHead));
       paint(alpha(t.text, 0.09), alpha(t.text, 0.4));
       for (const screw of head.screws) {
         oval(screw, 0.04, 0.04);
@@ -1284,11 +1309,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const named = current ?? upcoming;
   if (named) {
     const [rx, ly] = P(cam.right + 0.4, boardHi + 0.5, 0);
-    g.font = `700 52px ${t.num}`;
+    const font = `700 52px ${t.num}`;
+    g.font = font;
     g.globalAlpha = current ? 1 : Math.max(0.35, 1 - (named.time - now) / 1.2);
     g.fillStyle = t.text;
     g.textAlign = 'left';
-    g.fillText(named.name, Math.min(rx, W - 24 - measure(g, named.name).width), ly); // kept on screen at the top of the neck
+    g.fillText(named.name, Math.min(rx, W - 24 - measure(g, font, named.name).width), ly); // kept on screen at the top of the neck
     g.globalAlpha = 1;
   }
   lap('labels');
