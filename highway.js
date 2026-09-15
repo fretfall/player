@@ -1292,7 +1292,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if ((muted || palm) && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, t.muted); // its mute, greyed out
       g.globalAlpha = faded;
     } else {
-      if (!open && z > 1.75) {
+      if (!open && z > 1.75 && t.fretNumbers) {
         const fret = note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
         label(fret, x, floor, z - 0.55, note.grace ? 0.18 : 0.26, c); // just in front of the note's line
       }
