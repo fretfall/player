@@ -2483,16 +2483,16 @@
                     [
                         [
                             "Palm mute",
-                            "Rest the side of your picking hand on the strings near the bridge.",
+                            "Rest the side of your picking hand on the strings near the bridge: a big dark X across the note.",
                             svg(
-                                `<rect x="16" y="10" width="24" height="12" class="fi l0" stroke-width="1.6"/><path d="M19 12l18 8M19 20l18-8" class="l0" stroke-width="1.6"/>`,
+                                `${gem(16, 10, 24, 12, 0)}<path d="M18 11l20 10M18 21l20-10" class="li" stroke-width="2" opacity=".85"/>`,
                             ),
                         ],
                         [
-                            "Muted note",
-                            "Touch the string with your fretting hand without pressing it down, for a percussive click.",
+                            "Fret-hand mute",
+                            "Touch the string with your fretting hand without pressing it down, for a percussive click: a small white X on the note.",
                             svg(
-                                `<path d="M20 8l16 16M20 24l16-16" class="l0" stroke-width="2.5"/>`,
+                                `${gem(16, 10, 24, 12, 0)}<path d="M24.5 13l7 6M24.5 19l7-6" class="li" stroke-width="3.5" opacity=".7"/><path d="M24.5 13l7 6M24.5 19l7-6" class="lw" stroke-width="1.8"/>`,
                             ),
                         ],
                         [
@@ -2516,7 +2516,7 @@
                         ],
                         [
                             "Strum",
-                            "Strum the chord in the direction of the arrow.",
+                            "Strum the chord in the direction of the arrow, where a Guitar Pro file marks it.",
                             svg(
                                 `<path d="M28 5v22M23 21l5 6 5-6" class="lt" stroke-width="1.8"/>`,
                             ),

@@ -366,6 +366,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
     line3([x - w, y - h, z], [x + w, y + h, z]);
     line3([x - w, y + h, z], [x + w, y - h, z]);
   };
+  // Mutes: a palm mute is a big dark X across the note, a fret-hand mute a small white X in its middle. hw
+  // and hh: the gem's half size; color: the X's own colour instead (greyed out on a repeat)
+  const muteMark = (x, y, z, k, hw, hh, palm, color = null) => {
+    const [w, h] = palm ? [hw * 0.85, hh * 0.8] : [Math.min(hw, 0.34) * 0.4, hh * 0.55];
+    if (!color) { // a dark edge under a white X
+      g.strokeStyle = palm ? alpha(t.ink, 0.85) : alpha(t.ink, 0.7);
+      g.lineWidth = Math.max(palm ? 2 : 3.5, (palm ? 0.06 : 0.1) * k);
+      xMark(x, y, z, w, h);
+    }
+    if (palm && !color) return;
+    g.strokeStyle = color ?? '#ffffff';
+    g.lineWidth = Math.max(color ? 2 : 1.8, 0.05 * k);
+    xMark(x, y, z, w, h);
+  };
   // size in world units at the strike line. Text on the floor shrinks with distance far more gently than the
   // highway (as in Tabizera), so the numbers of notes a few seconds away stay readable; ink text sits on a gem
   // and keeps to its size
@@ -986,7 +1000,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.strokeStyle = 'rgba(255, 255, 255, 0.5)';
       g.lineWidth = 2;
       line3([l, floor, z], [r, floor, z]);
-      if (chord.highDensity && (chord.palmMute || chord.fretHandMute)) xMark((l + r) / 2, floor + gap * 0.4, z, 0.14, gap * 0.3);
+      if (chord.highDensity && (chord.palmMute || chord.fretHandMute)) { // a repeat's mute: grey and big for a palm mute, small and white for the fretting hand (see muteMark)
+        g.strokeStyle = chord.palmMute ? t.muted : '#ffffff';
+        xMark((l + r) / 2, floor + gap * 0.4, z, chord.palmMute ? 0.22 : 0.12, gap * (chord.palmMute ? 0.35 : 0.22));
+      }
       if (chord.accent) { // played harder: the frame's top corners shine white
         const arm = Math.min(0.6, (r - l) * 0.22), drop = (boardHi - floor) * 0.35;
         g.strokeStyle = '#ffffff';
@@ -1039,11 +1056,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       gem(x, y, z, hw, hh);
       stroke();
       glow(false);
-      if ((muted || palm) && t.repeatMarks !== 'hide') { // its mute, greyed out
-        g.strokeStyle = t.muted;
-        g.lineWidth = 2;
-        xMark(x, y, z, open ? gap * 0.4 : hw * 0.8, open ? gap * 0.4 : hh * 1.1);
-      }
+      if ((muted || palm) && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, t.muted); // its mute, greyed out
       g.globalAlpha = faded;
     } else {
       if (!open && t.number === 'floor' && z > 1.75) {
@@ -1053,21 +1066,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 
       if (note.ghost) g.globalAlpha = faded * 0.5;
-      if (muted || palm) { // mutes an X, in a hollow gem for a palm mute (open strings keep their bar)
-        glow(t.glow && z < NEAR, c, 8);
-        g.strokeStyle = c;
-        if (palm || open) {
-          g.fillStyle = alpha(t.ink, 0.7);
-          g.lineWidth = 2;
-          gem(x, y, z, hw, hh);
-          fill();
-          stroke();
-        }
-        g.lineWidth = palm ? 2 : 3;
-        if (open) xMark(x, y, z, gap * 0.4, gap * 0.4);
-        else xMark(x, y, z, hw * (palm ? 0.9 : 0.8), hh * (palm ? 0.9 : 1.3));
-        glow(false);
-      } else if (t.gem === 'pill') {
+      if (t.gem === 'pill') {
         const [lx, ly] = P(x - hw, y + hh, z), [rx, ry] = P(x + hw, y - hh, z);
         g.fillStyle = c;
         g.beginPath();
@@ -1104,14 +1103,15 @@ export function drawHighway(canvas, arr, now, t, cam) {
         g.lineWidth = t.gem === 'solid' ? 2 : 1;
         stroke();
       }
+      if (muted || palm) muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, open && palm ? c : null); // on an open string's thin bar, the palm mute's X keeps its colour
 
-      if (!open && !muted) {
+      if (!open && !muted && !palm) { // a mute's X takes the middle of the gem
         const finger = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
         const onGem = t.number === 'on' ? String(note.fret) : finger !== null ? (finger === 0 ? 'T' : String(finger)) : '';
         if (onGem) { // shown from the far end, fading in until 40% of the way along the drawing distance
           const shown = g.globalAlpha;
           g.globalAlpha = shown * Math.min(1, Math.max(0, (1 - dt / LOOK) / 0.4));
-          label(onGem, x, y, z - 0.01, gap * 0.62, palm ? t.text : t.ink, 700); // a hollow gem is dark inside
+          label(onGem, x, y, z - 0.01, gap * 0.62, t.ink, 700);
           g.globalAlpha = shown;
         }
       }
