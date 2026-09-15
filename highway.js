@@ -1074,10 +1074,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
       if (chord.accent) { // played harder: the frame's top corners shine white
         const arm = Math.min(0.6, (r - l) * 0.22), drop = (boardHi - floor) * 0.35;
+        const size = Math.min(1, P(l, boardHi, z)[2] / P(l, boardHi, NEAR)[2]); // thinner in the distance, as the frame is
         g.strokeStyle = '#ffffff';
-        g.lineWidth = (near ? 3.5 : 2.5) * (chord.accent === 'heavy' ? 1.4 : 1);
+        g.lineWidth = Math.max(1, 3.5 * size * (chord.accent === 'heavy' ? 1.4 : 1));
         g.lineCap = 'square';
-        glow(t.glow, '#ffffff', near ? 12 : 6);
+        glow(t.glow, '#ffffff', Math.max(2, 12 * size));
         path([[l, boardHi - drop, z], [l, boardHi, z], [l + arm, boardHi, z]], false);
         stroke();
         path([[r - arm, boardHi, z], [r, boardHi, z], [r, boardHi - drop, z]], false);

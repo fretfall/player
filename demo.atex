@@ -13,6 +13,8 @@
 \track "Guitar"
 \staff {tabs}
 \instrument distortionguitar
+:1 r |
+:1 r |
 \section "Chugs" \ro :8 (0.6{pm} 2.5{pm}){ch "E5" lyrics "Plug"} (0.6{pm} 2.5{pm}){lyrics "it"} (0.6{pm} 2.5{pm}){lyrics "in"} (0.6{pm} 2.5{pm}){lyrics "and"} (3.6{sl} 5.5{sl}){ch "G5" lyrics "turn"} (5.6{ac} 7.5{ac}){ch "A5" lyrics "it"} (x.6 x.5){lyrics "up+"} (x.6 x.5) |
 \rc 2 :8 0.6{pm lyrics "watch"} 0.6{pm lyrics "the"} 0.6{pm lyrics "high-"} 0.6{pm lyrics "way"} (7.6{hac} 9.5{hac}){ch "B5" lyrics "come"} (7.6 9.5){lyrics "a-"} (5.5{pm} 7.4{pm}){ch "D5" lyrics "live+"} (5.5{pm} 7.4{pm}) |
 :16 0.6{pm} 0.6{pm} :8 0.6{pm} :16 0.6{pm} 0.6{pm} :8 0.6{pm} :4 (5.6 7.5 7.4){ch "A5" lyrics "Rea-"} (5.6 7.5 7.4){lyrics "dy,"} |
@@ -62,6 +64,8 @@
 \staff {tabs}
 \tuning (G2 D2 A1 E1)
 \instrument electricbassfinger
+:1 r |
+:1 r |
 \ro :8 0.4 0.4 0.4 0.4 3.4 3.4 5.4 5.4 |
 \rc 2 :8 0.4 0.4 0.4 0.4 7.4 7.4 5.3 5.3 |
 :16 0.4 0.4 :8 0.4 :16 0.4 0.4 :8 0.4 :4 5.4 5.4 |
