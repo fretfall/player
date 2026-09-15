@@ -1790,6 +1790,25 @@
                         aria-labelledby="repeatMarksLabel"
                     ></div>
                 </div>
+                <div
+                    class="setting"
+                    title="The white line on the floor under each note and chord, where it's played"
+                >
+                    <div class="setting-head">
+                        <label for="noteLines">Note lines</label
+                        ><output id="noteLinesOut" for="noteLines"></output>
+                    </div>
+                    <input
+                        id="noteLines"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                    />
+                    <div class="scale" aria-hidden="true">
+                        <span>Hidden</span><span>Solid</span>
+                    </div>
+                </div>
                 <label class="toggle"
                     ><span
                         >Hand position guides<small
@@ -1859,6 +1878,13 @@
                         aria-labelledby="lookLabel"
                     ></div>
                 </div>
+                <label class="toggle"
+                    ><span
+                        >3D notes<small
+                            >Notes a few pixels deep, lit on top</small
+                        ></span
+                    ><input id="notes3d" type="checkbox" role="switch"
+                /></label>
                 <div class="setting">
                     <div class="setting-head">
                         <span id="colorsLabel">Colours</span>
@@ -2068,10 +2094,10 @@
                 low: { label: "Low E on top" },
                 high: { label: "High e on top" },
             }; // looking down at the guitar, or as in tab
-            const VIEW_DEFAULTS = 5; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords
+            const VIEW_DEFAULTS = 6; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords, 6 the side angle
             const VIEW_START = {
                 viewAngle: 30,
-                sideAngle: 0,
+                sideAngle: 5,
                 noteSpeed: 1,
                 drawDistance: 1,
                 fretWidth: 1,
@@ -2091,6 +2117,8 @@
                 countIn: false,
                 minimal: false,
                 guides: true,
+                noteLines: 0.5,
+                notes3d: true,
                 ...VIEW_START,
                 viewDefaults: VIEW_DEFAULTS,
                 panel: "view",
@@ -2104,7 +2132,9 @@
                     for (const key of Object.keys(VIEW_START))
                         delete saved[key];
                 if (version < 5) delete saved.repeatMarks;
+                if (version < 6) delete saved.sideAngle;
                 delete saved.viewDefaults;
+                if (typeof saved.noteLines !== "number") delete saved.noteLines; // saved while it was an on/off switch
                 Object.assign(settings, saved);
             } catch {}
             for (const [key, options, fallback] of [
@@ -2131,6 +2161,8 @@
                 theme = {
                     ...makeTheme(settings),
                     guides: settings.guides,
+                    noteLines: settings.noteLines,
+                    notes3d: settings.notes3d,
                     frames: settings.frames,
                     repeatMarks: settings.repeatMarks,
                     stringOrder: settings.stringOrder,
@@ -2283,7 +2315,7 @@
                     "--fill",
                     `${((range.value - range.min) / (range.max - range.min)) * 100}%`,
                 ); // the slider's track, lit up to the thumb
-            // The view sliders change the highway straight away, without reloading the theme's fonts
+            // The view sliders (and the note lines') change the highway straight away, without reloading the theme's fonts
             const VIEW = {
                 viewAngle: (v) => `${v}°`,
                 sideAngle: (v) =>
@@ -2292,6 +2324,7 @@
                 drawDistance: () => `${lookAhead(settings).toFixed(1)} s`,
                 fretWidth: (v) => `${Math.round(v * 100)}%`,
                 boardHeight: (v) => `${Math.round(v * 100)}%`,
+                noteLines: (v) => `${Math.round(v * 100)}%`,
             };
             const showView = () => {
                 for (const [key, show] of Object.entries(VIEW))
@@ -2369,12 +2402,14 @@
             $("volumeButton").onclick = () => toggleVolume();
             $("volumeMute").onclick = () =>
                 setVolume(settings.volume || 0.8, !settings.volumeMuted);
-            $("guides").checked = settings.guides;
-            $("guides").onchange = (e) => {
-                settings.guides = e.target.checked;
-                save();
-                applyTheme();
-            };
+            for (const key of ["guides", "notes3d"]) {
+                $(key).checked = settings[key];
+                $(key).onchange = (e) => {
+                    settings[key] = e.target.checked;
+                    save();
+                    applyTheme();
+                };
+            }
             $("mute").checked = settings.mute;
             $("mute").onchange = (e) => {
                 settings.mute = e.target.checked;

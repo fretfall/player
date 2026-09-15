@@ -17,6 +17,7 @@ const NEAR = 5;
 const BEND_LIFT = 1, BEND_RISE = 1.6; // string gaps a bent string rises on the fretboard, and its trail on the highway, per step bent
 const BEND_EASE = 2; // fret widths before the board over which the trail's rise settles to the string's
 const RAIL = 0.19; // half the width of a bent note's trail
+const GEM_DEPTH = 0.12; // how deep 3D notes are: 4 to 5 px at the board
 const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead; frets in view at the closest zoom, less the fret of slack
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
@@ -324,6 +325,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const boardLo = -0.22, boardHi = stack + 0.22, floor = boardLo - 0.06, far = LOOK * SPEED;
   const Z = (dt) => Math.max(0, dt) * SPEED; // played notes stay on the board while they fade: the camera is right behind it
   const color = (s) => t.str[s % t.str.length];
+  const noteLine = t.noteLines === 0 ? null : `rgba(255, 255, 255, ${t.noteLines ?? 0.5})`; // the white line under each note and frame
 
   // Camera just behind and above the strike line, looking far down the highway, as in Tabizera: notes come up
   // out of the distance and the lanes run to a vanishing point under the header. The view angle swings it around
@@ -363,7 +365,17 @@ export function drawHighway(canvas, arr, now, t, cam) {
     path([a, b], false);
     stroke();
   };
-  const gem = (x, y, z, hw, hh) => path([[x - hw, y - hh, z], [x + hw, y - hh, z], [x + hw, y + hh, z], [x - hw, y + hh, z]]); // a gem's square face
+  // A gem's face, and the outline of everything shaped like one (targets, repeats, where a slide lands): square, or for
+  // rounded notes a capsule along its string, which slants when the camera is swung to a side
+  const gem = (x, y, z, hw, hh) => {
+    if (t.gem !== 'pill') return path([[x - hw, y - hh, z], [x + hw, y - hh, z], [x + hw, y + hh, z], [x - hw, y + hh, z]]);
+    const [lx, ly] = P(x - hw, y, z), [rx, ry] = P(x + hw, y, z), [, top] = P(x, y + hh, z), [, bottom] = P(x, y - hh, z);
+    const along = Math.atan2(ry - ly, rx - lx), r = Math.min(Math.abs(bottom - top), Math.hypot(rx - lx, ry - ly)) / 2, [dx, dy] = [r * Math.cos(along), r * Math.sin(along)];
+    g.beginPath();
+    g.arc(lx + dx, ly + dy, r, along + Math.PI / 2, along + Math.PI * 1.5);
+    g.arc(rx - dx, ry - dy, r, along - Math.PI / 2, along + Math.PI / 2);
+    g.closePath();
+  };
   // A chord's frame covers the whole hand position (four frets at least, more if the chord stretches) and every
   // string, standing on the floor
   const frameAt = (frets, time) => {
@@ -828,14 +840,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
   lap('strings');
 
   // Under every frame and gem: a white line on the floor under each note, marking its beat (chords get theirs under the
-  // frame), and a stem from each fretted note down to it
+  // frame; the note lines setting sets how white, down to none), and a stem from each fretted note down to it
   for (const note of visible) {
     const dt = note.time - now, z = Z(dt), chord = chordOf(note), { a, open, x: from, y } = spot(note), x = slideX(note, from, -dt);
     if (dt < -0.15 || Math.abs(P(x, y, z)[0] - W / 2) > W / 2 + 200) continue;
     const hw = open ? (a.width - 0.2) / 2 : 0.34;
     g.globalAlpha = dt < 0 ? Math.max(0, 1 + dt / 0.15) : Math.min(1, (LOOK - dt) / 0.4);
-    if (!chord) {
-      g.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    if (!chord && noteLine) {
+      g.strokeStyle = noteLine;
       g.lineWidth = 2;
       line3([x - hw, floor, z], [x + hw, floor, z]);
     }
@@ -1046,9 +1058,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
         glow(false);
       }
       g.globalAlpha = shown; // a white line under every frame, box or gradient, marks the moment to play it
-      g.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      g.strokeStyle = noteLine;
       g.lineWidth = 2;
-      line3([l, floor, z], [r, floor, z]);
+      if (noteLine) line3([l, floor, z], [r, floor, z]);
       if (chord.highDensity && (chord.palmMute || chord.fretHandMute)) { // a repeat's mute: grey and big for a palm mute, small and white for the fretting hand (see muteMark)
         g.strokeStyle = chord.palmMute ? t.muted : '#ffffff';
         xMark((l + r) / 2, floor + gap * 0.4, z, chord.palmMute ? 0.22 : 0.12, gap * (chord.palmMute ? 0.35 : 0.22));
@@ -1115,17 +1127,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 
       if (note.ghost) g.globalAlpha = faded * 0.5;
-      if (t.gem === 'pill') { // a capsule along its string, which slants when the camera is swung to a side
-        const [lx, ly] = P(x - hw, y, z), [rx, ry] = P(x + hw, y, z), [, top] = P(x, y + hh, z), [, bottom] = P(x, y - hh, z);
-        const along = Math.atan2(ry - ly, rx - lx), r = Math.min(Math.abs(bottom - top), Math.hypot(rx - lx, ry - ly)) / 2, [dx, dy] = [r * Math.cos(along), r * Math.sin(along)];
+      if (t.gem === 'pill') { // a capsule; in 3D its back shows a few pixels behind it, lit as a square gem's top
+        if (t.notes3d !== false) {
+          gem(x, y, z + GEM_DEPTH, hw, hh);
+          g.fillStyle = c;
+          fill();
+          g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+          fill();
+        }
+        gem(x, y, z, hw, hh);
         g.fillStyle = c;
-        g.beginPath();
-        g.arc(lx + dx, ly + dy, r, along + Math.PI / 2, along + Math.PI * 1.5);
-        g.arc(rx - dx, ry - dy, r, along - Math.PI / 2, along + Math.PI / 2);
         fill();
-      } else { // a square gem: a thin box (about 3px deep at the board) with a lit top, lit from above
-        const harmonic = note.harmonic || note.harmonicPinch, depth = 0.04;
-        if (!harmonic) { // top and sides first; the face covers whichever side faces away
+      } else { // a square gem with a lit face; in 3D a thin box with a lit top, lit from above
+        const harmonic = note.harmonic || note.harmonicPinch, depth = GEM_DEPTH;
+        if (!harmonic && t.notes3d !== false) { // top and sides first; the face covers whichever side faces away
           for (const [side, shade] of [
             [[[x - hw, y + hh, z], [x + hw, y + hh, z], [x + hw, y + hh, z + depth], [x - hw, y + hh, z + depth]], 'rgba(255, 255, 255, 0.35)'],
             [[[x - hw, y - hh, z], [x - hw, y + hh, z], [x - hw, y + hh, z + depth], [x - hw, y - hh, z + depth]], 'rgba(0, 0, 0, 0.4)'],
