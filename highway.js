@@ -17,7 +17,6 @@ const NEAR = 5;
 const BEND_LIFT = 1, BEND_RISE = 1.6; // string gaps a bent string rises on the fretboard, and its trail on the highway, per step bent
 const BEND_EASE = 2; // fret widths before the board over which the trail's rise settles to the string's
 const RAIL = 0.19; // half the width of a bent note's trail
-const BEND_SPREAD = 2.5; // fret widths either side of a bent note that its string curves up over
 const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead; frets in view at the closest zoom, less the fret of slack
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
@@ -605,7 +604,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
     return sec < 0 || note.fret === 0 || !(bendPeak(note) > 0) ? 0 : liftAt(note, Math.min(sec, Math.max(note.sustain, 0.15)));
   };
 
-  // Strings being bent right now: pushed up in a smooth bump around the fretted note+
+  // Strings being bent right now: the whole string pushed up by the finger, as a real one is, in a straight line from the nut
+  // to the fretted note and on to the end of the board
   const bending = new Map();
   for (const note of visible) {
     const dt = note.time - now, held = Math.max(note.sustain, 0.15);
@@ -615,8 +615,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const stringPath = (s, lift = 0, sounding = false) => { // along the string at the board from where it ends on the headstock (or, sounding, from the nut: nothing past it rings), bent where it is being bent
     const b = bending.get(s), y0 = ys(s) + lift, start = sounding ? [[0, y0, 0]] : [ends ? [ends[s][0], ends[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
     if (!b) return path([...start, [LAST_FRET + 0.6, y0, 0]], false);
-    const bump = (fx) => [fx, y0 + b.dy * smooth(Math.max(0, 1 - Math.abs(fx - b.x) / BEND_SPREAD)), 0];
-    path([...start, ...Array.from({ length: 25 }, (_, j) => bump(b.x - BEND_SPREAD + (j * BEND_SPREAD) / 12)).filter(([fx]) => fx > 0), [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
+    path([...start, [b.x, y0 + b.dy, 0], [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
   };
   const boardY = (note) => ys(note.string) + noteLift(note); // a bent note rides with its string
 
