@@ -326,10 +326,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
   [shiftX, shiftY] = [W / 2 - fx, VH * (t.fill ? 0.83 : 0.81) - fy]; // the board low on screen, the highway's far end under the header (t.fill: no header, so bigger and up to near the top)
   lap('setup');
 
-  const glow = (on, c, blur = 10) => {
-    g.shadowBlur = on ? blur * B : 0;
-    g.shadowColor = on ? c : 'transparent';
-  };
   const path = (points, close = true) => {
     g.beginPath();
     points.forEach(([x, y, z], i) => {
@@ -340,7 +336,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   };
   const line3 = (a, b) => {
     path([a, b], false);
-    g.stroke();
+    stroke();
   };
   const gem = (x, y, z, hw, hh) => path([[x - hw, y - hh, z], [x + hw, y - hh, z], [x + hw, y + hh, z], [x - hw, y + hh, z]]); // a gem's square face
   // A chord's frame covers the whole hand position (four frets at least, more if the chord stretches) and every
@@ -379,6 +375,32 @@ export function drawHighway(canvas, arr, now, t, cam) {
     grad.addColorStop(1, alpha(c, a1));
     return grad;
   };
+  // Glows. A shadow blur is a pass of its own for every shape, by far the dearest thing a GPU canvas draws (it halved the
+  // frame rate), so a glowing shape gets a soft edge drawn around it instead: its outline stroked a few times, wider and
+  // fainter, under it. blur is how far out the glow reaches; a shape filled or stroked with a fade glows with a fade too
+  let halo = null;
+  const glow = (on, color, blur = 10) => (halo = on ? { color, blur } : null);
+  const HALO = [[0.6, 0.05], [0.35, 0.13], [0.15, 0.27]]; // reach as a share of blur, opacity: stacked, they fall off as a blur does
+  const withHalo = (filled) => {
+    if (!halo) return;
+    const style = filled ? g.fillStyle : g.strokeStyle, { lineWidth, strokeStyle, globalAlpha } = g;
+    const light = filled ? 1 : Math.min(1, (2 * lineWidth) / halo.blur); // a blurred thin line spreads out faint
+    g.strokeStyle = typeof style === 'string' ? halo.color : fade(halo.color, 1, 0.1);
+    for (const [reach, opacity] of HALO) {
+      g.lineWidth = (filled ? 0 : lineWidth) + 2 * halo.blur * reach;
+      g.globalAlpha = globalAlpha * opacity * light;
+      g.stroke();
+    }
+    Object.assign(g, { lineWidth, strokeStyle, globalAlpha });
+  };
+  const stroke = () => {
+    withHalo(false);
+    g.stroke();
+  };
+  const fill = () => {
+    withHalo(true);
+    g.fill();
+  };
   g.textBaseline = 'middle';
   g.lineCap = 'round';
   g.lineJoin = 'round';
@@ -402,7 +424,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (Math.max(l0, l1) <= 0 && Math.min(r0, r1) >= W) return g.fillRect(0, top, W, bottom - top);
     g.beginPath(); // the floor's edges show: follow them
     [[l0, bottom], [r0, bottom], [r1, top], [l1, top]].forEach(([x, y]) => g.lineTo(x, y));
-    g.fill();
+    fill();
   });
   g.strokeStyle = fade(t.lane, 0.5, 0.04);
   g.lineWidth = t.laneW;
@@ -423,7 +445,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const z0 = Z(Math.max(0, a.time - now)), z1 = Z(Math.min(LOOK, a.endTime - now)), l = a.fret - 1, r = l + a.width;
     g.fillStyle = fade(t.anchorFill, t.anchorOpacity, 0.02);
     path([[l, floor, z0], [r, floor, z0], [r, floor, z1], [l, floor, z1]]);
-    g.fill();
+    fill();
     g.strokeStyle = fade(t.anchorLane, 0.55, 0.04);
     g.lineWidth = t.anchorLaneW * 0.6;
     for (const x of [l, r]) line3([x, floor, z0], [x, floor, z1]);
@@ -467,7 +489,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
         g.moveTo(mouth, py - open);
         g.lineTo(tip, py);
         g.lineTo(mouth, py + open);
-        g.stroke();
+        stroke();
       }
       right = left - space;
     }
@@ -479,17 +501,17 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // strings, so nothing hides them
   g.fillStyle = t.board;
   path([[0, boardLo, 0], [LAST_FRET + 0.6, boardLo, 0], [LAST_FRET + 0.6, boardHi, 0], [0, boardHi, 0]]);
-  g.fill();
+  fill();
   g.fillStyle = alpha(t.anchorFill, 0.16);
   path([[cam.left, boardLo, 0], [cam.right, boardLo, 0], [cam.right, boardHi, 0], [cam.left, boardHi, 0]]);
-  g.fill();
+  fill();
   g.fillStyle = t.inlayDot;
   const between = (at) => (Math.max(0, Math.ceil(at) - 1) + 0.5) * gap; // halfway between the strings around `at`, counted in strings (on a string: the gap under it)
   for (const f of INLAYS) for (const y of f % 12 ? [between((n - 1) / 2)] : [between((n - 1) / 4), stack - between((n - 1) / 4)]) { // one dot in the middle, a pair a gap off either side of it
     const [px, py, k] = P(f - 0.5, y, 0);
     g.beginPath();
     g.ellipse(px, py, 0.1 * k, 0.08 * k, 0, 0, Math.PI * 2);
-    g.fill();
+    fill();
   }
 
   // The headstock in front of the nut, in the theme's colours (see HEADSTOCKS). Kept to its shape whatever the fret width;
@@ -499,9 +521,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const headV = (s) => ((ys(s) - stack / 2) * flip) / half; // a string's height, in the headstock's terms
   const parts = head && headstockParts(head, Array.from({ length: n }, (_, s) => headV(s)));
   const ends = parts?.ends.map(onHead);
-  const paint = (fill, stroke, width = 1) => { // fill and outline the current path
-    if (fill) { g.fillStyle = fill; g.fill(); }
-    if (stroke) { g.strokeStyle = stroke; g.lineWidth = width; g.stroke(); }
+  const paint = (fillStyle, strokeStyle, width = 1) => { // fill and outline the current path
+    if (fillStyle) { g.fillStyle = fillStyle; fill(); }
+    if (strokeStyle) { g.strokeStyle = strokeStyle; g.lineWidth = width; stroke(); }
   };
   const oval = (uv, ru, rv) => { // an oval on the headstock, radii in half neck widths
     const [x, y] = onHead(uv), [px, py] = P(x, y, 0), [ex] = P(x + (ru * half) / stretch, y, 0), [, ey] = P(x, y + rv * half, 0);
@@ -644,14 +666,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.strokeStyle = alpha(color(s), 0.9);
     g.lineWidth = width;
     stringPath(s, 0, true); // the neck and the headstock stroked apart: a glow is blurred over the box around its path, and the box around both is most of the screen
-    g.stroke();
+    stroke();
     path([ends ? ends[s] : [-0.6, ys(s), 0], [0, ys(s), 0]], false);
-    g.stroke();
+    stroke();
     glow(false);
     g.strokeStyle = 'rgba(255, 255, 255, 0.25)'; // the light catching the string
     g.lineWidth = Math.max(0.6, width * 0.3);
     stringPath(s, 0.012);
-    g.stroke();
+    stroke();
   }
   if (parts) { // over the string ends: what they wind onto, a string tree, a locking nut
     parts.ends.forEach(([u, v], s) => {
@@ -704,7 +726,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.strokeStyle = c;
     g.lineWidth = t.strW + 3;
     stringPath(note.string, 0, true);
-    g.stroke();
+    stroke();
     glow(false);
     if (-dt < 0.2) {
       const [px, py, k] = P(spot(note).x, y, 0);
@@ -717,7 +739,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.fillStyle = flash;
       g.beginPath();
       g.arc(0, 0, 0.5 * k, 0, Math.PI * 2);
-      g.fill();
+      fill();
       g.restore();
     }
   }
@@ -730,7 +752,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (shape.startTime > now || shape.endTime <= now || shape.endTime - shape.startTime < 0.3 || !shape.frets.some((f, str) => f >= 0 && str < n)) continue;
     const [l, r] = frameAt(shape.frets.filter((f, str) => str < n), shape.startTime);
     path([[l, boardLo, 0], [r, boardLo, 0], [r, boardHi, 0], [l, boardHi, 0]]);
-    g.stroke();
+    stroke();
   }
   glow(false);
   lap('strings');
@@ -764,7 +786,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       return [from[0] + (to[0] - from[0]) * u, from[1] + (to[1] - from[1]) * u + Math.sin(Math.PI * u) * bulge, from[2] + (to[2] - from[2]) * u];
     });
     path(points, false);
-    g.stroke();
+    stroke();
   };
   // Chord shapes being held or played again: two glowing rails on the floor along the frame's edges
   for (const rail of chordRails(arr)) {
@@ -846,14 +868,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (open && !chord) { // an open string sounds as a lane as wide as the hand position, edged in its colour
       g.fillStyle = fade(c, note.letRing ? 0.14 : 0.26, 0.03);
       path([...spine.map(([px, py, pz]) => [px - hw, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + hw, py, pz])]);
-      g.fill();
+      fill();
       glow(t.glow && !note.letRing, c, 6);
       g.strokeStyle = fade(c, 0.95, 0.08);
       g.lineWidth = 2.5;
       g.setLineDash(note.letRing ? [7, 6] : []);
       for (const side of [-hw, hw]) {
         path(spine.map(([px, py, pz]) => [px + side, py, pz]), false);
-        g.stroke();
+        stroke();
       }
       g.setLineDash([]);
       glow(false);
@@ -861,23 +883,23 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const band = (half) => path([...spine.map(([px, py, pz]) => [px - half, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + half, py, pz])]);
       band(RAIL);
       g.fillStyle = fade(c, 1, 0.6);
-      g.fill();
+      fill();
       band(RAIL * 0.35); // a slightly darker stripe along the middle
       g.fillStyle = fade(shade(c, -0.22), 1, 0.55);
-      g.fill();
+      fill();
       glow(t.glow, c, 8);
       g.strokeStyle = fade(shade(c, 0.6), 1, 0.5); // bright edges
       g.lineWidth = 2;
       for (const side of [-RAIL, RAIL]) {
         path(spine.map(([px, py, pz]) => [px + side, py, pz]), false);
-        g.stroke();
+        stroke();
       }
       glow(false);
     } else {
       glow(t.glow && !note.letRing, c, 6);
       g.fillStyle = fade(c, note.letRing ? 0.3 : 0.6, 0.06);
       path([...spine.map(([px, py, pz]) => [px - 0.09, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + 0.09, py, pz])]);
-      g.fill();
+      fill();
       glow(false);
     }
     if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
@@ -885,7 +907,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = note.letRing ? 2 : 1.5;
       g.setLineDash(note.letRing ? [7, 6] : []);
       path(spine, false);
-      g.stroke();
+      stroke();
       g.setLineDash([]);
     }
     if (slide !== null && d1 >= Math.min(dt + tail, LOOK) - 0.001) { // where the slide ends, unless the trail was cut short
@@ -894,7 +916,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = 2;
       g.setLineDash(note.slideTo === null ? [5, 4] : []);
       gem(ex, ey, ez, hw, hh);
-      g.stroke();
+      stroke();
       g.setLineDash([]);
     }
   }
@@ -926,17 +948,17 @@ export function drawHighway(canvas, arr, now, t, cam) {
         panel.addColorStop(0, alpha(near ? t.anchorLane : t.anchorFill, weight * 0.6));
         panel.addColorStop(1, alpha(near ? t.anchorLane : t.anchorFill, 0));
         g.fillStyle = panel;
-        g.fill();
+        fill();
       } else {
         g.globalAlpha = shown * weight;
         if (!chord.highDensity) {
           g.fillStyle = t.chordFill;
-          g.fill();
+          fill();
         }
         g.strokeStyle = near ? t.anchorLane : t.chordBox;
         g.lineWidth = near || !chord.highDensity ? 1.5 : 1.2;
         glow(t.glow && near, t.anchorLane, 8);
-        g.stroke();
+        stroke();
         glow(false);
       }
       g.globalAlpha = shown; // a white line under every frame, box or gradient, marks the moment to play it
@@ -951,9 +973,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
         g.lineCap = 'square';
         glow(t.glow, '#ffffff', near ? 12 : 6);
         path([[l, boardHi - drop, z], [l, boardHi, z], [l + arm, boardHi, z]], false);
-        g.stroke();
+        stroke();
         path([[r - arm, boardHi, z], [r, boardHi, z], [r, boardHi - drop, z]], false);
-        g.stroke();
+        stroke();
         glow(false);
         g.lineCap = 'round';
       }
@@ -972,7 +994,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
         g.lineWidth = 2;
         if (chord.roll) path(Array.from({ length: 17 }, (_, j) => [ax + Math.sin((j / 16) * Math.PI * 6) * 0.06, from + ((to - from) * j) / 16, z]), false); // rolled: a wavy arrow
         else path([[ax, from, z], [ax, to, z]], false);
-        g.stroke();
+        stroke();
         const head = to < from ? 0.14 : -0.14;
         line3([ax - 0.08, to + head, z], [ax, to, z]);
         line3([ax + 0.08, to + head, z], [ax, to, z]);
@@ -994,7 +1016,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = near ? 2 : 1.5;
       glow(t.glow && near, c, 8);
       gem(x, y, z, hw, hh);
-      g.stroke();
+      stroke();
       glow(false);
       if ((muted || palm) && t.repeatMarks !== 'hide') { // its mute, greyed out
         g.strokeStyle = t.muted;
@@ -1017,8 +1039,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
           g.fillStyle = alpha(t.ink, 0.7);
           g.lineWidth = 2;
           gem(x, y, z, hw, hh);
-          g.fill();
-          g.stroke();
+          fill();
+          stroke();
         }
         g.lineWidth = palm ? 2 : 3;
         if (open) xMark(x, y, z, gap * 0.4, gap * 0.4);
@@ -1029,7 +1051,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
         g.fillStyle = c;
         g.beginPath();
         g.roundRect(lx, ly, rx - lx, ry - ly, (ry - ly) / 2);
-        g.fill();
+        fill();
       } else { // a square gem: a thin box (about 3px deep at the board) with a lit top, lit from above
         const harmonic = note.harmonic || note.harmonicPinch, depth = 0.04;
         if (!harmonic) { // top and sides first; the face covers whichever side faces away
@@ -1040,26 +1062,26 @@ export function drawHighway(canvas, arr, now, t, cam) {
           ]) {
             path(side);
             g.fillStyle = c;
-            g.fill();
+            fill();
             g.fillStyle = shade;
-            g.fill();
+            fill();
           }
         }
         glow(t.glow && z < NEAR, c, 8);
         g.fillStyle = c;
         if (harmonic) path([[x, y + hh * 1.3, z], [x + hw * 0.8, y, z], [x, y - hh * 1.3, z], [x - hw * 0.8, y, z]]);
         else gem(x, y, z, hw, hh);
-        g.fill();
+        fill();
         glow(false);
         const [, ty] = P(x, y + hh, z), [, by] = P(x, y - hh, z), shine = g.createLinearGradient(0, ty, 0, by);
         shine.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
         shine.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
         shine.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
         g.fillStyle = shine;
-        g.fill();
+        fill();
         g.strokeStyle = t.gem === 'solid' ? t.ink : 'rgba(255, 255, 255, 0.6)';
         g.lineWidth = t.gem === 'solid' ? 2 : 1;
-        g.stroke();
+        stroke();
       }
 
       if (!open && !muted) {
@@ -1086,10 +1108,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = Math.max(1.2, 0.035 * k);
       g.beginPath();
       g.arc(lx + r * 0.35, cy, r, Math.PI * 0.7, Math.PI * 1.3);
-      g.stroke();
+      stroke();
       g.beginPath();
       g.arc(rx - r * 0.35, cy, r, -Math.PI * 0.3, Math.PI * 0.3);
-      g.stroke();
+      stroke();
     }
     if (note.grace) { // grace note: small, with a slash
       g.strokeStyle = ink;
@@ -1102,7 +1124,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = Math.max(1, 0.025 * k);
       g.beginPath();
       g.arc(sx, cy, r, 0, Math.PI * 2);
-      g.stroke();
+      stroke();
       g.font = `700 ${fontSize(0.15 * k)}px ${t.num}`;
       g.textAlign = 'center';
       g.fillText(String(n - note.string), sx, cy);
@@ -1140,7 +1162,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (note.staccato) { // staccato: a dot
       g.beginPath();
       g.arc(cx, above + 0.04 * k, Math.max(1.5, 0.045 * k), 0, Math.PI * 2);
-      g.fill();
+      fill();
       above -= 0.16 * k;
     }
     if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3); // an accented chord's frame shows it
@@ -1158,7 +1180,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const w = 0.24 * k, amp = (note.vibratoWide ? 0.07 : 0.035) * k;
       g.beginPath();
       for (let j = 0; j <= 20; j++) g[j ? 'lineTo' : 'moveTo'](cx - w + (2 * w * j) / 20, above + Math.sin((j / 20) * Math.PI * 4) * amp);
-      g.stroke();
+      stroke();
       above -= (0.16 + (note.vibratoWide ? 0.06 : 0)) * k;
     }
     if (note.pick) { // pick stroke: ⊓ down, V up
@@ -1166,16 +1188,16 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.beginPath();
       if (note.pick === 'down') [[-w, h / 2], [-w, -h / 2], [w, -h / 2], [w, h / 2]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, above + dy));
       else [[-w, -h / 2], [0, h / 2], [w, -h / 2]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, above + dy));
-      g.stroke();
+      stroke();
       above -= 0.22 * k;
     }
     if (note.fermata) { // fermata: an arch over a dot
       g.beginPath();
       g.arc(cx, above + 0.06 * k, 0.14 * k, Math.PI, 0);
-      g.stroke();
+      stroke();
       g.beginPath();
       g.arc(cx, above + 0.02 * k, Math.max(1.5, 0.03 * k), 0, Math.PI * 2);
-      g.fill();
+      fill();
       above -= 0.24 * k;
     }
     if (note.tremolo) { // three short slashes, as in notation
@@ -1223,20 +1245,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (pressed) {
       glow(true, c, 14);
       g.fillStyle = c;
-      g.fill();
+      fill();
       glow(false);
       g.strokeStyle = 'rgba(255, 255, 255, 0.7)';
       g.lineWidth = 1.5;
-      g.stroke();
+      stroke();
     } else {
       const near = (1 - dt / PRESS_AHEAD) ** 2;
       g.globalAlpha = 0.35 * near;
       g.fillStyle = c;
-      g.fill();
+      fill();
       g.globalAlpha = 0.25 + 0.75 * near;
       g.strokeStyle = c;
       g.lineWidth = 2.2;
-      g.stroke();
+      stroke();
     }
     const finger = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
     if (!open && finger !== null) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, pressed ? t.ink : t.text, 800);
