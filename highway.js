@@ -152,6 +152,7 @@ const measure = (g, font, str) => { // → { width, middle: how far the ink's mi
 };
 // The floor in bands of flat colour, for each theme: filling a gradient that big is by far the slowest thing to draw without a GPU
 const FLOOR_BANDS = 128, floorBands = new WeakMap();
+const fades = new Map(); // gradients along the highway, by colour and opacities (see fade in drawHighway)
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -211,7 +212,8 @@ function chordSpans(arr) {
     if (last && c.time - last.end < 1 && (c.name ? c.name === last.name : c.highDensity)) last.end = Math.max(last.end, end);
     else if (c.name) spans.push({ name: c.name, time: c.time, end });
   }
-  return (arr.chordSpans = spans);
+  for (const h of arr.handShapes ?? []) if (h.arpeggio && h.name) spans.push({ name: h.name, time: h.startTime, end: h.endTime }); // an arpeggio is named while it's held
+  return (arr.chordSpans = spans.sort((p, q) => p.time - q.time));
 }
 // Chord shapes worth rails on the highway: a chord and the repeats that follow it, from the first strike until the last
 // one stops (or the next different chord starts), when that lasts long enough to see
@@ -226,6 +228,7 @@ function chordRails(arr) {
     end = Math.min(end, arr.chords[j]?.time ?? Infinity);
     if (end - first.time > 0.2) rails.push({ time: first.time, end, frets: first.notes.map((n) => arr.notes[n].fret) });
   }
+  for (const h of arr.handShapes ?? []) if (h.arpeggio) rails.push({ time: h.startTime, end: h.endTime, frets: h.frets, arpeggio: h }); // an arpeggio's shape, held while its notes are played
   return (arr.chordRails = rails);
 }
 const TEXT_MARKS = { artificial: 'AH', pinch: 'PH', tap: 'TH', semi: 'SH', feedback: 'FH' };
@@ -401,10 +404,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.textBaseline = 'middle';
   };
   const [, nearY] = P(focus[0], floor, 0), [, farY] = P(focus[0], floor, far);
-  const fade = (c, a0, a1) => {
-    const grad = g.createLinearGradient(0, nearY, 0, farY);
-    grad.addColorStop(0, alpha(c, a0));
-    grad.addColorStop(1, alpha(c, a1));
+  const fade = (c, a0, a1) => { // the same fade for everything that asks for it until the highway's ends move: a new gradient for every trail is dear
+    const span = `${nearY}|${farY}`;
+    if (fades.span !== span || fades.size > 300) {
+      fades.clear();
+      fades.span = span;
+    }
+    const key = `${c}|${a0}|${a1}`;
+    let grad = fades.get(key);
+    if (!grad) {
+      grad = g.createLinearGradient(0, nearY, 0, farY);
+      grad.addColorStop(0, alpha(c, a0));
+      grad.addColorStop(1, alpha(c, a1));
+      fades.set(key, grad);
+    }
     return grad;
   };
   // Glows. A shadow blur is a pass of its own for every shape, by far the dearest thing a GPU canvas draws (it halved the
@@ -413,12 +426,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
   let halo = null;
   const glow = (on, color, blur = 10) => (halo = on ? { color, blur } : null);
   const HALO = [[0.6, 0.05], [0.35, 0.13], [0.15, 0.27]]; // reach as a share of blur, opacity: stacked, they fall off as a blur does
+  const THIN_HALO = [[0.4, 0.3]]; // a glow of a pixel or two (the strings') looks the same in one layer, and every string has one
   const withHalo = (filled) => {
     if (!halo) return;
     const style = filled ? g.fillStyle : g.strokeStyle, { lineWidth, strokeStyle, globalAlpha } = g;
     const light = filled ? 1 : Math.min(1, (2 * lineWidth) / halo.blur); // a blurred thin line spreads out faint
     g.strokeStyle = typeof style === 'string' ? halo.color : fade(halo.color, 1, 0.1);
-    for (const [reach, opacity] of HALO) {
+    for (const [reach, opacity] of halo.blur > 4 ? HALO : THIN_HALO) {
       g.lineWidth = (filled ? 0 : lineWidth) + 2 * halo.blur * reach;
       g.globalAlpha = globalAlpha * opacity * light;
       g.stroke();
@@ -652,9 +666,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
   };
   // A slide glides from x along the neck over its note's length (a quarter second at least), easing in and out. Its trail
   // follows it, and so do its gem and its target on the fretboard while it sounds: a sliding chord moves with its slide
-  const slideX = (note, x, sec) => { // sec seconds into the note
+  const slideX = (note, x, sec) => { // sec seconds into the note; an open string keeps to its bar (its slide is an arch, see the trails)
     const to = note.slideTo ?? note.slideUnpitchTo ?? null, p = Math.min(1, Math.max(0, sec / Math.max(note.sustain, 0.25)));
-    return to === null ? x : x + (to - 0.5 - x) * p * p * (3 - 2 * p);
+    return to === null || note.fret === 0 ? x : x + (to - 0.5 - x) * p * p * (3 - 2 * p);
   };
 
   // A bend raises what shows the note: its trail on the highway, and its string and target on the fretboard, all by the
@@ -756,12 +770,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
   }
 
-  // Sounding notes light their string from the nut on, with a flash where they landed
+  // Sounding notes light their string from the nut on, with a flash where they landed. A note left ringing
+  // (let ring, an arpeggio) glows as it's struck and then stays lit without the glow: a glow on every ringing string is dear
+  const ringing = (note, dt) => note.letRing && -dt > 0.25;
   for (const note of visible) {
     const dt = note.time - now;
     if (dt > 0 || -dt > Math.max(note.sustain, 0.15) || note.mute) continue;
     const c = color(note.string), y = boardY(note);
-    glow(true, c, 10);
+    glow(!ringing(note, dt), c, 10);
     g.strokeStyle = c;
     g.lineWidth = t.strW + 3;
     stringPath(note.string, 0, true);
@@ -827,16 +843,25 @@ export function drawHighway(canvas, arr, now, t, cam) {
     path(points, false);
     stroke();
   };
-  // Chord shapes being held or played again: two glowing rails on the floor along the frame's edges
+  // Chord shapes being held or played again: two glowing rails on the floor along the frame's edges. An
+  // arpeggio's rails don't glow (they run for seconds, under notes that ring), and where its shape is taken they start with
+  // the outline of its frame, and its name
   for (const rail of chordRails(arr)) {
     if (rail.end <= now || rail.time >= now + LOOK) continue;
     const [l, r] = frameAt(rail.frets, rail.time), dt = rail.time - now, z0 = Z(Math.max(dt, 0)), z1 = Z(Math.min(rail.end - now, LOOK));
     g.globalAlpha = Math.min(1, (LOOK - Math.max(dt, 0)) / 0.4);
-    glow(t.glow, t.anchorLane, 10);
+    glow(t.glow && !rail.arpeggio, t.anchorLane, 10);
     g.strokeStyle = fade(t.anchorLane, 1, 0.2);
     g.lineWidth = 3.5;
     for (const side of [l, r]) line3([side, floor, z0], [side, floor, z1]);
     glow(false);
+    if (rail.arpeggio && dt > 0) {
+      g.strokeStyle = alpha(t.anchorLane, 0.7);
+      g.lineWidth = 1.5;
+      path([[l, floor, z0], [l, boardHi, z0], [r, boardHi, z0], [r, floor, z0]], false);
+      stroke();
+      if (rail.arpeggio.name && z0 > NEAR) label(rail.arpeggio.name, l - 0.12, boardHi / 2, z0, 0.34, t.text, 600, 'right');
+    }
   }
   g.globalAlpha = 1;
 
@@ -864,6 +889,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const tail = slide === null ? note.sustain : Math.max(note.sustain, 0.25);
     const moves = slide !== null || note.bend || note.bendCurve || note.whammy;
     if (tail <= 0.2 || dt + tail <= 0 || (chord && !moves) || frameOnly(note)) continue; // chords sustain without trails: their frames already show the beats
+    if (open && slide) { // a slide from an open string: an arch from its bar to the fret it lands on when the note ends
+      g.strokeStyle = c;
+      g.lineWidth = 2.5;
+      g.setLineDash(note.letRing ? [7, 6] : []);
+      arc([x, y, Z(Math.max(dt, 0))], [slide - 0.5, y, Z(Math.min(dt + tail, LOOK))], gap * 1.5);
+      g.setLineDash([]);
+    }
     // A trail ends where the next note in its way starts: the next chord, the next note on its string (a slide runs into
     // the note it slides to), or a later note lying across it. Cut there in time, so the trail keeps its shape as it comes
     let next = null;
@@ -898,7 +930,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
       if (d1 <= d0 + 0.001) continue;
     }
-    const steps = Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
+    const straight = slide === null && !bent && !note.vibrato && !note.tremolo; // a straight line along the highway stays straight in perspective: its two ends draw it
+    const steps = straight ? 1 : Math.min(400, Math.max(12, Math.ceil((d1 - d0) * SPEED * 8)));
     const spine = Array.from({ length: steps + 1 }, (_, j) => along(d0 + ((d1 - d0) * j) / steps));
     if (open && !chord) { // an open string sounds as a lane as wide as the hand position, edged in its colour
       g.fillStyle = fade(c, note.letRing ? 0.14 : 0.26, 0.03);
@@ -950,7 +983,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.strokeStyle = c;
       g.lineWidth = 2;
       g.setLineDash(note.slideTo === null ? [5, 4] : []);
-      gem(ex, ey, ez, hw, hh);
+      if (open) gem(slide - 0.5, ey, ez, 0.34, 0.42 * gap); // where the arch lands, a fret's width
+      else gem(ex, ey, ez, hw, hh);
       stroke();
       g.setLineDash([]);
     }
@@ -1268,7 +1302,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // Where to press, on top of everything on the board: targets fill in as notes approach, finger number and all,
   // and light up while they sound. A spot played again straight after stays lit from the strike before (see markRepeats), so
   // repeated notes and chords hold their targets until the fingering switches instead of flashing on every strike
-  const lit = new Set(); // one lit target per spot, however many notes hold it
+  const lit = new Set(), outlined = new Set(); // one lit target per spot, however many notes hold it; the spots with a target
   for (const note of visible) {
     const dt = note.time - now, chord = chordOf(note), bent = bending.get(note.string), heldFrom = note.heldFrom ?? null;
     const pressed = dt <= 0.06 || (heldFrom !== null && now >= heldFrom - 0.06);
@@ -1277,11 +1311,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
     if (bent && bent.note !== note && !pressed) continue; // the next note on a string being bent shows once it is let down
     if (pressed && lit.has(`${note.string}:${note.fret}`)) continue;
     if (pressed) lit.add(`${note.string}:${note.fret}`);
+    outlined.add(`${note.string}:${note.fret}`);
     const { a, open, x: from } = spot(note), x = slideX(note, from, -dt), y = boardY(note), c = color(note.string);
     const hw = (open ? (a.width - 0.2) / 2 : 0.32) + 2 / k0, hh = (open ? 0.1 : 0.36) * gap + 2 / k0; // 2px bigger than the gem shape
     gem(x, y, 0, hw, hh);
     if (pressed) {
-      glow(true, c, 14);
+      glow(!ringing(note, dt), c, 14);
       g.fillStyle = c;
       fill();
       glow(false);
@@ -1304,6 +1339,22 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const [px, py] = P(x, y + hh, 0), letDown = note.bendCurve?.[0]?.[1] > 0 && note.bendCurve.at(-1)[1] < bendPeak(note);
       chevron(g, px, py - (letDown ? 0.14 : 0.05) * k0, 0.17 * k0 * stretch, 0.085 * k0, letDown ? 1 : -1, '#ffffff', alpha(t.ink, 0.9));
     }
+    g.globalAlpha = 1;
+  }
+  // An arpeggio's shape, from a moment before it's taken until it's let go: every spot it frets outlined with its finger, so
+  // the whole shape is held, not only the note being played (those light up above)
+  for (const shape of arr.handShapes ?? []) {
+    if (!shape.arpeggio || shape.startTime - now > PRESS_AHEAD || shape.endTime <= now) continue;
+    g.globalAlpha = 0.3 + 0.5 * Math.min(1, 1 - (shape.startTime - now) / PRESS_AHEAD) ** 2;
+    shape.frets.forEach((fret, s) => {
+      if (fret <= 0 || s >= n || outlined.has(`${s}:${fret}`)) return;
+      const x = fret - 0.5, y = ys(s), finger = shape.fingers[s];
+      gem(x, y, 0, 0.32 + 2 / k0, 0.36 * gap + 2 / k0);
+      g.strokeStyle = color(s);
+      g.lineWidth = 2.2;
+      stroke();
+      if (finger >= 0) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, t.text, 800);
+    });
     g.globalAlpha = 1;
   }
   lap('targets');

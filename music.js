@@ -88,6 +88,26 @@ export function annotate(notes, chords) {
   for (const c of chords) c.barre ??= barreOf(c);
 }
 
+// Arpeggios: a chord shape held while its notes are played one at a time (a held hand shape over single notes). Each
+// of its notes rings until the shape is let go or its string is played again, as let ring, and the shape gets `arpeggio`,
+// so the highway shows it held all the way. A shape held for less than 0.6 s is a fingering for a quick pair of notes, not
+// an arpeggio, and so is one that only one string plays. notes: sorted by time.
+export function markArpeggios(notes, handShapes) {
+  for (const shape of handShapes) {
+    if (shape.endTime - shape.startTime < 0.6) continue;
+    const from = notes.findIndex((n) => n.time >= shape.startTime - 0.005), inShape = [];
+    for (let i = from; i >= 0 && i < notes.length && notes[i].time < shape.endTime - 0.005; i++)
+      if (notes[i].chord === null && shape.frets[notes[i].string] === notes[i].fret) inShape.push(i);
+    if (new Set(inShape.map((i) => notes[i].string)).size < 2) continue;
+    shape.arpeggio = true;
+    for (const i of inShape) {
+      const n = notes[i], next = notes.find((m, j) => j > i && m.string === n.string && m.time > n.time + 0.005);
+      n.sustain = Math.max(n.sustain, Math.min(shape.endTime, next?.time ?? Infinity) - n.time);
+      n.letRing = true;
+    }
+  }
+}
+
 function barreOf({ frets = [], fingers = [] }) {
   const held = {};
   frets.forEach((fret, string) => {

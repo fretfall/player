@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { tempoMap, tickToMs, msToTick, tuningName, markRepeats, annotate, lyricsShown } from './music.js';
+import { tempoMap, tickToMs, msToTick, tuningName, markRepeats, annotate, lyricsShown, markArpeggios } from './music.js';
 
 // 120 bpm for 4 quarters, then 60 bpm
 const map = tempoMap([{ tick: 3840, tempo: 60 }], 120);
@@ -44,6 +44,25 @@ annotate(an, shapes);
 assert.deepEqual([an[0].sustain, an[2].tieTo], [0.5, 3]);
 assert.deepEqual(an.map((x) => x.dynamicLabel), [null, null, 'p', null]);
 assert.deepEqual(shapes.map((c) => c.barre), [{ fret: 3, from: 0, to: 5 }, null]);
+
+// Arpeggios: a C shape held for 2 s while its strings are played one at a time; each rings until the shape is let go or its
+// string comes again. A note off the shape, and a shape held too briefly, stay as they are
+const arp = [
+  { time: 1, string: 1, fret: 3, sustain: 0, chord: null },
+  { time: 1.5, string: 2, fret: 2, sustain: 0, chord: null },
+  { time: 2, string: 1, fret: 3, sustain: 0, chord: null },
+  { time: 2.5, string: 3, fret: 5, sustain: 0, chord: null }, // not in the shape
+  { time: 5, string: 1, fret: 3, sustain: 0, chord: null },
+  { time: 5.2, string: 2, fret: 2, sustain: 0, chord: null },
+];
+const shapesHeld = [
+  { startTime: 1, endTime: 3, frets: [-1, 3, 2, 0, 1, 0] },
+  { startTime: 5, endTime: 5.4, frets: [-1, 3, 2, 0, 1, 0] },
+];
+markArpeggios(arp, shapesHeld);
+assert.deepEqual(shapesHeld.map((h) => !!h.arpeggio), [true, false]);
+assert.deepEqual(arp.map((n) => Math.round(n.sustain * 10) / 10), [1, 1.5, 1, 0, 0, 0]);
+assert.deepEqual(arp.map((n) => !!n.letRing), [true, true, true, false, false, false]);
 
 // Lyrics in two rows: the line being sung on top, the next one under it
 const sungLine = (start, texts) => ({

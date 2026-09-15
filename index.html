@@ -1940,6 +1940,7 @@
                 markRepeats,
                 annotate,
                 lyricsShown,
+                markArpeggios,
             } from "./music.js";
             import { suggestPositions, fingerFor } from "./fingering.js";
             import { loadSong } from "./the reference game.js";
@@ -2457,6 +2458,13 @@
                             ),
                         ],
                         [
+                            "Arpeggio",
+                            "Hold the chord shape and play its strings one at a time: the shape's rails run as long as you hold it, every note rings on as a dashed trail, and the board outlines every spot of the shape.",
+                            svg(
+                                `<path d="M8 30V6M48 30V6" class="ll" stroke-width="2.5"/><path d="M8 6h40" class="ll" stroke-width="1" opacity=".6"/>${gem(14, 20, 12, 5, 1)}<path d="M20 20V8" class="l1" stroke-width="1.6" stroke-dasharray="3 2"/>${gem(32, 12, 12, 5, 3)}`,
+                            ),
+                        ],
+                        [
                             "Chord name",
                             "The chord you are playing, big, to the right of your hand. It shows up a second before the chord.",
                             svg(word("G5", 16)),
@@ -2591,7 +2599,7 @@
                         ],
                         [
                             "Slide",
-                            "Slide to the fret where the trail ends. A dashed end means slide off without a clear target.",
+                            "Slide to the fret where the trail ends. A dashed end means slide off without a clear target. From an open string, an arch runs from its bar to the fret you land on.",
                             svg(
                                 `${gem(4, 20, 16, 8)}<path d="M12 20L40 8" class="l1" stroke-width="3" opacity=".6"/><rect x="32" y="3" width="16" height="7" class="l1" stroke-width="1.5"/>`,
                             ),
@@ -3354,9 +3362,11 @@
                                             pullOff:
                                                 !!origin &&
                                                 nt.fret < origin.fret,
-                                            slideTo: nt.slideTarget
-                                                ? nt.slideTarget.fret
-                                                : null,
+                                            slideTo:
+                                                nt.slideTarget &&
+                                                (nt.fret || nt.slideTarget.fret) // from an open string to another is no slide
+                                                    ? nt.slideTarget.fret
+                                                    : null,
                                             slideUnpitchTo: null,
                                             slideIn:
                                                 [null, "below", "above"][
@@ -3579,6 +3589,7 @@
                 for (const a of next.arrangements) {
                     markRepeats(a.notes, a.chords);
                     annotate(a.notes, a.chords);
+                    markArpeggios(a.notes, a.handShapes ?? []);
                 }
                 song = { ...next, lines: lyricLines(next.lyrics) };
                 if (!following) loop = null; // a band window keeps the loop it was sent
