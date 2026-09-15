@@ -271,8 +271,9 @@
                 letter-spacing: 0.18em;
                 color: var(--accent);
             }
-            /* Two rows of lyrics, a row per line (placed by showLyrics). A row glides from the lower place to the upper one
-               and out the top, a new one fades in; the line being sung is the bright one, and its syllables light up */
+            /* Two rows of lyrics, a row per line (placed by showLyrics): the line being sung on top, its syllables lighting up,
+               and the next one dimmer under it. A row glides from the lower place to the upper one and out the top, and a new
+               one fades in */
             #lines {
                 position: relative;
                 height: 2.45em;
@@ -285,20 +286,17 @@
                 left: 0;
                 white-space: nowrap;
                 color: var(--muted);
-                opacity: 0.5;
                 transition:
-                    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-                    opacity 0.5s ease;
+                    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                    opacity 0.35s ease;
             }
             #lines .low {
                 transform: translateY(1.3em);
-            }
-            #lines .active {
-                opacity: 1;
+                opacity: 0.5;
             }
             #lines .gone {
                 opacity: 0;
-                transition-duration: 0.6s, 0.3s; /* on its way out, gone before it reaches the section name */
+                transition-duration: 0.45s, 0.25s; /* on its way out, gone before it reaches the section name */
             }
             #lines .gone.up {
                 transform: translateY(-0.8em);
@@ -4274,7 +4272,7 @@
             const lyricRows = new Map(); // line → its row
             function showLyrics(t) {
                 const lines = song.lines,
-                    { top, bottom, active } = lyricsShown(lines, t),
+                    { top, bottom } = lyricsShown(lines, t),
                     places = new Map(
                         [top, bottom]
                             .filter((i) => i >= 0)
@@ -4311,15 +4309,14 @@
                         $("lines").append(row);
                         row.getBoundingClientRect(); // drawn hidden first, so it fades in
                         if (movingUp) {
-                            row.style.transitionDelay = "0.45s";
-                            setTimeout(() => (row.style.transitionDelay = ""), 1000);
+                            row.style.transitionDelay = "0.2s";
+                            setTimeout(() => (row.style.transitionDelay = ""), 700);
                         }
                         lyricRows.set(line, row);
                     } else if (row.low !== low) row.style.transitionDelay = ""; // moving up: straight away
                     row.low = low;
                     row.classList.remove("gone");
                     row.classList.toggle("low", low);
-                    row.classList.toggle("active", row.at === active);
                     const sung = line.syllables.filter((s) => s.time <= t).length;
                     if (row.sung !== sung) {
                         row.sung = sung;

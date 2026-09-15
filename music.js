@@ -99,20 +99,14 @@ function barreOf({ frets = [], fingers = [] }) {
   return strings?.length >= 3 ? { fret: +key.split(':')[1], from: Math.min(...strings), to: Math.max(...strings) } : null;
 }
 
-// Lyrics in two rows, karaoke style. lines: [{ time, end, syllables: [{ time, text }] }] in order, a syllable that ends a
-// word ending in a space. Returns the lines on the top and bottom rows and the line being sung, as indexes (-1: none).
-// A line shows from half a second before it starts until 1.5 s after it ends, and the line after it from 8 s ahead. A
-// line that follows straight on is sung on the bottom row, under the one before, until `holdWords` of its words have
-// lit up (fewer on a short line); then the rows move up and the next line comes in under it.
-export function lyricsShown(lines, t, holdWords = 3) {
-  const li = lines.findLastIndex((l) => l.time <= t + 0.5), soon = (i) => (lines[i]?.time ?? Infinity) - t < 8;
-  if (li < 0 || t >= lines[li].end + 1.5) {
-    const top = soon(li + 1) ? li + 1 : -1;
-    return { top, bottom: top >= 0 && soon(top + 1) ? top + 1 : -1, active: -1 };
-  }
-  const words = (syllables) => syllables.filter((s) => s.text.endsWith(' ')).length, { syllables } = lines[li];
-  const follows = li > 0 && lines[li].time - 0.5 < lines[li - 1].end + 1.5; // the line before was still up when this one came
-  const hold = follows && words(syllables.filter((s) => s.time <= t)) < Math.max(1, Math.min(holdWords, words(syllables) - 1));
-  const top = hold ? li - 1 : li;
-  return { top, bottom: top + 1 === li || soon(top + 1) ? top + 1 : -1, active: li };
+// Lyrics in two rows, karaoke style. lines: [{ time, end, syllables }] in order. Returns the lines on the top and bottom
+// rows as indexes (-1: empty). The top row is the line being sung, from 0.2 s after the line before it ends (so its last
+// word is seen lit), or else the next one, from 8 s ahead; the bottom row is the line after that, up next. A line with
+// nothing coming up soon after it stays 1.5 s once it ends.
+export function lyricsShown(lines, t) {
+  const soon = (i) => i < lines.length && lines[i].time - t < 8;
+  let top = lines.findIndex((l) => t < l.end + 0.2);
+  if (top < 0) top = lines.length;
+  if (!soon(top)) top = top > 0 && t < lines[top - 1].end + 1.5 ? top - 1 : -1;
+  return { top, bottom: top >= 0 && soon(top + 1) ? top + 1 : -1 };
 }

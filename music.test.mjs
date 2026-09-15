@@ -46,25 +46,27 @@ assert.deepEqual([an[0].sustain, an[2].tieTo], [0.5, 3]);
 assert.deepEqual(an.map((x) => x.dynamicLabel), [null, null, 'p', null]);
 assert.deepEqual(shapes.map((c) => c.barre), [{ fret: 3, from: 0, to: 5 }, null]);
 
-// Lyrics in two rows: a line sung under the one before for its first words, then both move up
+// Lyrics in two rows: the line being sung on top, the next one under it
 const sungLine = (start, texts) => ({
   time: start,
   end: start + texts.length * 0.5,
   syllables: texts.map((text, i) => ({ time: start + i * 0.5, text })),
 });
 const verse = [
-  sungLine(10, ['Plug ', 'it ', 'in ', 'and ']), // ends 12
-  sungLine(12.2, ['watch ', 'the ', 'high', 'way ', 'come ']), // straight on; four words, "high" + "way" is one
+  sungLine(10, ['Plug ', 'it ', 'in ', 'and ']), // its last word at 11.5, ends at 12
+  sungLine(12.2, ['watch ', 'the ', 'high', 'way ', 'come ']), // straight on, ends at 14.7
   sungLine(30, ['Rea', 'dy, ', 'set, ', 'go! ']), // after a pause
 ];
 const rows = (t) => Object.values(lyricsShown(verse, t)).join();
-assert.equal(rows(0), '-1,-1,-1'); // top, bottom, being sung
-assert.equal(rows(3), '0,-1,-1'); // coming up in 7 s, the one after it not yet
-assert.equal(rows(10.1), '0,1,0');
-assert.equal(rows(13.5), '0,1,1'); // two words into the second line: the first still on top
-assert.equal(rows(13.7), '1,-1,1'); // the third word: up it goes
-assert.equal(rows(16.5), '-1,-1,-1'); // done, and the next line is far off
-assert.equal(rows(23), '2,-1,-1');
-assert.equal(rows(29.6), '2,-1,2'); // after a pause it starts on top
+assert.equal(rows(0), '-1,-1'); // top, bottom
+assert.equal(rows(3), '0,-1'); // coming up in 7 s, the one after it not yet
+assert.equal(rows(5), '0,1');
+assert.equal(rows(12.1), '0,1'); // its last word still lit on top, though the next line starts in a moment
+assert.equal(rows(12.3), '1,-1'); // moved up; the line after is far off
+assert.equal(rows(15), '1,-1'); // done, and staying a moment with nothing coming up
+assert.equal(rows(16.5), '-1,-1');
+assert.equal(rows(23), '2,-1');
+assert.equal(rows(33), '2,-1');
+assert.equal(rows(34), '-1,-1');
 
 console.log('ok');
