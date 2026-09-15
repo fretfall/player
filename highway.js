@@ -214,6 +214,20 @@ const floorStrip = (t) => {
   return floorStrips.get(t);
 };
 const fades = new Map(); // gradients along the highway, by colour and opacities (see fade in drawHighway)
+// Gradients from 0 to 1, top to bottom, made once for each canvas: a shape moving every frame is filled with one placed by the
+// transform (a path keeps the transform it was made in, a gradient takes the one it's filled in) instead of a new gradient a frame
+const units = new WeakMap();
+const unitGradient = (g, key, stops) => {
+  let known = units.get(g);
+  if (!known) units.set(g, (known = new Map()));
+  let grad = known.get(key);
+  if (!grad) {
+    grad = g.createLinearGradient(0, 0, 0, 1);
+    for (const [at, color] of stops) grad.addColorStop(at, color);
+    known.set(key, grad);
+  }
+  return grad;
+};
 const uprights = new Map(); // top to bottom gradients for the fret wires and the headstock, the same every frame while the camera holds still
 const upright = (g, y0, y1, c0, c1) => {
   const key = `${y0}|${y1}|${c0}|${c1}`;
@@ -314,7 +328,11 @@ function chordRails(arr) {
 const TEXT_MARKS = { artificial: 'AH', pinch: 'PH', tap: 'TH', semi: 'SH', feedback: 'FH' };
 
 const bendLabel = (b) => (b < 0.5 ? '¼' : b === 0.5 ? '½' : b === 1 ? 'full' : b % 1 ? `${Math.floor(b)}½` : String(b));
-const ease = (from, to, ms, tau) => (from === undefined ? to : from + (to - from) * (1 - Math.exp(-ms / tau)));
+const ease = (from, to, ms, tau) => {
+  if (from === undefined) return to;
+  const eased = from + (to - from) * (1 - Math.exp(-ms / tau));
+  return Math.abs(to - eased) < 1e-6 ? to : eased; // settled: exactly still (see the board in drawHighway)
+};
 
 // Critically damped spring (Unity's SmoothDamp): cam[key] reaches target in about `time` seconds, speeding up and
 // slowing down smoothly even when the target jumps, so the camera never lurches
@@ -401,7 +419,7 @@ function clearCanvas(canvas) {
 // cam is kept by the caller between frames; reset it to {} to snap to a new song
 export function drawHighway(canvas, arr, now, t, cam) {
   const { g: onCanvas, W, B } = clearCanvas(canvas);
-  let g = onCanvas; // the headstock is drawn into an image of its own now and then (see there)
+  let g = onCanvas; // the board is drawn into an image of its own now and then (see there)
   if (!arr) return;
 
   const anchors = arr.anchors.length ? arr.anchors : WHOLE_SONG;
@@ -498,6 +516,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // a font at a size not seen before is slow to set up and lay out. Sets the font and the transform (put back with unscale);
   // → how far the ink's middle is above the baseline, in the font's size
   let textFont = null; // what g.font was last set to here (reading it back is slow)
+  let originY = 0; // where the canvas being drawn on starts: the board is drawn into an image of its own now and then (see there)
   const setFont = (font) => {
     if (font !== textFont) g.font = textFont = font;
   };
@@ -507,10 +526,16 @@ export function drawHighway(canvas, arr, now, t, cam) {
     measure(g, font, str);
     setFont(font);
     g.textAlign = align;
-    g.setTransform(B * s, 0, 0, B * s, B * x, B * y);
+    g.setTransform(B * s, 0, 0, B * s, B * x, B * (y - originY));
     return measure(g, font, str).middle;
   };
-  const unscale = () => g.setTransform(B, 0, 0, B, 0, 0);
+  const unscale = () => g.setTransform(B, 0, 0, B, 0, -B * originY);
+  const fillFrom = (grad, y0, y1) => { // fill the current path with a unit gradient (see unitGradient) running from y0 down to y1
+    g.fillStyle = grad;
+    g.setTransform(B, 0, 0, B * (y1 - y0), 0, B * (y0 - originY));
+    g.fill();
+    unscale();
+  };
   const label = (str, x, y, z, size, fill, weight = 700, align = 'center', halo = true, onGem = false) => {
     const [px, py, k] = P(x, y, z), px2 = size * (onGem ? k : Math.sqrt(k * k0));
     if (px2 < (onGem ? 1 : 8) || px < -60 || px > W + 60) return; // numbers on gems fade in from the far end, however small
@@ -681,23 +706,51 @@ export function drawHighway(canvas, arr, now, t, cam) {
   g.globalAlpha = 1;
   lap('floor');
 
-  // The fingerboard at the strike line. Everything on the board comes after it, and the notes come after the
-  // strings, so nothing hides them
-  g.fillStyle = t.board;
-  path([[0, boardLo, 0], [LAST_FRET + 0.6, boardLo, 0], [LAST_FRET + 0.6, boardHi, 0], [0, boardHi, 0]]);
-  fill();
-  g.fillStyle = alpha(t.anchorFill, 0.16);
-  path([[cam.left, boardLo, 0], [cam.right, boardLo, 0], [cam.right, boardHi, 0], [cam.left, boardHi, 0]]);
-  fill();
-  g.fillStyle = t.inlayDot;
-  const between = (at) => (Math.max(0, Math.ceil(at) - 1) + 0.5) * gap; // halfway between the strings around `at`, counted in strings (on a string: the gap under it)
-  g.beginPath();
-  for (const f of INLAYS) for (const y of f % 12 ? [between((n - 1) / 2)] : [between((n - 1) / 4), stack - between((n - 1) / 4)]) { // one dot in the middle, a pair a gap off either side of it
-    const [px, py, k] = P(f - 0.5, y, 0);
-    g.moveTo(px + 0.1 * k, py);
-    g.ellipse(px, py, 0.1 * k, 0.08 * k, 0, 0, Math.PI * 2);
+
+  const visible = [];
+  for (let i = firstAt(arr.notes, now - stringLinks(arr).held - 0.3); i < arr.notes.length; i++) {
+    const note = arr.notes[i];
+    if (note.time > now + LOOK) break;
+    const lasts = Math.max(note.sustain, (note.slideTo ?? note.slideUnpitchTo ?? null) === null ? 0 : 0.25, 0.15);
+    if (note.time + lasts >= now - 0.05) visible.push(note);
   }
-  fill();
+
+  const chordOf = (note) => (note.chord === null || note.chord === undefined ? null : arr.chords[note.chord]);
+  const frameOnly = (note) => t.repeatMarks === 'frame' && (note.repeat || chordOf(note)?.highDensity); // a repeated chord shown by its frame alone
+  const spot = (note) => { // x along the neck (an open string spans the hand position), y at its string's height
+    const a = anchorAt(anchors, note.time), open = note.fret === 0;
+    return { a, open, x: open ? a.fret - 1 + a.width / 2 : note.fret - 0.5, y: ys(note.string) };
+  };
+  // A slide glides from x along the neck over its note's length (a quarter second at least), easing in and out. Its trail
+  // follows it, and so do its gem and its target on the fretboard while it sounds: a sliding chord moves with its slide
+  const slideX = (note, x, sec) => { // sec seconds into the note; an open string keeps to its bar (its slide is an arch, see the trails)
+    const to = note.slideTo ?? note.slideUnpitchTo ?? null, p = Math.min(1, Math.max(0, sec / Math.max(note.sustain, 0.25)));
+    return to === null || note.fret === 0 ? x : x + (to - 0.5 - x) * p * p * (3 - 2 * p);
+  };
+
+  // A bend raises what shows the note: its trail on the highway, and its string and target on the fretboard, all by the
+  // same amount, so they meet at the board
+  const liftAt = (note, sec) => pitchAt(note, sec) * gap * BEND_LIFT; // sec seconds into the note
+  const noteLift = (note) => { // while it sounds
+    const sec = now - note.time;
+    return sec < 0 || note.fret === 0 || !(bendPeak(note) > 0) ? 0 : liftAt(note, Math.min(sec, Math.max(note.sustain, 0.15)));
+  };
+
+  // Strings being bent right now: the whole string pushed up by the finger, as a real one is, in a straight line from the nut
+  // to the fretted note and on to the end of the board
+  const bending = new Map();
+  for (const note of visible) {
+    const dt = note.time - now, held = Math.max(note.sustain, 0.15);
+    if (dt > 0 || -dt > held || note.fret === 0 || !(bendPeak(note) > 0)) continue;
+    bending.set(note.string, { note, x: note.fret - 0.5, dy: noteLift(note) });
+  }
+  const stringPath = (s, lift = 0, sounding = false) => { // along the string at the board from where it ends on the headstock (or, sounding, from the nut: nothing past it rings), bent where it is being bent
+    const b = bending.get(s), y0 = ys(s) + lift, start = sounding ? [[0, y0, 0]] : [ends ? [ends[s][0], ends[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
+    if (!b) return path([...start, [LAST_FRET + 0.6, y0, 0]], false);
+    path([...start, [b.x, y0 + b.dy, 0], [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
+  };
+  const boardY = (note) => ys(note.string) + noteLift(note); // a bent note rides with its string
+
 
   // The headstock in front of the nut, in the theme's colours (see HEADSTOCKS). Kept to its shape whatever the fret width;
   // the strings run on over it to where they end (see stringPath), and what they wind onto goes over them further down
@@ -755,134 +808,150 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
     }
   };
-  // The keys, the plate and its cover hold still while the camera does, and with their glow they are the dearest shapes of a frame:
-  // once the camera has held still for a frame they are drawn into an image of their own, and that is drawn until the camera or
-  // a setting moves
-  if (parts) {
-    const key = [t.headstock, n, gap, flip, W, B, focal, stretch, shiftX, shiftY, ...eye, ...fwd, ...right, ...up].join();
-    if (cam.plate?.key !== key || cam.plate.t !== t) {
-      cam.plate = { key, t };
-      drawPlate();
-    } else {
-      const plate = cam.plate;
-      if (!plate.image) {
-        const outline = parts.outline.map((uv) => P(...onHead(uv))), reach = 0.8 * half * k0 + 16; // the keys stick out past the outline, the glow past them
-        const x0 = Math.floor(Math.max(0, Math.min(...outline.map(([x]) => x)) - reach) * B) / B, x1 = Math.min(W, Math.max(...outline.map(([x]) => x)) + reach);
-        const y0 = Math.floor(Math.max(0, Math.min(...outline.map(([, y]) => y)) - reach) * B) / B, y1 = Math.min(VH, Math.max(...outline.map(([, y]) => y)) + reach);
-        plate.image = new OffscreenCanvas(Math.max(1, Math.ceil((x1 - x0) * B)), Math.max(1, Math.ceil((y1 - y0) * B)));
-        g = plate.image.getContext('2d');
-        g.setTransform(B, 0, 0, B, -x0 * B, -y0 * B);
-        g.lineCap = g.lineJoin = 'round';
-        drawPlate();
-        g = onCanvas;
-        [plate.x, plate.y] = [x0, y0];
-      }
-      g.drawImage(plate.image, plate.x, plate.y, plate.image.width / B, plate.image.height / B);
-    }
-  }
-  lap('headstock');
-
-  const visible = [];
-  for (let i = firstAt(arr.notes, now - stringLinks(arr).held - 0.3); i < arr.notes.length; i++) {
-    const note = arr.notes[i];
-    if (note.time > now + LOOK) break;
-    const lasts = Math.max(note.sustain, (note.slideTo ?? note.slideUnpitchTo ?? null) === null ? 0 : 0.25, 0.15);
-    if (note.time + lasts >= now - 0.05) visible.push(note);
-  }
-
-  const chordOf = (note) => (note.chord === null || note.chord === undefined ? null : arr.chords[note.chord]);
-  const frameOnly = (note) => t.repeatMarks === 'frame' && (note.repeat || chordOf(note)?.highDensity); // a repeated chord shown by its frame alone
-  const spot = (note) => { // x along the neck (an open string spans the hand position), y at its string's height
-    const a = anchorAt(anchors, note.time), open = note.fret === 0;
-    return { a, open, x: open ? a.fret - 1 + a.width / 2 : note.fret - 0.5, y: ys(note.string) };
-  };
-  // A slide glides from x along the neck over its note's length (a quarter second at least), easing in and out. Its trail
-  // follows it, and so do its gem and its target on the fretboard while it sounds: a sliding chord moves with its slide
-  const slideX = (note, x, sec) => { // sec seconds into the note; an open string keeps to its bar (its slide is an arch, see the trails)
-    const to = note.slideTo ?? note.slideUnpitchTo ?? null, p = Math.min(1, Math.max(0, sec / Math.max(note.sustain, 0.25)));
-    return to === null || note.fret === 0 ? x : x + (to - 0.5 - x) * p * p * (3 - 2 * p);
-  };
-
-  // A bend raises what shows the note: its trail on the highway, and its string and target on the fretboard, all by the
-  // same amount, so they meet at the board
-  const liftAt = (note, sec) => pitchAt(note, sec) * gap * BEND_LIFT; // sec seconds into the note
-  const noteLift = (note) => { // while it sounds
-    const sec = now - note.time;
-    return sec < 0 || note.fret === 0 || !(bendPeak(note) > 0) ? 0 : liftAt(note, Math.min(sec, Math.max(note.sustain, 0.15)));
-  };
-
-  // Strings being bent right now: the whole string pushed up by the finger, as a real one is, in a straight line from the nut
-  // to the fretted note and on to the end of the board
-  const bending = new Map();
-  for (const note of visible) {
-    const dt = note.time - now, held = Math.max(note.sustain, 0.15);
-    if (dt > 0 || -dt > held || note.fret === 0 || !(bendPeak(note) > 0)) continue;
-    bending.set(note.string, { note, x: note.fret - 0.5, dy: noteLift(note) });
-  }
-  const stringPath = (s, lift = 0, sounding = false) => { // along the string at the board from where it ends on the headstock (or, sounding, from the nut: nothing past it rings), bent where it is being bent
-    const b = bending.get(s), y0 = ys(s) + lift, start = sounding ? [[0, y0, 0]] : [ends ? [ends[s][0], ends[s][1] + lift, 0] : [-0.6, y0, 0], [0, y0, 0]];
-    if (!b) return path([...start, [LAST_FRET + 0.6, y0, 0]], false);
-    path([...start, [b.x, y0 + b.dy, 0], [LAST_FRET + 0.6, y0, 0]], false); // bent on the neck only
-  };
-  const boardY = (note) => ys(note.string) + noteLift(note); // a bent note rides with its string
-
-  // The strike line: metal fret wires, the nut, the hand position's posts, and the strings
-  const [, wireTop] = P(focus[0], boardHi, 0), [, wireBottom] = P(focus[0], boardLo, 0);
-  g.strokeStyle = upright(g, wireTop, wireBottom, alpha(t.anchorPost, 0.75), t.post); // lit from above, like fret wire
-  g.lineWidth = Math.max(1.5, 0.05 * k0);
-  g.beginPath();
-  for (let w = 1; w <= LAST_FRET; w++) lines([w, boardLo - 0.04, 0], [w, boardHi + 0.04, 0]);
-  stroke();
-  g.strokeStyle = t.nut;
-  g.lineWidth = Math.max(3, 0.12 * k0);
-  line3([0, boardLo - 0.06, 0], [0, boardHi + 0.06, 0]);
-  glow(true, t.anchorPost, 12);
-  g.strokeStyle = t.anchorPost;
-  g.lineWidth = Math.max(3, 0.07 * k0);
-  for (const x of [cam.left, cam.right]) line3([x, boardLo - 0.14, 0], [x, boardHi + 0.14, 0]);
-  glow(false);
   const stringWidth = (s) => STRING_W * (0.7 + 0.14 * (n - 1 - s)); // wound strings are thicker
-  for (let s = 0; s < n; s++) {
-    const width = stringWidth(s);
-    glow(true, color(s), 3);
-    g.strokeStyle = alpha(color(s), 0.9);
-    g.lineWidth = width;
-    stringPath(s, 0, true); // the neck and the headstock stroked apart: a glow is blurred over the box around its path, and the box around both is most of the screen
-    stroke();
-    path([ends ? ends[s] : [-0.6, ys(s), 0], [0, ys(s), 0]], false);
-    stroke();
-    glow(false);
-    g.strokeStyle = 'rgba(255, 255, 255, 0.25)'; // the light catching the string
-    g.lineWidth = Math.max(0.6, width * 0.3);
-    stringPath(s, 0.012);
-    stroke();
-  }
-  if (parts) { // over the string ends: what they wind onto, and a string tree
-    parts.ends.forEach(([u, v], s) => {
-      if (head.clamps) {
-        box(u - 0.1, u + 0.1, v - 0.1, v + 0.1, 0.04);
-        paint(alpha(t.text, 0.22), alpha(t.text, 0.45));
-        oval([u, v], 0.05, 0.05);
-        paint(t.nut);
-      } else { // a post in its bushing, the string wound round the side it comes from
-        oval([u, v], 0.17, 0.17);
-        paint(alpha(t.ink, 0.5), alpha(t.nut, 0.4));
-        oval([u, v], 0.085, 0.085);
-        paint(t.nut);
-        oval([u, v], 0.03, 0.03);
-        paint(alpha(t.ink, 0.85));
-        const [px, py, k] = P(...ends[s]), [nutX, nutY] = P(0, ys(s), 0), toNut = Math.atan2(nutY - py, nutX - px);
-        g.beginPath();
-        g.arc(px, py, 0.1 * half * k, toNut - 1.3, toNut + 1.3);
-        paint(null, color(s), stringWidth(s));
-      }
-    });
-    if (head.tree) { // pressing the top two strings down on their way to their posts
-      const vs = [n - 2, n - 1].map((s) => { const [pu, pv] = parts.ends[s]; return headV(s) + ((pv - headV(s)) * head.tree) / pu; });
-      box(head.tree - 0.05, head.tree + 0.05, Math.min(...vs) - 0.08, Math.max(...vs) + 0.08, 0.04);
-      paint(alpha(t.nut, 0.7), alpha(t.ink, 0.6));
+  // The headstock's plate, keys and cover move only with the view: when the board is drawn again because the hand moved, they come
+  // from an image of their own, made once the view has held still for a frame
+  const plate = () => {
+    if (cam.plate?.key !== view || cam.plate.t !== t) {
+      cam.plate = { key: view, t };
+      return drawPlate();
     }
+    const kept = cam.plate;
+    if (!kept.image) {
+      const [xs, heights] = [[], []];
+      for (const uv of [...parts.outline, ...parts.keys.map(({ u, side, edge }) => [u, edge + side * 0.8])]) {
+        const [x, y] = P(...onHead(uv));
+        xs.push(x);
+        heights.push(y);
+      }
+      const x0 = Math.floor(Math.max(0, Math.min(...xs) - 24) * B) / B, x1 = Math.min(W, Math.max(...xs) + 24);
+      const y0 = Math.floor(Math.max(0, Math.min(...heights) - 24) * B) / B, y1 = Math.min(VH, Math.max(...heights) + 24);
+      kept.image = new OffscreenCanvas(Math.max(1, Math.ceil((x1 - x0) * B)), Math.max(1, Math.ceil((y1 - y0) * B)));
+      const [outer, outerY, outerFont] = [g, originY, textFont];
+      [g, originY, textFont, kept.x, kept.y] = [kept.image.getContext('2d'), 0, null, x0, y0];
+      g.setTransform(B, 0, 0, B, -x0 * B, -y0 * B);
+      g.lineCap = g.lineJoin = 'round';
+      drawPlate();
+      [g, originY, textFont] = [outer, outerY, outerFont];
+    }
+    g.drawImage(kept.image, kept.x, kept.y, kept.image.width / B, kept.image.height / B);
+  };
+  const drawBoard = () => {
+    // The fingerboard at the strike line. Everything on the board comes after it, and the notes come after the
+    // strings, so nothing hides them
+    g.fillStyle = t.board;
+    path([[0, boardLo, 0], [LAST_FRET + 0.6, boardLo, 0], [LAST_FRET + 0.6, boardHi, 0], [0, boardHi, 0]]);
+    fill();
+    g.fillStyle = alpha(t.anchorFill, 0.16);
+    path([[cam.left, boardLo, 0], [cam.right, boardLo, 0], [cam.right, boardHi, 0], [cam.left, boardHi, 0]]);
+    fill();
+    g.fillStyle = t.inlayDot;
+    const between = (at) => (Math.max(0, Math.ceil(at) - 1) + 0.5) * gap; // halfway between the strings around `at`, counted in strings (on a string: the gap under it)
+    g.beginPath();
+    for (const f of INLAYS) for (const y of f % 12 ? [between((n - 1) / 2)] : [between((n - 1) / 4), stack - between((n - 1) / 4)]) { // one dot in the middle, a pair a gap off either side of it
+      const [px, py, k] = P(f - 0.5, y, 0);
+      g.moveTo(px + 0.1 * k, py);
+      g.ellipse(px, py, 0.1 * k, 0.08 * k, 0, 0, Math.PI * 2);
+    }
+    fill();
+    if (parts) plate(); // the headstock in front of the nut
+
+    // The strike line: metal fret wires, the nut, the hand position's posts, and the strings
+    const [, wireTop] = P(focus[0], boardHi, 0), [, wireBottom] = P(focus[0], boardLo, 0);
+    g.strokeStyle = upright(g, wireTop, wireBottom, alpha(t.anchorPost, 0.75), t.post); // lit from above, like fret wire
+    g.lineWidth = Math.max(1.5, 0.05 * k0);
+    g.beginPath();
+    for (let w = 1; w <= LAST_FRET; w++) lines([w, boardLo - 0.04, 0], [w, boardHi + 0.04, 0]);
+    stroke();
+    g.strokeStyle = t.nut;
+    g.lineWidth = Math.max(3, 0.12 * k0);
+    line3([0, boardLo - 0.06, 0], [0, boardHi + 0.06, 0]);
+    glow(true, t.anchorPost, 12);
+    g.strokeStyle = t.anchorPost;
+    g.lineWidth = Math.max(3, 0.07 * k0);
+    for (const x of [cam.left, cam.right]) line3([x, boardLo - 0.14, 0], [x, boardHi + 0.14, 0]);
+    glow(false);
+    for (let s = 0; s < n; s++) {
+      const width = stringWidth(s);
+      glow(true, color(s), 3);
+      g.strokeStyle = alpha(color(s), 0.9);
+      g.lineWidth = width;
+      stringPath(s); // on the headstock and along the neck in one stroke
+      stroke();
+      glow(false);
+      g.strokeStyle = 'rgba(255, 255, 255, 0.25)'; // the light catching the string
+      g.lineWidth = Math.max(0.6, width * 0.3);
+      stringPath(s, 0.012);
+      stroke();
+    }
+    if (parts) { // over the string ends: what they wind onto, and a string tree
+      parts.ends.forEach(([u, v], s) => {
+        if (head.clamps) {
+          box(u - 0.1, u + 0.1, v - 0.1, v + 0.1, 0.04);
+          paint(alpha(t.text, 0.22), alpha(t.text, 0.45));
+          oval([u, v], 0.05, 0.05);
+          paint(t.nut);
+        } else { // a post in its bushing, the string wound round the side it comes from
+          oval([u, v], 0.17, 0.17);
+          paint(alpha(t.ink, 0.5), alpha(t.nut, 0.4));
+          oval([u, v], 0.085, 0.085);
+          paint(t.nut);
+          oval([u, v], 0.03, 0.03);
+          paint(alpha(t.ink, 0.85));
+          const [px, py, k] = P(...ends[s]), [nutX, nutY] = P(0, ys(s), 0), toNut = Math.atan2(nutY - py, nutX - px);
+          g.beginPath();
+          g.arc(px, py, 0.1 * half * k, toNut - 1.3, toNut + 1.3);
+          paint(null, color(s), stringWidth(s));
+        }
+      });
+      if (head.tree) { // pressing the top two strings down on their way to their posts
+        const vs = [n - 2, n - 1].map((s) => { const [pu, pv] = parts.ends[s]; return headV(s) + ((pv - headV(s)) * head.tree) / pu; });
+        box(head.tree - 0.05, head.tree + 0.05, Math.min(...vs) - 0.08, Math.max(...vs) + 0.08, 0.04);
+        paint(alpha(t.nut, 0.7), alpha(t.ink, 0.6));
+      }
+    }
+
+    // Fret numbers under the board: the hand position in the accent colour, the inlay frets bold. Nothing is behind them to
+    // need a halo, and outlined text is slow to draw
+    for (const bold of [false, true]) // a weight at a time: switching fonts is dear
+      for (let f = 1; f <= LAST_FRET; f++) {
+        const on = f >= here.fret && f < here.fret + here.width, inlay = INLAYS.includes(f);
+        if ((on || inlay) === bold) label(String(f), f - 0.5, boardLo - 0.3, 0, on ? 0.3 : inlay ? 0.26 : 0.2, on ? t.accent : inlay ? t.inlay : t.numOff, bold ? 800 : 500, 'center', false);
+      }
+  };
+  // The board, the headstock, the fret wires, the strings and the fret numbers hold still while the camera and the hand position do
+  // and no string is bent, and with their glow they are much of what a frame draws: once they have held still for a frame they are
+  // drawn into an image of their own, as wide as the screen, and that is drawn until something of theirs moves. All of it lies flat
+  // at the strike line, so where four corners of the board and the headstock's far end land on screen say where all of it does:
+  // to a tenth of a device pixel, and the hand position to as little, it holds still as soon as what's left of a glide can't be seen
+  const landing = (x, y) => P(x, y, 0).slice(0, 2).map((v) => Math.round(v * B * 10)).join(':');
+  const view = [t.headstock, n, gap, flip, W, B, Math.round(stretch * 1e4), landing(0, boardLo), landing(LAST_FRET, boardLo), landing(0, boardHi), landing(LAST_FRET, boardHi), landing(-4, stack / 2)].join();
+  const still = !bending.size && [view, here.fret, here.width, Math.round(cam.left * 1000), Math.round(cam.right * 1000)].join();
+  if (!still || cam.board?.key !== still || cam.board.t !== t) {
+    cam.board = still && { key: still, t };
+    drawBoard();
+  } else {
+    const board = cam.board;
+    if (!board.drawn) {
+      // From over the top of the board to under its fret numbers, and round the headstock out to its keys' tips (nearer the camera,
+      // swung, they come out bigger than at the nut), with room for the glow
+      const heights = [[0, boardHi + 0.2], [LAST_FRET, boardHi + 0.2], [0, boardLo - 0.9], [LAST_FRET, boardLo - 0.9]].map(([x, y]) => P(x, y, 0)[1]);
+      if (parts) heights.push(...[...parts.outline, ...parts.keys.map(({ u, side, edge }) => [u, edge + side * 0.8])].map((uv) => P(...onHead(uv))[1]));
+      const y0 = Math.floor(Math.max(0, Math.min(...heights) - 24) * B) / B, y1 = Math.min(VH, Math.max(...heights) + 24);
+      const [width, height] = [Math.ceil(W * B), Math.max(1, Math.ceil((y1 - y0) * B))];
+      if (cam.boardImage?.width !== width || cam.boardImage.height !== height) cam.boardImage = new OffscreenCanvas(width, height); // kept from one still stretch to the next
+      [g, originY, textFont, board.y, board.drawn] = [cam.boardImage.getContext('2d'), y0, null, y0, true];
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, width, height);
+      unscale();
+      g.lineCap = g.lineJoin = 'round';
+      g.textBaseline = 'middle';
+      drawBoard();
+      [g, originY, textFont] = [onCanvas, 0, null];
+    }
+    g.drawImage(cam.boardImage, 0, board.y, cam.boardImage.width / B, cam.boardImage.height / B);
   }
+  lap('board');
 
   // Sounding notes light their string from the nut on, with a flash where they landed. A note left ringing
   // (let ring, an arpeggio) glows as it's struck and then stays lit without the glow: a glow on every ringing string is dear
@@ -1142,11 +1211,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const weight = near ? 0.65 : chord.highDensity && t.repeatMarks !== 'frame' ? 0.18 : 0.5; // a frame on its own keeps its full weight
       path([[l, floor, z], [r, floor, z], [r, boardHi, z], [l, boardHi, z]]);
       if (t.frames === 'gradient') { // a panel glowing up from the floor, fading out above the top string
-        const [, bottom] = P(l, floor, z), [, top] = P(l, boardHi, z), panel = g.createLinearGradient(0, bottom, 0, top);
-        panel.addColorStop(0, alpha(near ? t.anchorLane : t.anchorFill, weight * 0.6));
-        panel.addColorStop(1, alpha(near ? t.anchorLane : t.anchorFill, 0));
-        g.fillStyle = panel;
-        fill();
+        const [, bottom] = P(l, floor, z), [, top] = P(l, boardHi, z), lit = near ? t.anchorLane : t.anchorFill;
+        fillFrom(unitGradient(g, `${lit}|${weight}`, [[0, alpha(lit, weight * 0.6)], [1, alpha(lit, 0)]]), bottom, top);
       } else {
         g.globalAlpha = shown * weight;
         if (!chord.highDensity) {
@@ -1262,12 +1328,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
         else gem(x, y, z, hw, hh);
         fill();
         glow(false);
-        const [, ty] = P(x, y + hh, z), [, by] = P(x, y - hh, z), shine = g.createLinearGradient(0, ty, 0, by);
-        shine.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
-        shine.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
-        shine.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
-        g.fillStyle = shine;
-        fill();
+        const [, ty] = P(x, y + hh, z), [, by] = P(x, y - hh, z);
+        fillFrom(unitGradient(g, 'shine', [[0, 'rgba(255, 255, 255, 0.45)'], [0.5, 'rgba(255, 255, 255, 0)'], [1, 'rgba(0, 0, 0, 0.25)']]), ty, by);
         g.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         g.lineWidth = 1;
         stroke();
@@ -1518,13 +1580,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
   lap('targets');
 
-  // Fret numbers under the board: the hand position in the accent colour, the inlay frets bold. Nothing is behind them to
-  // need a halo, and outlined text is slow to draw
-  for (const bold of [false, true]) // a weight at a time: switching fonts is dear
-    for (let f = 1; f <= LAST_FRET; f++) {
-      const on = f >= here.fret && f < here.fret + here.width, inlay = INLAYS.includes(f);
-      if ((on || inlay) === bold) label(String(f), f - 0.5, boardLo - 0.3, 0, on ? 0.3 : inlay ? 0.26 : 0.2, on ? t.accent : inlay ? t.inlay : t.numOff, bold ? 800 : 500, 'center', false);
-    }
 
   // The chord name, big, always to the right of the hand position: the chord sounding now, for as long as it sounds,
   // or else the next one, fading in over the second before it
