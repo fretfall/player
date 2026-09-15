@@ -1,8 +1,8 @@
 // Style tokens, shared by the app and design/gen.mjs. A theme is one look + one palette + one font set.
 
-export const LOOKS = {
-  stage: { label: 'Square', gem: 'glass', number: 'floor', glow: true, strW: 2.2, laneW: 0.9, anchorLaneW: 2.4, postW: 3, anchorPostW: 5 },
-  workbench: { label: 'Rounded', gem: 'pill', number: 'on', glow: false, strW: 2.6, laneW: 1.1, anchorLaneW: 2.4, postW: 4, anchorPostW: 6 },
+export const LOOKS = { // the notes' shape, and nothing else
+  stage: { label: 'Square', gem: 'glass' },
+  workbench: { label: 'Rounded', gem: 'pill' },
 };
 
 export const COLORS = {
