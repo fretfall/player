@@ -1164,7 +1164,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     };
     let onTop = cy - hh * k; // the top of the gem, and then of what sits on it
     if (note.hammerOn || note.pullOff) { // a white triangle on the note, pointing down to hammer on and up to pull off
-      const w = hw * k * stretch * 0.6, h = hh * k * 0.9, [tip, base] = note.hammerOn ? [onTop + 0.4 * h, onTop - 0.6 * h] : [onTop - 0.6 * h, onTop + 0.4 * h];
+      const scale = note.grace ? 0.6 : 1, w = 0.2 * k * stretch * scale, h = 0.38 * gap * k * scale, [tip, base] = note.hammerOn ? [onTop + 0.4 * h, onTop - 0.6 * h] : [onTop - 0.6 * h, onTop + 0.4 * h];
       g.beginPath();
       g.moveTo(cx - w, base);
       g.lineTo(cx + w, base);
