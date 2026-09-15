@@ -74,6 +74,12 @@ assert.equal(sidesOf('fourTwo', 6), '1,1,1,1,-1,-1');
 assert.equal(sidesOf('fourTwo', 4), '1,1,1,-1');
 assert.equal(sidesOf('openBook', 7), '1,1,1,1,-1,-1,-1');
 assert.equal(sidesOf('pointed', 6), '1,1,1,-1,-1,-1');
+// The headless plate's rounded outline never turns back on itself (a loop there stroked a spike beside the nut)
+const plate = headstockParts(HEADSTOCKS.headless, [0.8, -0.8]).outline;
+assert.ok(plate.slice(2).every(([u, v], i) => {
+  const [[u0, v0], [u1, v1]] = [plate[i], plate[i + 1]];
+  return (u1 - u0) * (u - u1) + (v1 - v0) * (v - v1) >= 0;
+}), 'headless outline loops');
 for (const headstock of Object.keys(HEADSTOCKS))
   for (const stringOrder of ['low', 'high'])
     assert.doesNotThrow(() => drawHighway(canvas, arrangement, 2, { ...theme(DEFAULT_STYLE), headstock, stringOrder }, {}), `${headstock}, ${stringOrder}`);

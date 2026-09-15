@@ -12,22 +12,25 @@ export function tempoMap(changes, initialTempo) {
   return map;
 }
 
-// ponytail: linear scan over tempo changes, binary search if a song ever has thousands of them
-export function tickToMs(map, tick) {
-  let seg = map[0];
-  for (const t of map) {
-    if (t.tick > tick) break;
-    seg = t;
+// The tempo in force at `value` of `key` (tick or ms): the last change at or before it, or the song's start. A binary search:
+// both run every frame, and a song with a tempo change on every beat has thousands
+function segmentAt(map, key, value) {
+  let lo = 0, hi = map.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (map[mid][key] <= value) lo = mid + 1;
+    else hi = mid;
   }
+  return map[Math.max(0, lo - 1)];
+}
+
+export function tickToMs(map, tick) {
+  const seg = segmentAt(map, 'tick', tick);
   return seg.ms + ((tick - seg.tick) * 60000) / (seg.tempo * TICKS_PER_QUARTER);
 }
 
 export function msToTick(map, ms) {
-  let seg = map[0];
-  for (const t of map) {
-    if (t.ms > ms) break;
-    seg = t;
-  }
+  const seg = segmentAt(map, 'ms', ms);
   return seg.tick + ((ms - seg.ms) * seg.tempo * TICKS_PER_QUARTER) / 60000;
 }
 

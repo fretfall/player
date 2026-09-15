@@ -2700,9 +2700,11 @@
             };
             function toggleSheet(name, open = $(name).hidden) {
                 for (const [sheet, button] of Object.entries(SHEETS)) {
-                    const show = sheet === name && open;
+                    const show = sheet === name && open,
+                        changed = $(sheet).hidden === show;
                     $(sheet).hidden = !show;
                     $(button).setAttribute("aria-expanded", String(show));
+                    if (changed) announce("sheet", { name: sheet, open: show });
                 }
             }
             const toggleSettings = (open) => toggleSheet("settings", open);
@@ -3452,7 +3454,8 @@
                 arr = null,
                 player = null,
                 speed = 1,
-                loop = null;
+                loop = null,
+                announcedPlaying = false; // told with fretfall:playing, see the hook near the end
 
             // A band window (?band=part, see Band below) draws another window's player instead of playing one of its own
             const bandPart = new URLSearchParams(location.search).get("band"),
@@ -3594,6 +3597,8 @@
                 $("play").dataset.label = $("play").ariaLabel = player?.playing
                     ? "Pause"
                     : "Play"; // data-label: its name in the small-screen menu
+                if (!!player?.playing !== announcedPlaying)
+                    announce("playing", { playing: (announcedPlaying = !!player?.playing) });
             }
 
             // alphaTab score → the same model the reference game.js produces (seconds, string 0 = lowest), with Guitar Pro's notation
@@ -4225,6 +4230,14 @@
                     arr = null;
                     status("No guitar or bass parts in this file");
                 }
+                announce("song", {
+                    file: opening, // null: the demo, or a band window's song
+                    title: song.title,
+                    artist: song.artist,
+                    parts: parts.map((a) => a.name),
+                    part: arr ? parts.indexOf(arr) : -1,
+                });
+                opening = null;
             }
 
             let bars = [],
@@ -4467,20 +4480,24 @@
             const AUDIO = /\.(mp3|m4a|aac|ogg|oga|wav|flac)$/i,
                 OPENING = "Opening song…";
             let songReady = Promise.resolve(),
-                resolveSong = () => {};
+                resolveSong = () => {},
+                opening = null; // the name of the file being opened, told with the song once it's ready
 
-            async function openFiles(files) {
+            // options.audio: a .pak's audio already converted to Ogg (by a library that keeps them), so it opens without
+            // the few seconds converting takes
+            async function openFiles(files, options) {
                 if (following)
                     return status("Open songs in the window the band started from");
                 // a tab and its recording can come together: the tab first
                 for (const file of [...files].sort(
                     (a, b) => AUDIO.test(a.name) - AUDIO.test(b.name),
                 ))
-                    await openFile(file);
+                    await openFile(file, options);
             }
 
-            async function openFile(file) {
+            async function openFile(file, { audio } = {}) {
                 if (AUDIO.test(file.name)) return addRecording(file);
+                opening = file.name;
                 const bytes = await file.arrayBuffer();
                 if (!/\.pak$/i.test(file.name)) {
                     usePlayer(synthPlayer);
@@ -4493,17 +4510,21 @@
                     return api.load(new Uint8Array(bytes));
                 }
                 status(
-                    "Opening song… converting the audio takes a few seconds",
+                    audio
+                        ? OPENING
+                        : "Opening song… converting the audio takes a few seconds",
                     true,
                 );
                 await paint();
                 try {
-                    const ww = await import(WW2OGG);
+                    const ww = audio ? null : await import(WW2OGG);
                     const next = await loadSong(bytes, {
-                        wemToOgg: (wem) =>
-                            ww.convertWwiseRiffToOgg(wem, {
-                                codebooks: ww.getPackedCodebooks("aoTuV_603"),
-                            }).ogg,
+                        wemToOgg: audio
+                            ? () => new Uint8Array(audio)
+                            : (wem) =>
+                                  ww.convertWwiseRiffToOgg(wem, {
+                                      codebooks: ww.getPackedCodebooks("aoTuV_603"),
+                                  }).ogg,
                     });
                     if (!next.audio) throw new Error("no audio in this file");
                     for (const a of next.arrangements) {
@@ -4544,6 +4565,7 @@
                     status(null);
                     autoplay();
                 } catch (e) {
+                    opening = null;
                     status(`Could not open ${file.name}: ${e.message}`);
                 }
             }
@@ -4663,9 +4685,20 @@
             }
             // Autoplay (Settings): a song that has just opened starts playing. Not before anyone has used the page (browsers keep
             // it silent until then, so the demo on a first visit waits), and not in the band's windows, which follow this one
+            let autoplayWaits = false; // for the synth's instruments to load
             const autoplay = () => {
                 if (!settings.autoplay || following || !player || player.playing) return;
                 if (navigator.userActivation?.hasBeenActive === false) return;
+                if (player === synthPlayer && !api.isReadyForPlayback) { // a Guitar Pro file opened before its instruments have loaded
+                    if (autoplayWaits) return;
+                    autoplayWaits = true;
+                    const ready = () => {
+                        api.playerReady.off(ready);
+                        autoplayWaits = false;
+                        autoplay();
+                    };
+                    return api.playerReady.on(ready);
+                }
                 audioClock();
                 Promise.resolve(player.play()).catch(
                     (e) => e.name !== "AbortError" && e.name !== "NotAllowedError" && status(e.message),
@@ -5226,6 +5259,33 @@
             $("bandBack").onclick = () => {
                 for (const w of bandWindows) w?.close();
             };
+
+            // --- For a page built on the player, like a song library: open songs, choose the part, and follow along through events
+            // on window, each with its facts in detail: fretfall:song (a song is ready: file, title, artist, parts, part),
+            // fretfall:playing ({ playing }) and fretfall:sheet (Settings or the notation sheet: { name, open }). The page can use
+            // the player's markup and styles too, but only this stays put as the player changes. fretfall:ready: it's here
+            function announce(name, detail) {
+                dispatchEvent(new CustomEvent(`fretfall:${name}`, { detail }));
+            }
+            window.fretfall = {
+                open: (files, options) => openFiles(files, options), // → done once they're open
+                pick: () => $("file").click(), // the Open dialog
+                get playing() {
+                    return !!player?.playing;
+                },
+                get parts() {
+                    return song?.arrangements.map((a) => a.name) ?? [];
+                },
+                get part() {
+                    return song && arr ? song.arrangements.indexOf(arr) : -1;
+                },
+                set part(i) {
+                    if (song?.arrangements[i] && song.arrangements[i] !== arr)
+                        selectArrangement(i);
+                },
+                closeSheets: () => toggleSheet(null, false),
+            };
+            announce("ready");
 
             usePlayer(following ? bandPlayer : synthPlayer);
             setVolume();

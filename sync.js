@@ -77,13 +77,27 @@ export function align({ env, hop, start }, onsets, { minRatio = 0.9, maxRatio = 
     for (const t of onsets) sum += e[Math.round((offset + ratio * t - start) / hop)] ?? 0;
     return sum / onsets.length;
   };
-  // ponytail: brute-force grid (~1 s for a 4-minute song), FFT cross-correlation if long files make it slow
-  const coarse = widen(env, 4);
+  // Coarse: for each ratio, every offset at once. On a grid of STEP hops, the onsets are spikes and the envelope is pooled to
+  // its loudest in each cell; their cross-correlation, one FFT of each (the envelope's once), scores the chart at every shift
+  const STEP = 4, cell = STEP * hop, coarse = widen(env, STEP), cells = Math.ceil(coarse.length / STEP);
+  const pad = Math.ceil(10 / cell) + 2, reach = Math.ceil((maxRatio * last) / cell) + 1;
+  let n = 1;
+  while (n < cells + reach + 2 * pad) n <<= 1; // room for every shift without wrapping onto the envelope
+  const envRe = new Float64Array(n), envIm = new Float64Array(n), re = new Float64Array(n), im = new Float64Array(n);
+  for (let c = 0; c < cells; c++) for (let f = c * STEP; f < Math.min(coarse.length, (c + 1) * STEP); f++) envRe[c] = Math.max(envRe[c], coarse[f]);
+  fft(envRe, envIm);
   let best = { score: -1, ratio: 1, offset: 0 };
   for (let ratio = minRatio; ratio <= maxRatio + 1e-9; ratio += 0.0025) {
-    for (let offset = -10 - ratio * first; offset <= audioSeconds + 10 - ratio * last; offset += 4 * hop) {
-      const score = fit(coarse, ratio, offset);
-      if (score > best.score) best = { score, ratio, offset };
+    re.fill(0);
+    im.fill(0);
+    for (const t of onsets) re[Math.round((ratio * t) / cell)] += 1;
+    fft(re, im);
+    for (let i = 0; i < n; i++) [re[i], im[i]] = [envRe[i] * re[i] + envIm[i] * im[i], envIm[i] * re[i] - envRe[i] * im[i]]; // envelope × conj(spikes)
+    fft(re, im); // transformed again: the correlation at shift k lands at n - k, n times over
+    const from = Math.floor((-10 - ratio * first - start) / cell), to = Math.ceil((audioSeconds + 10 - ratio * last - start) / cell);
+    for (let k = from; k <= to; k++) {
+      const score = re[(((n - k) % n) + n) % n] / n / onsets.length;
+      if (score > best.score) best = { score, ratio, offset: start + k * cell };
     }
   }
   const fine = widen(env, 1), rough = best;

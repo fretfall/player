@@ -26,7 +26,10 @@ const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has po
 
 export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
   const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
-  const corner = (cu, cv, from) => Array.from({ length: 5 }, (_, j) => [cu + Math.cos(from + (j * Math.PI) / 8) * r, cv + Math.sin(from + (j * Math.PI) / 8) * r]);
+  const corner = (cu, cv, from) => { // its ends given twice, so a spline through the outline runs straight between corners instead of looping
+    const arc = Array.from({ length: 5 }, (_, j) => [cu + Math.cos(from + (j * Math.PI) / 8) * r, cv + Math.sin(from + (j * Math.PI) / 8) * r]);
+    return [arc[0], ...arc, arc[4]];
+  };
   return [...corner(ub - r, vb - r, 0), ...corner(ua + r, vb - r, Math.PI / 2), ...corner(ua + r, va + r, Math.PI), ...corner(ub - r, va + r, 1.5 * Math.PI)];
 };
 // Headstocks in front of the nut, named after their classic types rather than any maker, traced from photos of each and drawn
@@ -1629,12 +1632,17 @@ export function drawTab(canvas, arr, now, t) {
   const row = (s) => top + (t.stringOrder === 'high' ? n - 1 - s : s) * gap; // as the highway: low E on top, or high e as in tab
   const speed = TAB_SPEED * (t.noteSpeed ?? 1), paged = t.tabLayout === 'pages';
   const left = TAB_LABELS + 30, right = W - TAB_EDGE - 30;
-  let X, playX, from, to;
+  // In pages, a strip on the right shows how the next page starts, faded and at the page's own spacing, so the notes after
+  // the turn are there to read before it
+  const peek = paged ? Math.min(170, (right - left) * 0.14) : 0, pageRight = right - (paged ? peek + 24 : 0);
+  let X, playX, from, to, upcoming = null;
   if (paged) {
-    const pages = tabPages(arr, (right - left) / speed), page = pages.findLast((p) => p.start <= now) ?? pages[0];
-    X = (time) => left + ((time - page.start) * (right - left)) / (page.end - page.start);
+    const pages = tabPages(arr, (pageRight - left) / speed), at = Math.max(0, pages.findLastIndex((p) => p.start <= now)), page = pages[at];
+    const scale = (pageRight - left) / (page.end - page.start); // px a second on this page
+    X = (time) => left + (time - page.start) * scale;
     [from, to] = [page.start, page.end - 0.001];
     playX = X(Math.min(Math.max(now, page.start), page.end));
+    if (pages[at + 1]) upcoming = { start: pages[at + 1].start, scale };
   } else {
     playX = Math.max(TAB_LABELS + TAB_FADE + 60, W * 0.2);
     X = (time) => playX + (time - now) * speed;
@@ -1657,349 +1665,376 @@ export function drawTab(canvas, arr, now, t) {
   g.lineCap = 'round';
   g.lineJoin = 'round';
   g.textBaseline = 'alphabetic';
-  if (paged) { // notes held over from the page before, or on into the next, end at the page's edges
-    g.save();
-    g.beginPath();
-    g.rect(left - 40, 0, right - left + 44, VH);
-    g.clip();
-  }
+  // Everything drawn along the time between from and to: bars, strings, hand positions and dynamics, notes and their marks.
+  // Drawn once for the view, and in pages once more for the next page's strip. clip: [left, right] to keep to, or none
+  const glowing = [];
+  const drawSpan = (clip) => {
+    if (clip) { // notes held over from the page before, or on into the next, end at its edges
+      g.save();
+      g.beginPath();
+      g.rect(clip[0], 0, clip[1] - clip[0], VH);
+      g.clip();
+    }
 
-  // Bar lines with their numbers and the bar markings beside them (tempo, time, key, repeats, jumps, text), fainter beats,
-  // and the strings: quiet, so the notes carry the colour
-  const small = `600 ${fontSize(Math.min(15, gap * 0.26))}px ${t.num}`, words = `700 ${fontSize(Math.min(13, gap * 0.22))}px ${t.num}`;
-  const barAt = new Map();
-  g.font = small;
-  g.textAlign = 'left';
-  const bars = new Path2D(), beats = new Path2D();
-  g.fillStyle = t.muted;
-  for (let b = firstAt(arr.beats, from - 1); b < arr.beats.length; b++) {
-    const beat = arr.beats[b];
-    if (beat.time > to) break;
-    const x = X(beat.time), bar = beat.measure >= 0, lines = bar ? bars : beats;
-    lines.moveTo(x, top - gap * 0.35);
-    lines.lineTo(x, bottom + gap * 0.35);
-    if (!bar) continue;
-    g.fillText(String(beat.measure), x + 6, cardTop + gap * 0.36);
-    barAt.set(Math.round(beat.time * 50), measure(g, small, String(beat.measure)).width + 16);
-  }
-  g.lineWidth = 1;
-  g.strokeStyle = alpha(t.text, 0.05);
-  g.stroke(beats);
-  g.lineWidth = 1.5;
-  g.strokeStyle = alpha(t.text, 0.16);
-  g.stroke(bars);
-  g.fillStyle = t.accent;
-  const markings = new Map();
-  for (const m of arr.markers ?? []) if (m.time >= from && m.time <= to) markings.set(Math.round(m.time * 50), [...(markings.get(Math.round(m.time * 50)) ?? []), m.text]);
-  for (const [key, texts] of markings) g.fillText([...new Set(texts)].join('  ·  '), X(key / 50) + 6 + (barAt.get(key) ?? 0), cardTop + gap * 0.36);
-  g.strokeStyle = alpha(t.text, 0.14);
-  g.beginPath();
-  for (let s = 0; s < n; s++) {
-    g.moveTo(TAB_LABELS, row(s));
-    g.lineTo(W - TAB_EDGE, row(s));
-  }
-  g.stroke();
-
-  // Under the strings: where the hand moves to (unless the guides are off), dynamics, and crescendo and diminuendo wedges
-  const handY = bottom + gap * 0.92, dynamicsY = bottom + gap * 1.24; // clear of the bottom string's notes and their ties
-  if (t.guides !== false) {
+    // Bar lines with their numbers and the bar markings beside them (tempo, time, key, repeats, jumps, text), fainter beats,
+    // and the strings: quiet, so the notes carry the colour
+    const small = `600 ${fontSize(Math.min(15, gap * 0.26))}px ${t.num}`, words = `700 ${fontSize(Math.min(13, gap * 0.22))}px ${t.num}`;
+    const barAt = new Map();
     g.font = small;
-    g.fillStyle = g.strokeStyle = t.anchorLane;
-    g.lineWidth = 2;
-    let free = -Infinity; // where the last label ends: a move too soon after it, under that label, isn't shown
-    const anchors = arr.anchors ?? [];
-    for (let i = Math.max(1, firstAt(anchors, from)); i < anchors.length && anchors[i].time <= to; i++) {
-      const a = anchors[i], x = X(a.time);
-      if (x < free) continue;
-      const text = `fret ${a.fret}`;
-      g.globalAlpha = past(x);
-      line(x, bottom + gap * 0.6, x, handY - 2);
-      g.fillText(text, x + 5, handY);
-      free = x + 5 + measure(g, small, text).width + 8;
+    g.textAlign = 'left';
+    const bars = new Path2D(), beats = new Path2D();
+    g.fillStyle = t.muted;
+    for (let b = firstAt(arr.beats, from - 1); b < arr.beats.length; b++) {
+      const beat = arr.beats[b];
+      if (beat.time > to) break;
+      const x = X(beat.time), bar = beat.measure >= 0, lines = bar ? bars : beats;
+      lines.moveTo(x, top - gap * 0.35);
+      lines.lineTo(x, bottom + gap * 0.35);
+      if (!bar) continue;
+      g.fillText(String(beat.measure), x + 6, cardTop + gap * 0.36);
+      barAt.set(Math.round(beat.time * 50), measure(g, small, String(beat.measure)).width + 16);
+    }
+    g.lineWidth = 1;
+    g.strokeStyle = alpha(t.text, 0.05);
+    g.stroke(beats);
+    g.lineWidth = 1.5;
+    g.strokeStyle = alpha(t.text, 0.16);
+    g.stroke(bars);
+    g.fillStyle = t.accent;
+    const markings = new Map();
+    for (const m of arr.markers ?? []) if (m.time >= from && m.time <= to) markings.set(Math.round(m.time * 50), [...(markings.get(Math.round(m.time * 50)) ?? []), m.text]);
+    for (const [key, texts] of markings) g.fillText([...new Set(texts)].join('  ·  '), X(key / 50) + 6 + (barAt.get(key) ?? 0), cardTop + gap * 0.36);
+    g.strokeStyle = alpha(t.text, 0.14);
+    g.beginPath();
+    for (let s = 0; s < n; s++) {
+      g.moveTo(TAB_LABELS, row(s));
+      g.lineTo(W - TAB_EDGE, row(s));
+    }
+    g.stroke();
+
+    // Under the strings: where the hand moves to (unless the guides are off), dynamics, and crescendo and diminuendo wedges
+    const handY = bottom + gap * 0.92, dynamicsY = bottom + gap * 1.24; // clear of the bottom string's notes and their ties
+    if (t.guides !== false) {
+      g.font = small;
+      g.fillStyle = g.strokeStyle = t.anchorLane;
+      g.lineWidth = 2;
+      let free = -Infinity; // where the last label ends: a move too soon after it, under that label, isn't shown
+      const anchors = arr.anchors ?? [];
+      for (let i = Math.max(1, firstAt(anchors, from)); i < anchors.length && anchors[i].time <= to; i++) {
+        const a = anchors[i], x = X(a.time);
+        if (x < free) continue;
+        const text = `fret ${a.fret}`;
+        g.globalAlpha = past(x);
+        line(x, bottom + gap * 0.6, x, handY - 2);
+        g.fillText(text, x + 5, handY);
+        free = x + 5 + measure(g, small, text).width + 8;
+      }
+      g.globalAlpha = 1;
+    }
+    g.strokeStyle = t.text;
+    g.lineWidth = 1.5;
+    for (const pin of arr.hairpins ?? []) {
+      if (pin.endTime < from || pin.time > to) continue;
+      const x0 = X(pin.time), x1 = Math.max(x0 + 30, X(pin.endTime)), [tip, mouth] = pin.kind === 'cresc' ? [x0, x1] : [x1, x0];
+      g.globalAlpha = past(x1);
+      g.beginPath();
+      g.moveTo(mouth, dynamicsY - 11);
+      g.lineTo(tip, dynamicsY - 5);
+      g.lineTo(mouth, dynamicsY + 1);
+      g.stroke();
     }
     g.globalAlpha = 1;
-  }
-  g.strokeStyle = t.text;
-  g.lineWidth = 1.5;
-  for (const pin of arr.hairpins ?? []) {
-    if (pin.endTime < from || pin.time > to) continue;
-    const x0 = X(pin.time), x1 = Math.max(x0 + 30, X(pin.endTime)), [tip, mouth] = pin.kind === 'cresc' ? [x0, x1] : [x1, x0];
-    g.globalAlpha = past(x1);
-    g.beginPath();
-    g.moveTo(mouth, dynamicsY - 11);
-    g.lineTo(tip, dynamicsY - 5);
-    g.lineTo(mouth, dynamicsY + 1);
-    g.stroke();
-  }
-  g.globalAlpha = 1;
 
-  const size = fontSize(Math.min(26, gap * 0.42)), h = size * 1.3, pad = size * 0.32, round = t.gem === 'pill' ? h / 2 : 5;
-  const fonts = { note: `700 ${size}px ${t.num}`, grace: `700 ${fontSize(size * 0.72)}px ${t.num}`, finger: `700 ${fontSize(size * 0.5)}px ${t.num}` };
-  const white = t.markings === 'white';
+    const size = fontSize(Math.min(26, gap * 0.42)), h = size * 1.3, pad = size * 0.32, round = t.gem === 'pill' ? h / 2 : 5;
+    const fonts = { note: `700 ${size}px ${t.num}`, grace: `700 ${fontSize(size * 0.72)}px ${t.num}`, finger: `700 ${fontSize(size * 0.5)}px ${t.num}` };
+    const white = t.markings === 'white';
 
-  // An arpeggio's shape, held while its notes are played one at a time: a dashed outline round the strings it holds, named
-  for (const shape of arr.handShapes ?? []) {
-    if (!shape.arpeggio || shape.endTime < from || shape.startTime > to) continue;
-    const rows = shape.frets.flatMap((f, s) => (f >= 0 && s < n ? [row(s)] : []));
-    if (!rows.length) continue;
-    const x0 = X(shape.startTime) - 12, x1 = X(shape.endTime);
-    g.globalAlpha = past(x1);
-    g.strokeStyle = alpha(t.text, 0.4);
-    g.lineWidth = 1.5;
-    g.setLineDash([6, 5]);
-    g.beginPath();
-    g.roundRect(x0, Math.min(...rows) - h / 2 - 6, x1 - x0, Math.max(...rows) - Math.min(...rows) + h + 12, 8);
-    g.stroke();
-    g.setLineDash([]);
-    if (shape.name) {
-      g.font = `700 ${fontSize(Math.min(24, gap * 0.4))}px ${t.num}`;
-      g.fillStyle = t.text;
-      g.fillText(shape.name, x0, top - gap * 0.72);
-    }
-  }
-  g.globalAlpha = 1;
-
-  // Room kept between a bar and the next note on its string: for its slide's slash, and the next one's bracket, slide in or string number
-  const slides = (note) => (note.slideTo ?? note.slideUnpitchTo ?? null) !== null || !!note.slideOut;
-  const bracketed = (note) => { const chord = chordOf(note); return !!chord && !note.repeat && !chord.highDensity && chord.notes.length > 1; };
-  const room = (note, next) => 4 + (slides(note) ? 16 : 0) + (bracketed(next) ? 10 : 0) + (next.slideIn ? 18 : 0) + (next.showString ? 20 : 0);
-  // Marks stack up over a note: markX is its middle, markY the top of the stack so far
-  let markX = 0, markY = 0;
-  const stack = (height, draw) => {
-    draw(markY - height / 2);
-    markY -= height + 3;
-  };
-  const wordFonts = { '': words, 'italic ': `italic ${words}` };
-  const word = (str, style = '') => stack(10, (my) => {
-    g.font = wordFonts[style];
-    g.fillText(str, markX, my + 5);
-  });
-  const { next: nexts, prev: prevs, held } = stringLinks(arr), previous = new Map(), framed = new Set(), glowing = [], numbers = [], marks = [];
-  for (let i = firstAt(arr.notes, from - held - 0.5); i < arr.notes.length; i++) {
-    const note = arr.notes[i];
-    if (note.time > to) break;
-    if (X(note.time + note.sustain) < TAB_LABELS - 40 - h * 4) continue; // long gone past the play line: faded out, not worth measuring
-    const chord = chordOf(note), grace = note.grace ? 0.72 : 1, nh = h * grace, y = row(note.string), c = color(note.string), x0 = X(note.time);
-    const muted = note.mute || chord?.fretHandMute, palm = note.palmMute || chord?.palmMute, repeated = note.repeat || chord?.highDensity;
-    const text = muted ? '×' : note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
-    const fingerOf = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
-    const finger = muted || note.fret === 0 || fingerOf === null ? '' : fingerOf === 0 ? 'T' : String(fingerOf);
-    const font = note.grace ? fonts.grace : fonts.note;
-    const textWidth = measure(g, font, text).width, fingerWidth = finger ? measure(g, fonts.finger, finger).width + 3 : 0;
-    const next = arr.notes[nexts[i]], until = next ? X(next.time) - room(note, next) : Infinity; // bars end short of the next note on the string
-    const w = Math.min(Math.max(nh, textWidth + fingerWidth + pad * 2 * grace), Math.max(10, until - x0));
-    const x1 = Math.max(x0 + w, Math.min(X(note.time + note.sustain) - 2, until)), cx = x0 + w / 2;
-    const squeeze = Math.min(1, (w - 4) / (textWidth + fingerWidth)); // notes closer than a number is wide: narrower numbers
-    const last = previous.get(note.string) ?? (prevs[i] >= 0 ? { x0: X(arr.notes[prevs[i]].time), w: h } : null); // one dropped as gone: its number's place is near enough
-    previous.set(note.string, { x0, w });
-    if (x1 < TAB_LABELS - 40 && typeof note.tieTo !== 'number') continue;
-    const sounding = note.time <= now && now < note.time + Math.max(note.sustain, 0.15);
-    const shown = (sounding || x0 >= playX - 1 ? 1 : 0.4) * (note.ghost ? 0.55 : 1);
-    g.globalAlpha = shown;
-
-    if (chord && !framed.has(chord)) { // a chord's frame: a bracket down the side of its notes, white on an accented one
-      framed.add(chord);
-      const rows = chord.notes.map((j) => row(arr.notes[j].string)), y0 = Math.min(...rows) - h / 2, y1 = Math.max(...rows) + h / 2, bx = x0 - 7;
-      if (rows.length > 1 && !repeated) {
-        g.strokeStyle = chord.accent ? '#ffffff' : alpha(t.text, 0.7);
-        g.lineWidth = chord.accent === 'heavy' ? 4 : chord.accent ? 3 : 2;
-        g.beginPath();
-        g.moveTo(bx + 4, y0);
-        g.lineTo(bx, y0);
-        g.lineTo(bx, y1);
-        g.lineTo(bx + 4, y1);
-        g.stroke();
-      }
-      g.font = words;
-      g.fillStyle = g.strokeStyle = repeated ? t.muted : t.text;
-      g.lineWidth = 1.8;
-      g.textAlign = 'left';
-      if (chord.barre && !repeated) g.fillText(`${chord.barre.half ? '½' : ''}B${chord.barre.fret}`, bx, y0 - 5); // one finger across the strings at this fret
-      if (chord.strum || chord.roll) { // strum or roll beside it: down runs from the low strings to the high ones
-        const strings = chord.notes.map((j) => arr.notes[j].string), low = row(Math.min(...strings)), high = row(Math.max(...strings));
-        const [ya, yb] = (chord.strum ?? chord.roll) === 'down' ? [low, high] : [high, low], ax = bx - 9;
-        g.beginPath();
-        for (let j = 0; j <= 16; j++) g.lineTo(ax + (chord.roll ? Math.sin((j / 16) * Math.PI * 6) * 2.5 : 0), ya + ((yb - ya) * j) / 16);
-        g.stroke();
-        arrowhead(ax, yb, 0, yb - ya || 1);
-      }
-      const before = arr.chords[note.chord - 1];
-      if (chord.name && !repeated && (!before || note.time - before.time > 1 || before.name !== chord.name)) { // named once per change
+    // An arpeggio's shape, held while its notes are played one at a time: a dashed outline round the strings it holds, named
+    for (const shape of arr.handShapes ?? []) {
+      if (!shape.arpeggio || shape.endTime < from || shape.startTime > to) continue;
+      const rows = shape.frets.flatMap((f, s) => (f >= 0 && s < n ? [row(s)] : []));
+      if (!rows.length) continue;
+      const x0 = X(shape.startTime) - 12, x1 = X(shape.endTime);
+      g.globalAlpha = past(x1);
+      g.strokeStyle = alpha(t.text, 0.4);
+      g.lineWidth = 1.5;
+      g.setLineDash([6, 5]);
+      g.beginPath();
+      g.roundRect(x0, Math.min(...rows) - h / 2 - 6, x1 - x0, Math.max(...rows) - Math.min(...rows) + h + 12, 8);
+      g.stroke();
+      g.setLineDash([]);
+      if (shape.name) {
         g.font = `700 ${fontSize(Math.min(24, gap * 0.4))}px ${t.num}`;
         g.fillStyle = t.text;
-        g.fillText(chord.name, x0, top - gap * 0.72);
+        g.fillText(shape.name, x0, top - gap * 0.72);
       }
     }
+    g.globalAlpha = 1;
 
-    // The note: a bar as long as it's held, in its string's colour (grey when muted, outlined when a chord is played again,
-    // faint and dashed where it's let ring), its fret number and finger at the start
-    g.beginPath();
-    g.roundRect(x0, y - nh / 2, x1 - x0, nh, round * grace);
-    if (sounding && !repeated) {
-      g.shadowColor = c;
-      g.shadowBlur = 18;
-    }
-    if (repeated) {
-      g.strokeStyle = c;
-      g.lineWidth = 2;
-      g.stroke();
-    } else if (note.letRing && x1 > x0 + w + 2) {
-      g.fillStyle = alpha(c, 0.3);
-      g.fill();
-      g.shadowBlur = 0;
-      g.strokeStyle = c;
-      g.lineWidth = 2;
-      g.setLineDash([6, 5]);
-      line(x0 + w + 4, y, x1 - 4, y);
-      g.setLineDash([]);
-      g.beginPath();
-      g.roundRect(x0, y - nh / 2, w, nh, round * grace);
-      g.fillStyle = c;
-      g.fill();
-    } else {
-      g.fillStyle = muted ? alpha(t.text, 0.22) : c;
-      g.fill();
-    }
-    g.shadowBlur = 0;
-    if (sounding) glowing.push({ y, c });
-    const fill = repeated ? c : muted ? t.text : white ? '#ffffff' : t.ink;
-    numbers.push({ text, font, finger, fill, shown, squeeze, x: cx, y: y + measure(g, font, text).middle, left: -(textWidth + fingerWidth) / 2, textWidth });
-
-    // Around the note: slides in and out, a tie on to the note it's held into, the string's number when it's asked for
-    marks.push(() => {
-      g.globalAlpha = shown;
-      const ink = repeated ? t.muted : t.text;
-      g.strokeStyle = g.fillStyle = ink;
-      g.lineWidth = 1.6;
-      const slide = note.slideTo ?? note.slideUnpitchTo ?? null, up = slide === null ? (note.slideOut === 'up' ? 1 : note.slideOut ? -1 : 0) : Math.sign(slide - note.fret) || 1;
-      if (up) {
-        const unclear = note.slideTo === null && note.slideUnpitchTo !== null && note.slideUnpitchTo !== undefined; // off to no clear fret
-        if (unclear) g.setLineDash([3, 3]);
-        line(x1 + 4, y + up * nh * 0.3, x1 + 14, y - up * nh * 0.3);
-        if (unclear) g.setLineDash([]);
-      }
-      if (note.slideIn) line(x0 - 16, y + (note.slideIn === 'below' ? 1 : -1) * nh * 0.3, x0 - 6, y - (note.slideIn === 'below' ? 1 : -1) * nh * 0.3);
-      if (typeof note.tieTo === 'number') {
-        const tx = X(arr.notes[note.tieTo].time) + nh / 2;
-        g.setLineDash([4, 3]);
-        g.beginPath();
-        g.moveTo(cx, y + nh / 2 + 3);
-        g.quadraticCurveTo((cx + tx) / 2, y + nh / 2 + 14, tx, y + nh / 2 + 3);
-        g.stroke();
-        g.setLineDash([]);
-      }
-      if (note.showString) {
-        const sx = x0 - (chord ? 26 : 13);
-        g.beginPath();
-        g.arc(sx, y, 8, 0, Math.PI * 2);
-        g.stroke();
-        g.font = fonts.finger;
-        g.textAlign = 'center';
-        g.fillText(String(n - note.string), sx, y + measure(g, fonts.finger, '1').middle);
-      }
-      if (note.dynamicLabel) {
-        g.font = `italic ${words}`;
-        g.textAlign = 'left';
-        g.fillStyle = t.text;
-        g.fillText(note.dynamicLabel, x0, dynamicsY);
-        g.fillStyle = ink;
-      }
-
-      // Over the note, nearest first as notation stacks them: vibrato along the bar, the slur from a hammer-on or pull-off, then
-      // articulation, techniques and the picking hand. A bend's arrow rises from the end of its number
-      let above = y - nh / 2 - 6;
-      if (note.vibrato) {
-        g.beginPath();
-        for (let x = x0 + 2; x <= Math.max(x1, x0 + 24) - 2; x += 2) g.lineTo(x, above + Math.sin((x - x0) / 3) * (note.vibratoWide ? 3 : 1.8));
-        g.stroke();
-        above -= note.vibratoWide ? 10 : 8;
-      }
-      g.textAlign = 'center';
-      g.font = words;
-      if ((note.hammerOn || note.pullOff) && last) {
-        const ax = last.x0 + last.w / 2, midX = (ax + cx) / 2;
-        g.beginPath();
-        g.moveTo(ax, above);
-        g.quadraticCurveTo(midX, above - 12, cx, above);
-        g.stroke();
-        g.fillText(note.hammerOn ? 'H' : 'P', midX, above - 9);
-        above -= 10;
-      }
-      const peak = bendPeak(note);
-      if (peak > 0) {
-        const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < peak;
-        const bx = x0 + w - 2, base = y - nh / 2, tip = base - 16;
-        g.beginPath();
-        if (pre) g.moveTo(bx, base), g.lineTo(bx, tip);
-        else g.moveTo(bx - 4, base + 2), g.quadraticCurveTo(bx + 4, base, bx + 6, tip);
-        g.stroke();
-        arrowhead(pre ? bx : bx + 6, tip, pre ? 0 : 0.3, -1);
-        if (release) {
-          g.beginPath();
-          g.moveTo(bx + 12, tip);
-          g.quadraticCurveTo(bx + 16, base - 6, bx + 16, base);
-          g.stroke();
-          arrowhead(bx + 16, base, 0, 1);
-        }
-        g.textAlign = 'left';
-        g.fillText(`${pre ? 'pre ' : ''}${bendLabel(peak)}`, bx + (release ? 20 : 10), tip + 4);
-        g.textAlign = 'center';
-      }
-      [markX, markY] = [cx, above];
-      if (note.tap && !note.tapLeft) word('T');
-      if (note.staccato) stack(4, (my) => {
-        g.beginPath();
-        g.arc(cx, my, 2, 0, Math.PI * 2);
-        g.fill();
-      });
-      if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) word({ heavy: '^', tenuto: '–' }[note.accent] ?? '>');
-      if (palm) word('PM');
-      for (const mark of [
-        note.tapLeft ? 'm.g.' : '', TEXT_MARKS[note.harmonicType] ?? (note.harmonicPinch ? 'PH' : ''),
-        note.slap ? 'slap' : note.pop ? 'pop' : '', note.golpe ? `golpe (${note.golpe})` : '', note.rasgueado ? `rasg. ${note.rasgueado}` : '',
-        typeof note.trill === 'number' ? `tr ${note.trill}` : '', note.ornament ?? '', note.fade ?? '', note.whammy ? 'w/bar' : '',
-        note.wah === 'open' ? 'o' : note.wah === 'closed' ? '+' : '',
-      ]) if (mark) word(mark);
-      if (note.rightFinger) word(note.rightFinger, 'italic ');
-      if (note.pick) stack(9, (my) => { // ⊓ down, V up
-        g.beginPath();
-        if (note.pick === 'down') [[-4, 4.5], [-4, -4.5], [4, -4.5], [4, 4.5]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, my + dy));
-        else [[-4, -4.5], [0, 4.5], [4, -4.5]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, my + dy));
-        g.stroke();
-      });
-      if (note.fermata) stack(9, (my) => {
-        g.beginPath();
-        g.arc(cx, my + 4, 7, Math.PI, 0);
-        g.stroke();
-        g.beginPath();
-        g.arc(cx, my + 3, 1.5, 0, Math.PI * 2);
-        g.fill();
-      });
-      if (note.tremolo) stack(12, (my) => { for (let j = -1; j <= 1; j++) line(cx - 6, my + j * 4 + 2.5, cx + 6, my + j * 4 - 2.5); });
+    // Room kept between a bar and the next note on its string: for its slide's slash, and the next one's bracket, slide in or string number
+    const slides = (note) => (note.slideTo ?? note.slideUnpitchTo ?? null) !== null || !!note.slideOut;
+    const bracketed = (note) => { const chord = chordOf(note); return !!chord && !note.repeat && !chord.highDensity && chord.notes.length > 1; };
+    const room = (note, next) => 4 + (slides(note) ? 16 : 0) + (bracketed(next) ? 10 : 0) + (next.slideIn ? 18 : 0) + (next.showString ? 20 : 0);
+    // Marks stack up over a note: markX is its middle, markY the top of the stack so far
+    let markX = 0, markY = 0;
+    const stack = (height, draw) => {
+      draw(markY - height / 2);
+      markY -= height + 3;
+    };
+    const wordFonts = { '': words, 'italic ': `italic ${words}` };
+    const word = (str, style = '') => stack(10, (my) => {
+      g.font = wordFonts[style];
+      g.fillText(str, markX, my + 5);
     });
-  }
-  // Over the bars: the fret numbers, then the fingers to fret them with, small beside them, then the marks, each a font at a time
-  // (switching fonts for every note is dear). A number squeezed between notes closer than it is wide is drawn narrower
-  const number = (job, str, dx, alphaShare) => {
-    g.globalAlpha = job.shown * alphaShare;
-    g.fillStyle = job.fill;
-    if (job.squeeze === 1) return g.fillText(str, job.x + job.left + dx, job.y);
-    g.save();
-    g.translate(job.x, job.y);
-    g.scale(job.squeeze, 1);
-    g.fillText(str, job.left + dx, 0);
-    g.restore();
+    const { next: nexts, prev: prevs, held } = stringLinks(arr), previous = new Map(), framed = new Set(), numbers = [], marks = [];
+    for (let i = firstAt(arr.notes, from - held - 0.5); i < arr.notes.length; i++) {
+      const note = arr.notes[i];
+      if (note.time > to) break;
+      if (X(note.time + note.sustain) < TAB_LABELS - 40 - h * 4) continue; // long gone past the play line: faded out, not worth measuring
+      if (clip && note.time < from && X(note.time + note.sustain) - 2 <= X(from) && typeof note.tieTo !== 'number') continue; // over by this page's start: its tail would show at the edge
+      const chord = chordOf(note), grace = note.grace ? 0.72 : 1, nh = h * grace, y = row(note.string), c = color(note.string), x0 = X(note.time);
+      const muted = note.mute || chord?.fretHandMute, palm = note.palmMute || chord?.palmMute, repeated = note.repeat || chord?.highDensity;
+      const text = muted ? '×' : note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
+      const fingerOf = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
+      const finger = muted || note.fret === 0 || fingerOf === null ? '' : fingerOf === 0 ? 'T' : String(fingerOf);
+      const font = note.grace ? fonts.grace : fonts.note;
+      const textWidth = measure(g, font, text).width, fingerWidth = finger ? measure(g, fonts.finger, finger).width + 3 : 0;
+      const next = arr.notes[nexts[i]], until = next ? X(next.time) - room(note, next) : Infinity; // bars end short of the next note on the string
+      const w = Math.min(Math.max(nh, textWidth + fingerWidth + pad * 2 * grace), Math.max(10, until - x0));
+      const x1 = Math.max(x0 + w, Math.min(X(note.time + note.sustain) - 2, until)), cx = x0 + w / 2;
+      const squeeze = Math.min(1, (w - 4) / (textWidth + fingerWidth)); // notes closer than a number is wide: narrower numbers
+      const last = previous.get(note.string) ?? (prevs[i] >= 0 ? { x0: X(arr.notes[prevs[i]].time), w: h } : null); // one dropped as gone: its number's place is near enough
+      previous.set(note.string, { x0, w });
+      if (x1 < TAB_LABELS - 40 && typeof note.tieTo !== 'number') continue;
+      const sounding = note.time <= now && now < note.time + Math.max(note.sustain, 0.15);
+      const shown = (sounding || x0 >= playX - 1 ? 1 : 0.4) * (note.ghost ? 0.55 : 1);
+      g.globalAlpha = shown;
+
+      if (chord && !framed.has(chord)) { // a chord's frame: a bracket down the side of its notes, white on an accented one
+        framed.add(chord);
+        const rows = chord.notes.map((j) => row(arr.notes[j].string)), y0 = Math.min(...rows) - h / 2, y1 = Math.max(...rows) + h / 2, bx = x0 - 7;
+        if (rows.length > 1 && !repeated) {
+          g.strokeStyle = chord.accent ? '#ffffff' : alpha(t.text, 0.7);
+          g.lineWidth = chord.accent === 'heavy' ? 4 : chord.accent ? 3 : 2;
+          g.beginPath();
+          g.moveTo(bx + 4, y0);
+          g.lineTo(bx, y0);
+          g.lineTo(bx, y1);
+          g.lineTo(bx + 4, y1);
+          g.stroke();
+        }
+        g.font = words;
+        g.fillStyle = g.strokeStyle = repeated ? t.muted : t.text;
+        g.lineWidth = 1.8;
+        g.textAlign = 'left';
+        if (chord.barre && !repeated) g.fillText(`${chord.barre.half ? '½' : ''}B${chord.barre.fret}`, bx, y0 - 5); // one finger across the strings at this fret
+        if (chord.strum || chord.roll) { // strum or roll beside it: down runs from the low strings to the high ones
+          const strings = chord.notes.map((j) => arr.notes[j].string), low = row(Math.min(...strings)), high = row(Math.max(...strings));
+          const [ya, yb] = (chord.strum ?? chord.roll) === 'down' ? [low, high] : [high, low], ax = bx - 9;
+          g.beginPath();
+          for (let j = 0; j <= 16; j++) g.lineTo(ax + (chord.roll ? Math.sin((j / 16) * Math.PI * 6) * 2.5 : 0), ya + ((yb - ya) * j) / 16);
+          g.stroke();
+          arrowhead(ax, yb, 0, yb - ya || 1);
+        }
+        const before = arr.chords[note.chord - 1];
+        if (chord.name && !repeated && (!before || note.time - before.time > 1 || before.name !== chord.name)) { // named once per change
+          g.font = `700 ${fontSize(Math.min(24, gap * 0.4))}px ${t.num}`;
+          g.fillStyle = t.text;
+          g.fillText(chord.name, x0, top - gap * 0.72);
+        }
+      }
+
+      // The note: a bar as long as it's held, in its string's colour (grey when muted, outlined when a chord is played again,
+      // faint and dashed where it's let ring), its fret number and finger at the start
+      g.beginPath();
+      g.roundRect(x0, y - nh / 2, x1 - x0, nh, round * grace);
+      if (sounding && !repeated) {
+        g.shadowColor = c;
+        g.shadowBlur = 18;
+      }
+      if (repeated) {
+        g.strokeStyle = c;
+        g.lineWidth = 2;
+        g.stroke();
+      } else if (note.letRing && x1 > x0 + w + 2) {
+        g.fillStyle = alpha(c, 0.3);
+        g.fill();
+        g.shadowBlur = 0;
+        g.strokeStyle = c;
+        g.lineWidth = 2;
+        g.setLineDash([6, 5]);
+        line(x0 + w + 4, y, x1 - 4, y);
+        g.setLineDash([]);
+        g.beginPath();
+        g.roundRect(x0, y - nh / 2, w, nh, round * grace);
+        g.fillStyle = c;
+        g.fill();
+      } else {
+        g.fillStyle = muted ? alpha(t.text, 0.22) : c;
+        g.fill();
+      }
+      g.shadowBlur = 0;
+      if (sounding) glowing.push({ y, c });
+      const fill = repeated ? c : muted ? t.text : white ? '#ffffff' : t.ink;
+      numbers.push({ text, font, finger, fill, shown, squeeze, x: cx, y: y + measure(g, font, text).middle, left: -(textWidth + fingerWidth) / 2, textWidth });
+
+      // Around the note: slides in and out, a tie on to the note it's held into, the string's number when it's asked for
+      marks.push(() => {
+        g.globalAlpha = shown;
+        const ink = repeated ? t.muted : t.text;
+        g.strokeStyle = g.fillStyle = ink;
+        g.lineWidth = 1.6;
+        const slide = note.slideTo ?? note.slideUnpitchTo ?? null, up = slide === null ? (note.slideOut === 'up' ? 1 : note.slideOut ? -1 : 0) : Math.sign(slide - note.fret) || 1;
+        if (up) {
+          const unclear = note.slideTo === null && note.slideUnpitchTo !== null && note.slideUnpitchTo !== undefined; // off to no clear fret
+          if (unclear) g.setLineDash([3, 3]);
+          line(x1 + 4, y + up * nh * 0.3, x1 + 14, y - up * nh * 0.3);
+          if (unclear) g.setLineDash([]);
+        }
+        if (note.slideIn) line(x0 - 16, y + (note.slideIn === 'below' ? 1 : -1) * nh * 0.3, x0 - 6, y - (note.slideIn === 'below' ? 1 : -1) * nh * 0.3);
+        if (typeof note.tieTo === 'number') {
+          const tx = X(arr.notes[note.tieTo].time) + nh / 2;
+          g.setLineDash([4, 3]);
+          g.beginPath();
+          g.moveTo(cx, y + nh / 2 + 3);
+          g.quadraticCurveTo((cx + tx) / 2, y + nh / 2 + 14, tx, y + nh / 2 + 3);
+          g.stroke();
+          g.setLineDash([]);
+        }
+        if (note.showString) {
+          const sx = x0 - (chord ? 26 : 13);
+          g.beginPath();
+          g.arc(sx, y, 8, 0, Math.PI * 2);
+          g.stroke();
+          g.font = fonts.finger;
+          g.textAlign = 'center';
+          g.fillText(String(n - note.string), sx, y + measure(g, fonts.finger, '1').middle);
+        }
+        if (note.dynamicLabel) {
+          g.font = `italic ${words}`;
+          g.textAlign = 'left';
+          g.fillStyle = t.text;
+          g.fillText(note.dynamicLabel, x0, dynamicsY);
+          g.fillStyle = ink;
+        }
+
+        // Over the note, nearest first as notation stacks them: vibrato along the bar, the slur from a hammer-on or pull-off, then
+        // articulation, techniques and the picking hand. A bend's arrow rises from the end of its number
+        let above = y - nh / 2 - 6;
+        if (note.vibrato) {
+          g.beginPath();
+          for (let x = x0 + 2; x <= Math.max(x1, x0 + 24) - 2; x += 2) g.lineTo(x, above + Math.sin((x - x0) / 3) * (note.vibratoWide ? 3 : 1.8));
+          g.stroke();
+          above -= note.vibratoWide ? 10 : 8;
+        }
+        g.textAlign = 'center';
+        g.font = words;
+        if ((note.hammerOn || note.pullOff) && last) {
+          const ax = last.x0 + last.w / 2, midX = (ax + cx) / 2;
+          g.beginPath();
+          g.moveTo(ax, above);
+          g.quadraticCurveTo(midX, above - 12, cx, above);
+          g.stroke();
+          g.fillText(note.hammerOn ? 'H' : 'P', midX, above - 9);
+          above -= 10;
+        }
+        const peak = bendPeak(note);
+        if (peak > 0) {
+          const pre = note.bendCurve?.[0]?.[1] > 0, release = (note.bendCurve?.length ?? 0) > 1 && note.bendCurve.at(-1)[1] < peak;
+          const bx = x0 + w - 2, base = y - nh / 2, tip = base - 16;
+          g.beginPath();
+          if (pre) g.moveTo(bx, base), g.lineTo(bx, tip);
+          else g.moveTo(bx - 4, base + 2), g.quadraticCurveTo(bx + 4, base, bx + 6, tip);
+          g.stroke();
+          arrowhead(pre ? bx : bx + 6, tip, pre ? 0 : 0.3, -1);
+          if (release) {
+            g.beginPath();
+            g.moveTo(bx + 12, tip);
+            g.quadraticCurveTo(bx + 16, base - 6, bx + 16, base);
+            g.stroke();
+            arrowhead(bx + 16, base, 0, 1);
+          }
+          g.textAlign = 'left';
+          g.fillText(`${pre ? 'pre ' : ''}${bendLabel(peak)}`, bx + (release ? 20 : 10), tip + 4);
+          g.textAlign = 'center';
+        }
+        [markX, markY] = [cx, above];
+        if (note.tap && !note.tapLeft) word('T');
+        if (note.staccato) stack(4, (my) => {
+          g.beginPath();
+          g.arc(cx, my, 2, 0, Math.PI * 2);
+          g.fill();
+        });
+        if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) word({ heavy: '^', tenuto: '–' }[note.accent] ?? '>');
+        if (palm) word('PM');
+        for (const mark of [
+          note.tapLeft ? 'm.g.' : '', TEXT_MARKS[note.harmonicType] ?? (note.harmonicPinch ? 'PH' : ''),
+          note.slap ? 'slap' : note.pop ? 'pop' : '', note.golpe ? `golpe (${note.golpe})` : '', note.rasgueado ? `rasg. ${note.rasgueado}` : '',
+          typeof note.trill === 'number' ? `tr ${note.trill}` : '', note.ornament ?? '', note.fade ?? '', note.whammy ? 'w/bar' : '',
+          note.wah === 'open' ? 'o' : note.wah === 'closed' ? '+' : '',
+        ]) if (mark) word(mark);
+        if (note.rightFinger) word(note.rightFinger, 'italic ');
+        if (note.pick) stack(9, (my) => { // ⊓ down, V up
+          g.beginPath();
+          if (note.pick === 'down') [[-4, 4.5], [-4, -4.5], [4, -4.5], [4, 4.5]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, my + dy));
+          else [[-4, -4.5], [0, 4.5], [4, -4.5]].forEach(([dx, dy], j) => g[j ? 'lineTo' : 'moveTo'](cx + dx, my + dy));
+          g.stroke();
+        });
+        if (note.fermata) stack(9, (my) => {
+          g.beginPath();
+          g.arc(cx, my + 4, 7, Math.PI, 0);
+          g.stroke();
+          g.beginPath();
+          g.arc(cx, my + 3, 1.5, 0, Math.PI * 2);
+          g.fill();
+        });
+        if (note.tremolo) stack(12, (my) => { for (let j = -1; j <= 1; j++) line(cx - 6, my + j * 4 + 2.5, cx + 6, my + j * 4 - 2.5); });
+      });
+    }
+    // Over the bars: the fret numbers, then the fingers to fret them with, small beside them, then the marks, each a font at a time
+    // (switching fonts for every note is dear). A number squeezed between notes closer than it is wide is drawn narrower
+    const number = (job, str, dx, alphaShare) => {
+      g.globalAlpha = job.shown * alphaShare;
+      g.fillStyle = job.fill;
+      if (job.squeeze === 1) return g.fillText(str, job.x + job.left + dx, job.y);
+      g.save();
+      g.translate(job.x, job.y);
+      g.scale(job.squeeze, 1);
+      g.fillText(str, job.left + dx, 0);
+      g.restore();
+    };
+    g.textAlign = 'left';
+    for (const font of [fonts.note, fonts.grace]) {
+      g.font = font;
+      for (const job of numbers) if (job.font === font) number(job, job.text, 0, 1);
+    }
+    g.font = fonts.finger;
+    for (const job of numbers) if (job.finger) number(job, job.finger, job.textWidth + 3, 0.7);
+    for (const draw of marks) draw();
+    g.globalAlpha = 1;
+    if (clip) g.restore();
   };
-  g.textAlign = 'left';
-  for (const font of [fonts.note, fonts.grace]) {
-    g.font = font;
-    for (const job of numbers) if (job.font === font) number(job, job.text, 0, 1);
+  if (!paged) drawSpan(null);
+  else {
+    drawSpan([left - 40, pageRight + 4]);
+    if (upcoming) { // the next page's start, past a dashed line, faded
+      const strip = pageRight + 24, pagePlayX = playX;
+      X = (time) => strip + (time - upcoming.start) * upcoming.scale;
+      [from, to, playX] = [upcoming.start, upcoming.start + peek / upcoming.scale, -Infinity];
+      drawSpan([strip - 8, right + 4]);
+      g.save();
+      g.globalCompositeOperation = 'destination-out';
+      g.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      g.fillRect(strip - 8, 0, right + 12 - (strip - 8), VH);
+      g.restore();
+      g.strokeStyle = alpha(t.text, 0.22);
+      g.lineWidth = 1.5;
+      g.setLineDash([3, 5]);
+      line(pageRight + 12, top - gap * 0.6, pageRight + 12, bottom + gap * 0.6);
+      g.setLineDash([]);
+      playX = pagePlayX;
+    }
   }
-  g.font = fonts.finger;
-  for (const job of numbers) if (job.finger) number(job, job.finger, job.textWidth + 3, 0.7);
-  for (const draw of marks) draw();
-  g.globalAlpha = 1;
-  if (paged) g.restore();
 
   // The play line, glowing, with a spark where it crosses a string that's sounding
   g.shadowColor = t.accent;

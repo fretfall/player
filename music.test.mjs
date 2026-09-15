@@ -7,6 +7,13 @@ assert.equal(tickToMs(map, 960), 500);
 assert.equal(tickToMs(map, 3840), 2000);
 assert.equal(tickToMs(map, 4800), 3000);
 for (const tick of [0, 960, 3840, 4800]) assert.equal(msToTick(map, tickToMs(map, tick)), tick);
+// A tempo change on every beat: every tick lands in the right one, there and back
+const busy = tempoMap(Array.from({ length: 2000 }, (_, i) => ({ tick: (i + 1) * 960, tempo: 60 + (i % 7) * 10 })), 90);
+const byScan = (tick) => { const seg = busy.findLast((t) => t.tick <= tick); return seg.ms + ((tick - seg.tick) * 60000) / (seg.tempo * 960); };
+for (const tick of [0, 1, 959, 960, 961, 123456, 1919999, 1920000, 2500000]) {
+  assert.ok(Math.abs(tickToMs(busy, tick) - byScan(tick)) < 1e-6, `tick ${tick}`);
+  assert.ok(Math.abs(msToTick(busy, tickToMs(busy, tick)) - tick) < 1e-6, `back from tick ${tick}`);
+}
 
 assert.deepEqual([[40, 45, 50, 55, 59, 64], [38, 45, 50, 55, 59, 64], [39, 44, 49, 54, 58, 63], [26, 33, 38, 43], [38, 45, 50, 55, 57, 62]].map(tuningName),
   ['E Standard', 'Drop D', 'E♭ Standard', 'Drop D', 'D A D G A D']);
