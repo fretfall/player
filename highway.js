@@ -120,6 +120,22 @@ const shade = (color, amount) => { // a hex colour mixed toward white (amount > 
 };
 const alpha = (color, a) =>
   color.startsWith('#') ? `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${a})` : color;
+// Short text is set at quarter-pixel sizes and measured once per font and string: it shrinks smoothly with distance, and a
+// font at a size not seen before is slow to set up
+const fontSize = (px) => Math.round(px * 4) / 4;
+const metrics = new Map();
+const measure = (g, str) => { // → { width, middle: how far the ink's middle is above the baseline }
+  const key = `${g.font}|${str}`;
+  let m = metrics.get(key);
+  if (!m) {
+    if (metrics.size > 5000) metrics.clear(); // every song brings its own chord names: start over now and then
+    const ink = g.measureText(str); // kept as numbers: a TextMetrics holds on to the browser's font data, and the frames stall collecting it
+    metrics.set(key, (m = { width: ink.width, middle: (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2 }));
+  }
+  return m;
+};
+// The floor in bands of flat colour, for each theme: filling a gradient that big is by far the slowest thing to draw without a GPU
+const FLOOR_BANDS = 128, floorBands = new WeakMap();
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -341,14 +357,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // size in world units at the strike line. Text on the floor shrinks with distance far more gently than the
   // highway (as in Tabizera), so the numbers of notes a few seconds away stay readable; ink text sits on a gem
   // and keeps to its size
-  const label = (str, x, y, z, size, fill, weight = 700, align = 'center') => {
-    const onGem = fill === t.ink, [px, py, k] = P(x, y, z), px2 = size * (onGem ? k : Math.sqrt(k * k0));
+  const label = (str, x, y, z, size, fill, weight = 700, align = 'center', halo = fill !== t.ink) => {
+    const onGem = fill === t.ink, [px, py, k] = P(x, y, z), px2 = fontSize(size * (onGem ? k : Math.sqrt(k * k0)));
     if (px2 < (onGem ? 1 : 8) || px < -60 || px > W + 60) return; // numbers on gems fade in from the far end, however small
     g.font = `${weight} ${px2}px ${t.num}`;
     g.textAlign = align;
     g.textBaseline = 'alphabetic';
-    const ink = g.measureText(str), cy = py + (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2; // centre the digits themselves, not the font's em box
-    if (!onGem) { // a dark halo lifts numbers off the lines behind them
+    const cy = py + measure(g, str).middle; // centre the digits themselves, not the font's em box
+    if (halo) { // a dark halo lifts numbers off the lines behind them
       g.lineWidth = px2 * 0.2;
       g.strokeStyle = alpha(t.ink, 0.9);
       g.strokeText(str, px, cy);
@@ -368,13 +384,27 @@ export function drawHighway(canvas, arr, now, t, cam) {
   g.lineCap = 'round';
   g.lineJoin = 'round';
 
-  // Floor and grid: a lane for every fret wire, a line for every beat
-  const floorFill = g.createLinearGradient(0, nearY, 0, farY);
-  floorFill.addColorStop(0, t.floor0);
-  floorFill.addColorStop(1, alpha(t.floor1, 0));
-  g.fillStyle = floorFill;
-  path([[-60, floor, 0], [LAST_FRET + 60, floor, 0], [LAST_FRET + 60, floor, far], [-60, floor, far]]); // wider than any view
-  g.fill();
+  // Floor and grid: a lane for every fret wire, a line for every beat. The floor, wider than any view, fades from floor0 at
+  // the strike line to nothing at the far end, as a gradient would, in bands between whole device pixels (see FLOOR_BANDS)
+  if (!floorBands.has(t)) {
+    const [c0, c1] = [t.floor0, t.floor1].map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
+    floorBands.set(t, Array.from({ length: FLOOR_BANDS }, (_, i) => {
+      const u = (i + 0.5) / FLOOR_BANDS;
+      return `rgba(${c0.map((v, c) => Math.round(v + (c1[c] - v) * u))}, ${1 - u})`;
+    }));
+  }
+  const [left0] = P(-60, floor, 0), [left1] = P(-60, floor, far), [right0] = P(LAST_FRET + 60, floor, 0), [right1] = P(LAST_FRET + 60, floor, far);
+  const bandEdge = (i) => (i % FLOOR_BANDS ? Math.round((nearY + ((farY - nearY) * i) / FLOOR_BANDS) * B) / B : i ? farY : nearY);
+  const sides = (y) => [left0 + ((left1 - left0) * (y - nearY)) / (farY - nearY), right0 + ((right1 - right0) * (y - nearY)) / (farY - nearY)];
+  floorBands.get(t).forEach((color, i) => {
+    const bottom = bandEdge(i), top = bandEdge(i + 1), [l0, r0] = sides(bottom), [l1, r1] = sides(top);
+    if (top >= bottom) return;
+    g.fillStyle = color;
+    if (Math.max(l0, l1) <= 0 && Math.min(r0, r1) >= W) return g.fillRect(0, top, W, bottom - top);
+    g.beginPath(); // the floor's edges show: follow them
+    [[l0, bottom], [r0, bottom], [r1, top], [l1, top]].forEach(([x, y]) => g.lineTo(x, y));
+    g.fill();
+  });
   g.strokeStyle = fade(t.lane, 0.5, 0.04);
   g.lineWidth = t.laneW;
   for (let w = 0; w <= LAST_FRET; w++) line3([w, floor, 0], [w, floor, far]);
@@ -417,7 +447,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   for (const { dt, texts, pins } of moments.values()) { // right-aligned against the line at the depth of their bar, in perspective
     const [px, py, k] = P(markLine, floor, Z(dt)), scale = Math.sqrt(k * k0), size = 0.3 * scale, text = texts.join('  ·  '), space = 0.25 * scale;
     g.font = `700 ${size}px ${t.num}`;
-    const textWidth = text ? g.measureText(text).width : 0, width = textWidth + pins.length * (0.9 * scale + space);
+    const textWidth = text ? g.measureText(text).width : 0, width = textWidth + pins.length * (0.9 * scale + space); // measured at its own size: a long line of text, right-aligned, would jump at quarter pixels (see fontSize)
     let right = Math.max(px - 0.3 * scale, 16 + width); // a little padding from the line, kept on screen
     g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4);
     g.lineWidth = size * 0.2;
@@ -614,7 +644,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
     glow(t.glow, color(s), 3);
     g.strokeStyle = alpha(color(s), 0.9);
     g.lineWidth = width;
-    stringPath(s);
+    stringPath(s, 0, true); // the neck and the headstock stroked apart: a glow is blurred over the box around its path, and the box around both is most of the screen
+    g.stroke();
+    path([ends ? ends[s] : [-0.6, ys(s), 0], [0, ys(s), 0]], false);
     g.stroke();
     glow(false);
     g.strokeStyle = 'rgba(255, 255, 255, 0.25)'; // the light catching the string
@@ -1072,7 +1104,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.beginPath();
       g.arc(sx, cy, r, 0, Math.PI * 2);
       g.stroke();
-      g.font = `700 ${0.15 * k}px ${t.num}`;
+      g.font = `700 ${fontSize(0.15 * k)}px ${t.num}`;
       g.textAlign = 'center';
       g.fillText(String(n - note.string), sx, cy);
     }
@@ -1084,7 +1116,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.textAlign = 'center';
     const write = (word, size, style = '700') => {
       if (size * k < 2) return; // below a pixel or two it is only noise
-      g.font = `${style} ${size * k}px ${t.num}`;
+      g.font = `${style} ${fontSize(size * k)}px ${t.num}`;
       g.fillText(word, cx, above);
       above -= (size + 0.04) * k;
     };
@@ -1099,7 +1131,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       };
       if (!pre || !release) stack(-1); // a pre-bend that is let down only needs the way down
       if (release) stack(1);
-      g.font = `700 ${0.22 * k}px ${t.num}`;
+      g.font = `700 ${fontSize(0.22 * k)}px ${t.num}`;
       g.textAlign = 'left';
       g.fillStyle = ink;
       g.fillText(`${pre ? 'pre ' : ''}${bendLabel(peak)}`, cx + w + 0.08 * k, (cy - hh * k + top) / 2);
@@ -1217,10 +1249,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
   lap('targets');
 
-  // Fret numbers under the board: the hand position in the accent colour, the inlay frets bold
+  // Fret numbers under the board: the hand position in the accent colour, the inlay frets bold. Nothing is behind them to
+  // need a halo, and outlined text is slow to draw
   for (let f = 1; f <= LAST_FRET; f++) {
     const on = f >= here.fret && f < here.fret + here.width, inlay = INLAYS.includes(f);
-    label(String(f), f - 0.5, boardLo - 0.3, 0, on ? 0.3 : inlay ? 0.26 : 0.2, on ? t.accent : inlay ? t.inlay : t.numOff, on || inlay ? 800 : 500);
+    label(String(f), f - 0.5, boardLo - 0.3, 0, on ? 0.3 : inlay ? 0.26 : 0.2, on ? t.accent : inlay ? t.inlay : t.numOff, on || inlay ? 800 : 500, 'center', false);
   }
 
   // The chord name, big, always to the right of the hand position: the chord sounding now, for as long as it sounds,
@@ -1234,7 +1267,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.globalAlpha = current ? 1 : Math.max(0.35, 1 - (named.time - now) / 1.2);
     g.fillStyle = t.text;
     g.textAlign = 'left';
-    g.fillText(named.name, Math.min(rx, W - 24 - g.measureText(named.name).width), ly); // kept on screen at the top of the neck
+    g.fillText(named.name, Math.min(rx, W - 24 - measure(g, named.name).width), ly); // kept on screen at the top of the neck
     g.globalAlpha = 1;
   }
   lap('labels');
