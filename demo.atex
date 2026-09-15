@@ -1,0 +1,109 @@
+// Fretfall's demo: an original practice piece, so there's something to play before you open a file. About two
+// minutes, and it uses every notation the highway draws: mutes, repeats, slides (legato, shift, in and out), hammer-ons
+// and pull-offs, bends (pre-bend, release), whammy bar, vibrato (wide too), ties, let ring, tremolo picking, tapping with
+// either hand, every harmonic type, accents, staccato, ghost and grace notes, trills and ornaments, dynamics and
+// hairpins, fades, wah, fermata, ottava, pick strokes, picking-hand fingers, strums and rolled chords, barres, slap, pop,
+// golpe, rasgueado, string numbers, free text, lyrics, and at the bar lines: repeats with endings, segno and coda, key,
+// tempo, meter and feel. Written in alphaTex, alphaTab's text format. Lyrics go on beats as
+// {lyrics "syllable"}: a "-" at the end joins a syllable to the next, a "+" ends the line.
+\title "Fretfall Demo"
+\subtitle "Original practice piece"
+\tempo 100
+.
+\track "Guitar"
+\staff {tabs}
+\instrument distortionguitar
+\section "Chugs" \ro :8 (0.6{pm} 2.5{pm}){ch "E5" lyrics "Plug"} (0.6{pm} 2.5{pm}){lyrics "it"} (0.6{pm} 2.5{pm}){lyrics "in"} (0.6{pm} 2.5{pm}){lyrics "and"} (3.6{sl} 5.5{sl}){ch "G5" lyrics "turn"} (5.6{ac} 7.5{ac}){ch "A5" lyrics "it"} (x.6 x.5){lyrics "up+"} (x.6 x.5) |
+\rc 2 :8 0.6{pm lyrics "watch"} 0.6{pm lyrics "the"} 0.6{pm lyrics "high-"} 0.6{pm lyrics "way"} (7.6{hac} 9.5{hac}){ch "B5" lyrics "come"} (7.6 9.5){lyrics "a-"} (5.5{pm} 7.4{pm}){ch "D5" lyrics "live+"} (5.5{pm} 7.4{pm}) |
+:16 0.6{pm} 0.6{pm} :8 0.6{pm} :16 0.6{pm} 0.6{pm} :8 0.6{pm} :4 (5.6 7.5 7.4){ch "A5" lyrics "Rea-"} (5.6 7.5 7.4){lyrics "dy,"} |
+:8 (x.6 x.5 x.4) (x.6 x.5 x.4) :4 (3.6 5.5 5.4){ch "G5" lyrics "set,"} :2 (5.6 7.5 7.4){ch "A5" lyrics "go!+"} |
+\section "Riff" :16 5.6{h lf 2} 7.6{lf 4} 5.5{h lf 2} 7.5{lf 4} 7.4{h lf 4} 5.4{lf 2} 7.4{h lf 4} 5.4{lf 2} :8 7.3{sl lf 4} 9.3{lf 5} 7.4{lf 3} 5.4{lf 2} |
+:8 5.3{ss lf 2} 12.3{lf 2} :16 12.2{h lf 2} 15.2{lf 5} 12.1{h lf 2} 15.1{lf 5} 15.1{h lf 5} 12.1{lf 2} 14.2{h lf 4} 12.2{lf 2} :4 14.3{lf 4} |
+\section "Lead" :4 14.3{b (0 4) lf 4} 14.3{b (0 2) lf 4} :8 12.2{lf 2} 15.2{b (0 4 4 0) lf 5} :4 14.2{v lf 4} |
+:2 17.1{v lf 4} :4 -.1 12.1{tp 16 lf 2} |
+:16 19.1{tt h} 12.1{h} 15.1{h} 12.1 19.1{tt h} 12.1{h} 15.1{h} 12.1 19.2{tt h} 12.2{h} 15.2{h} 12.2 19.2{tt h} 12.2{h} 15.2{h} 12.2 |
+\section "Harmonics" :4 (12.3{nh} 12.2{nh} 12.1{nh}) 7.3{nh} :8 5.2{nh} 5.1{nh} :4 5.3{ph lf 2} |
+\section "Chords" :2 (3.6 2.5 0.4 0.3 0.2 3.1){ch "G" lyrics "Watch"} (0.5 2.4 2.3 1.2 0.1){ch "Am" lyrics "the"} |
+:2 (3.5 2.4 0.3 1.2 0.1){ch "C" lyrics "notes"} (0.4 2.3 3.2 2.1){ch "D" lyrics "fall+"} |
+:4 (1.6{lf 2} 3.5{lf 4} 3.4{lf 5} 2.3{lf 3} 1.2{lf 2} 1.1{lf 2}){ch "F" lyrics "Play"} (1.6 3.5 3.4 2.3 1.2 1.1){lyrics "them"} (1.6 3.5 3.4 2.3 1.2 1.1){lyrics "on"} (1.6 3.5 3.4 2.3 1.2 1.1){lyrics "time+"} |
+:8 (2.5 4.4 4.3 3.2 2.1){ch "Bm" lyrics "let"} (2.5 4.4 4.3 3.2 2.1){lyrics "the"} (2.5 4.4 4.3 3.2 2.1){lyrics "strings"} (2.5 4.4 4.3 3.2 2.1){lyrics "ring"} :2 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E" lyrics "out+"} |
+\section "Double stops" :8 (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (4.3{sl} 5.2{sl}) (6.3 7.2) :4 (8.3 10.2) |
+:16 (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) (6.3 7.2) :8 (4.3 5.2) (4.3 5.2) :4 (6.3 7.2) |
+\ts 3 4 \tempo 120 \section "Waltz" :4 0.5{lyrics "Waltz"} (2.4 2.3 1.2){ch "Am" lyrics "a-"} (2.4 2.3 1.2){lyrics "long"} |
+:4 3.6{lyrics "in"} (0.4 0.3 3.1){ch "G" lyrics "three,+"} (0.4 0.3 3.1){lyrics "and"} |
+:4 0.4{lyrics "round"} (2.3 3.2 2.1){ch "D" lyrics "and"} (2.3 3.2 2.1){lyrics "round+"} |
+\ts 4 4 \tempo 100 \section "Solo" :8 12.3{h lf 2} 14.3{lf 4} 12.2{lf 2} 15.2{b (0 4) lf 5} 15.2{lf 5} 12.2{lf 2} 14.3{lf 4} 12.3{lf 2} |
+:16 17.1{sl lf 3} 19.1{lf 5} 17.1{h lf 3} 15.1{lf 2} 17.2{h lf 4} 15.2{lf 2} 16.3{h lf 3} 14.3{lf 2} :4 17.2{b (0 4) v lf 4} 15.1{v lf 2} |
+:4 12.2{tp 32 lf 2} 12.2{tp 32 lf 2} :2 7.3{ph v lf 2} |
+\section "Articulation" :4 5.3{ac dy p} 7.3{hac} 5.3{ten st} 7.3{g} |
+:8 5.2{cre} 7.2{cre} 8.2{cre} 10.2{cre} :4 12.2{dy ff} 10.2{dec} |
+:2 (3.6{lr} 2.5{lr} 0.4{lr}){ch "G"} :4 0.3{lr} 0.2{lr dy mf} |
+\section "Slides and harmonics" :4 7.3{sib} 9.3{sou} 7.2{sia} 5.2{sod} |
+:4 12.3{ah} 7.2{th} 5.3{sh} 7.4{fh} |
+\section "Bends and whammy" :4 7.3{b (4 4 0)} 7.3{b (0 4 4 0)} 0.6{tb (0 -4 0)} 0.6{tb (0 -8)} |
+\section "Ornaments" :4 5.2{tr 7 16} 5.2{turn} 5.2{iturn} 5.2{umordent} |
+:4 3.3{gr} 5.3 5.3{lmordent} :2 7.3{vw} |
+\section "Picking" :8 5.4{sd rf 2} 7.4{su rf 3} 5.3{sd rf 2} 7.3{su rf 3} 5.2{sd rf 4} 7.2{su rf 3} 5.1{sd rf 5} 7.1{su rf 1} |
+:4 (0.6 2.5 2.4 1.3 0.2 0.1){bd ch "E"} (0.6 2.5 2.4 1.3 0.2 0.1){bu} (0.6 2.5 2.4 1.3 0.2 0.1){ad} (0.6 2.5 2.4 1.3 0.2 0.1){au} |
+\section "Barres" :2 (5.6 7.5 7.4 6.3 5.2 5.1){barre 5 full ch "A"} (7.5 9.4 9.3 8.2 7.1){barre 7 half ch "E/B"} |
+\section "Percussive" :8 0.4{s} 0.3{p} 5.4{s} 7.3{p} :4 0.6{glpt} 0.6{glpf} |
+:4 (0.6 2.5 2.4 1.3 0.2 0.1){rasg amii ch "E"} 12.1{lht} 15.1{tt} 12.1{string} |
+\section "Colour" :4 5.3{f} 7.3{vs} 5.3{fo} 7.3{waho} |
+:4 5.3{wahc} 7.3{fermata medium} 12.2{ot 8va} 12.2{ot regular} |
+:4 3.5{txt "pizz."} 3.5 3.5{txt "bass stop"} r |
+\ks g \tf triplet8th \jump segno \section "Swing" \ro :8 3.6{lyrics "Swing"} 5.6{lyrics "it,"} 3.6{lyrics "swing"} 5.6{lyrics "it,"} 7.6{lyrics "let"} 5.6{lyrics "the"} 3.6{lyrics "notes"} 5.6{lyrics "roll+"} |
+\ae 1 \rc 2 :4 (3.6 5.5 5.4){ch "G5" lyrics "Once"} (5.6 7.5 7.4){ch "A5" lyrics "a-"} :2 (7.6 9.5 9.4){ch "B5" lyrics "gain+"} |
+\ae 2 \tf none \ks c \jump coda :4 (8.6 10.5 10.4){ch "C5" lyrics "Take"} (10.6 12.5 12.4){ch "D5" lyrics "it"} :2 (0.6 2.5 2.4){ch "E5" lyrics "home+"} |
+\section "Outro" :8 0.6{pm} x.6 0.6{pm} x.6 (0.6{ac} 2.5{ac} 2.4{ac}){ch "E5"} (x.6 x.5 x.4) (3.6 5.5){ch "G5"} (x.6 x.5) |
+:8 0.6{pm} 0.6{pm} 0.6{pm} 0.6{pm} :4 (5.6{ac} 7.5{ac}){ch "A5" lyrics "That's"} (7.6{hac} 9.5{hac}){ch "B5" lyrics "a"} |
+:1 (0.6 2.5 2.4 1.3 0.2 0.1){ch "E" lyrics "wrap+"} |
+:2 (-.6 -.5 -.4 -.3 -.2 -.1) r |
+\track "Bass"
+\staff {tabs}
+\tuning (G2 D2 A1 E1)
+\instrument electricbassfinger
+\ro :8 0.4 0.4 0.4 0.4 3.4 3.4 5.4 5.4 |
+\rc 2 :8 0.4 0.4 0.4 0.4 7.4 7.4 5.3 5.3 |
+:16 0.4 0.4 :8 0.4 :16 0.4 0.4 :8 0.4 :4 5.4 5.4 |
+:4 r 3.4 :2 5.4 |
+:8 5.4 5.4 5.4 5.4 7.4 7.4 5.4 5.4 |
+:4 5.4 3.4 2.3 0.3 |
+:2 7.3 7.3 |
+:1 0.4 |
+:4 0.4 0.4 0.4 0.4 |
+:1 r |
+:2 3.4 0.3 |
+:2 3.3 0.2 |
+:4 1.4 1.4 1.4 1.4 |
+:2 2.3 0.4 |
+:4 3.4 3.4 5.4 5.4 |
+:4 3.4 3.4 5.4 5.4 |
+\ts 3 4 :4 0.3 r r |
+:4 3.4 r r |
+:4 0.2 r r |
+\ts 4 4 :2 0.4 0.4 |
+:2 5.4 7.4 |
+:2 0.4 5.3 |
+:2 0.3 0.3 |
+:2 0.2 5.3 |
+:1 3.4 |
+:2 0.3 0.2 |
+:1 0.3 |
+:2 0.4 0.4 |
+:1 0.2 |
+:1 0.3 |
+:2 0.4 0.4 |
+:1 0.4 |
+:2 5.4 7.4 |
+:8 0.4{s} 0.4{p} 0.4{s} 0.4{p} :2 0.4 |
+:1 0.4 |
+:1 0.3 |
+:1 0.3 |
+:1 r |
+\ro :8 3.4 3.4 5.4 5.4 7.4 7.4 5.4 5.4 |
+\ae 1 \rc 2 :4 3.4 5.4 :2 7.4 |
+\ae 2 :4 8.4 10.4 :2 0.4 |
+:8 0.4 0.4 0.4 0.4 0.4 0.4 3.4 3.4 |
+:8 0.4 0.4 0.4 0.4 :4 5.4 7.4 |
+:1 0.4 |
+:2 -.4 r |

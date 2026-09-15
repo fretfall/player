@@ -98,3 +98,21 @@ function barreOf({ frets = [], fingers = [] }) {
   const [key, strings] = Object.entries(held).sort((a, b) => b[1].length - a[1].length)[0] ?? [];
   return strings?.length >= 3 ? { fret: +key.split(':')[1], from: Math.min(...strings), to: Math.max(...strings) } : null;
 }
+
+// Lyrics in two rows, karaoke style. lines: [{ time, end, syllables: [{ time, text }] }] in order, a syllable that ends a
+// word ending in a space. Returns the lines on the top and bottom rows and the line being sung, as indexes (-1: none).
+// A line shows from half a second before it starts until 1.5 s after it ends, and the line after it from 8 s ahead. A
+// line that follows straight on is sung on the bottom row, under the one before, until `holdWords` of its words have
+// lit up (fewer on a short line); then the rows move up and the next line comes in under it.
+export function lyricsShown(lines, t, holdWords = 3) {
+  const li = lines.findLastIndex((l) => l.time <= t + 0.5), soon = (i) => (lines[i]?.time ?? Infinity) - t < 8;
+  if (li < 0 || t >= lines[li].end + 1.5) {
+    const top = soon(li + 1) ? li + 1 : -1;
+    return { top, bottom: top >= 0 && soon(top + 1) ? top + 1 : -1, active: -1 };
+  }
+  const words = (syllables) => syllables.filter((s) => s.text.endsWith(' ')).length, { syllables } = lines[li];
+  const follows = li > 0 && lines[li].time - 0.5 < lines[li - 1].end + 1.5; // the line before was still up when this one came
+  const hold = follows && words(syllables.filter((s) => s.time <= t)) < Math.max(1, Math.min(holdWords, words(syllables) - 1));
+  const top = hold ? li - 1 : li;
+  return { top, bottom: top + 1 === li || soon(top + 1) ? top + 1 : -1, active: li };
+}
