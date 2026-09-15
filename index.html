@@ -2433,7 +2433,7 @@
                     y = (v) => (28 - v * 12).toFixed(1),
                     d = (points) =>
                         `M${points.map(([u, v]) => `${x(u)} ${y(v)}`).join("L")}`;
-                return `<svg class="headstock" viewBox="24 -2 98 60" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
+                return `<svg class="headstock" viewBox="8 -2 114 60" preserveAspectRatio="xMinYMid meet" aria-hidden="true" fill="currentColor" stroke="currentColor">${[
                     ...keys.map(
                         ({ u, side, edge }) =>
                             `<ellipse cx="${x(u)}" cy="${y(edge + side * 0.36)}" rx="1.5" ry="2.6" fill-opacity=".35" stroke="none"/>`,

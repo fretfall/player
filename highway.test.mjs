@@ -54,6 +54,8 @@ const context = new Proxy({
   createLinearGradient: () => ({ addColorStop() {} }), createRadialGradient: () => ({ addColorStop() {} }),
 }, { get: (target, key) => (key in target ? target[key] : () => {}) });
 globalThis.devicePixelRatio = 2;
+globalThis.OffscreenCanvas = class { getContext() { return context; } }; // the floor's strip of colour bands
+globalThis.Path2D = class { moveTo() {} lineTo() {} }; // the tab's beat lines, gathered into one path
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
 const { arrangement } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>20</songLength>
   <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
@@ -78,10 +80,10 @@ for (const headstock of Object.keys(HEADSTOCKS))
 
 // A vibrato trail running into a chord ends at the bottom of the chord's note lying across it on the string below, not over it
 const trailTop = (string) => { // the top of the wavy spine on screen, the chord's fret 7 note on this string
-  let points = [], closed = false, top = Infinity;
+  let points = [], moves = 0, closed = false, top = Infinity; // a trail's spine: one open line of many points (lanes and beat lines are many short ones in a path)
   const recorder = new Proxy({
-    beginPath: () => { points = []; closed = false; }, moveTo: (x, y) => points.push(y), lineTo: (x, y) => points.push(y), closePath: () => { closed = true; },
-    stroke: () => { if (!closed && points.length > 12) top = Math.min(top, ...points); },
+    beginPath: () => { points = []; moves = 0; closed = false; }, moveTo: (x, y) => { points.push(y); moves++; }, lineTo: (x, y) => points.push(y), closePath: () => { closed = true; },
+    stroke: () => { if (!closed && moves === 1 && points.length > 12) top = Math.min(top, ...points); },
   }, { get: (target, key) => (key in target ? target[key] : context[key]) });
   const { arrangement: vibrato } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>10</songLength>
     <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
@@ -100,10 +102,10 @@ const { arrangement: sliding } = parseArrangement(`<song><arrangement>Rhythm</ar
   <levels><level difficulty="0"><notes><note time="5" string="0" fret="12" sustain="0.22" slideUnpitchTo="4" /></notes>
   <chords><chord time="5.26" chordId="0"><chordNote time="5.26" string="0" fret="4" /><chordNote time="5.26" string="1" fret="6" /></chord></chords>
   <anchors><anchor time="0" fret="2" width="4" /><anchor time="5.26" fret="4" width="4" /></anchors></level></levels></song>`);
-let spines = 0, points = 0, closed = false;
+let spines = 0, points = 0, moves = 0, closed = false;
 const spineCounter = new Proxy({
-  beginPath: () => { points = 0; closed = false; }, moveTo: () => points++, lineTo: () => points++, closePath: () => { closed = true; },
-  stroke: () => { if (!closed && points > 12) spines++; },
+  beginPath: () => { points = 0; moves = 0; closed = false; }, moveTo: () => { points++; moves++; }, lineTo: () => points++, closePath: () => { closed = true; },
+  stroke: () => { if (!closed && moves === 1 && points > 12) spines++; },
 }, { get: (target, key) => (key in target ? target[key] : context[key]) });
 const trailFrames = [], slideCam = {};
 for (let now = 1.5; now < 4.9; now += 1 / 30) {
