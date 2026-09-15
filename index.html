@@ -595,7 +595,7 @@
                 right: 32px;
                 top: 66px;
                 z-index: 2;
-                width: min(352px, calc(100vw - 32px));
+                width: min(400px, calc(100vw - 32px));
                 max-height: calc(100vh - 118px); /* clear of the tools */
                 display: flex;
                 flex-direction: column;
@@ -634,7 +634,7 @@
             }
             .tabs {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(5, 1fr);
                 gap: 2px;
                 margin: 0 14px;
                 padding: 3px;
@@ -681,6 +681,11 @@
                 display: grid;
                 gap: 8px;
             }
+            .pair {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+                gap: 18px 20px;
+            } /* two related sliders side by side, one above the other when narrow */
             .setting-head {
                 display: flex;
                 align-items: baseline;
@@ -1397,7 +1402,7 @@
                             <circle cx="13.5" cy="6" r="2" />
                             <circle cx="7.5" cy="14" r="2" />
                         </svg>
-                        <span class="tip" role="tooltip" id="settingsTip"><b>Settings <kbd>S</kbd></b>How the highway looks and moves, the strings' colours and order, and the audio delay</span>
+                        <span class="tip" role="tooltip" id="settingsTip"><b>Settings <kbd>S</kbd></b>The view of the highway and what shows on it, the strings' colours and order, and the audio delay</span>
                     </button>
                     <button
                         class="icon"
@@ -1584,6 +1589,14 @@
             <div class="tabs" role="tablist" aria-label="Settings sections">
                 <button
                     role="tab"
+                    id="tab-view"
+                    aria-controls="pane-view"
+                    data-tab="view"
+                >
+                    View
+                </button>
+                <button
+                    role="tab"
                     id="tab-highway"
                     aria-controls="pane-highway"
                     data-tab="highway"
@@ -1618,102 +1631,143 @@
 
             <section
                 class="pane"
-                id="pane-highway"
+                id="pane-view"
                 role="tabpanel"
-                aria-labelledby="tab-highway"
+                aria-labelledby="tab-view"
             >
-                <h3>View</h3>
-                <div class="setting">
-                    <div class="setting-head">
-                        <label for="viewAngle">View angle</label
-                        ><output id="viewAngleOut" for="viewAngle"></output>
+                <h3>Camera</h3>
+                <div class="pair">
+                    <div class="setting">
+                        <div class="setting-head">
+                            <label for="viewAngle">View angle</label
+                            ><output id="viewAngleOut" for="viewAngle"></output>
+                        </div>
+                        <input
+                            id="viewAngle"
+                            type="range"
+                            min="10"
+                            max="65"
+                            step="1"
+                        />
+                        <div class="scale" aria-hidden="true">
+                            <span>Flat</span><span>Top-down</span>
+                        </div>
                     </div>
-                    <input
-                        id="viewAngle"
-                        type="range"
-                        min="10"
-                        max="65"
-                        step="1"
-                    />
-                    <div class="scale" aria-hidden="true">
-                        <span>Flat</span><span>Top-down</span>
-                    </div>
-                </div>
-                <div class="setting">
-                    <div class="setting-head">
-                        <label for="noteSpeed">Note speed</label
-                        ><output id="noteSpeedOut" for="noteSpeed"></output>
-                    </div>
-                    <input
-                        id="noteSpeed"
-                        type="range"
-                        min="0.25"
-                        max="2"
-                        step="0.05"
-                    />
-                    <div class="scale" aria-hidden="true">
-                        <span>Close together</span><span>Far apart</span>
-                    </div>
-                </div>
-                <div class="setting">
-                    <div class="setting-head">
-                        <label for="drawDistance">Drawing distance</label
-                        ><output
-                            id="drawDistanceOut"
-                            for="drawDistance"
-                        ></output>
-                    </div>
-                    <input
-                        id="drawDistance"
-                        type="range"
-                        min="0.2"
-                        max="2"
-                        step="0.05"
-                    />
-                    <div class="scale" aria-hidden="true">
-                        <span>Near</span><span>Far</span>
+                    <div
+                        class="setting"
+                        title="Look at the highway from one side: it runs off that way, and the frets on that side come closer"
+                    >
+                        <div class="setting-head">
+                            <label for="sideAngle">Side angle</label
+                            ><output id="sideAngleOut" for="sideAngle"></output>
+                        </div>
+                        <input
+                            id="sideAngle"
+                            type="range"
+                            min="-20"
+                            max="20"
+                            step="1"
+                        />
+                        <div class="scale" aria-hidden="true">
+                            <span>Left</span><span>Right</span>
+                        </div>
                     </div>
                 </div>
-                <div
-                    class="setting"
-                    title="How wide each fret is on screen. The strings keep their spacing, and your hand position always stays in view"
-                >
-                    <div class="setting-head">
-                        <label for="fretWidth">Fret width</label
-                        ><output id="fretWidthOut" for="fretWidth"></output>
+                <h3>Neck</h3>
+                <div class="pair">
+                    <div
+                        class="setting"
+                        title="How wide each fret is on screen. The strings keep their spacing, and your hand position always stays in view"
+                    >
+                        <div class="setting-head">
+                            <label for="fretWidth">Fret width</label
+                            ><output id="fretWidthOut" for="fretWidth"></output>
+                        </div>
+                        <input
+                            id="fretWidth"
+                            type="range"
+                            min="0.5"
+                            max="2"
+                            step="0.05"
+                        />
+                        <div class="scale" aria-hidden="true">
+                            <span>More of the neck</span><span>Bigger frets</span>
+                        </div>
                     </div>
-                    <input
-                        id="fretWidth"
-                        type="range"
-                        min="0.5"
-                        max="2"
-                        step="0.05"
-                    />
-                    <div class="scale" aria-hidden="true">
-                        <span>More of the neck</span><span>Bigger frets</span>
+                    <div
+                        class="setting"
+                        title="How far apart the strings are. The notes grow with them, and the fret numbers stay where they are"
+                    >
+                        <div class="setting-head">
+                            <label for="boardHeight">Fretboard height</label
+                            ><output
+                                id="boardHeightOut"
+                                for="boardHeight"
+                            ></output>
+                        </div>
+                        <input
+                            id="boardHeight"
+                            type="range"
+                            min="0.5"
+                            max="2"
+                            step="0.05"
+                        />
+                        <div class="scale" aria-hidden="true">
+                            <span>Strings closer</span><span>Strings apart</span>
+                        </div>
                     </div>
                 </div>
-                <div
-                    class="setting"
-                    title="How far apart the strings are. The notes grow with them, and the fret numbers stay where they are"
-                >
-                    <div class="setting-head">
-                        <label for="boardHeight">Fretboard height</label
-                        ><output id="boardHeightOut" for="boardHeight"></output>
+                <h3>Notes</h3>
+                <div class="pair">
+                    <div class="setting">
+                        <div class="setting-head">
+                            <label for="noteSpeed">Note speed</label
+                            ><output id="noteSpeedOut" for="noteSpeed"></output>
+                        </div>
+                        <input
+                            id="noteSpeed"
+                            type="range"
+                            min="0.25"
+                            max="2"
+                            step="0.05"
+                        />
+                        <div class="scale" aria-hidden="true">
+                            <span>Close together</span><span>Far apart</span>
+                        </div>
                     </div>
-                    <input
-                        id="boardHeight"
-                        type="range"
-                        min="0.5"
-                        max="2"
-                        step="0.05"
-                    />
-                    <div class="scale" aria-hidden="true">
-                        <span>Strings closer</span><span>Strings apart</span>
+                    <div
+                        class="setting"
+                        title="How far down the highway notes show up. Shown as the seconds of notes in view, which faster notes also shorten"
+                    >
+                        <div class="setting-head">
+                            <label for="drawDistance">Drawing distance</label
+                            ><output
+                                id="drawDistanceOut"
+                                for="drawDistance"
+                            ></output>
+                        </div>
+                        <input
+                            id="drawDistance"
+                            type="range"
+                            min="0.2"
+                            max="2"
+                            step="0.05"
+                        />
+                        <div class="scale" aria-hidden="true">
+                            <span>Near</span><span>Far</span>
+                        </div>
                     </div>
                 </div>
                 <button class="text-button" id="resetView">Reset view</button>
-                <h3>On the highway</h3>
+            </section>
+
+            <section
+                class="pane"
+                id="pane-highway"
+                role="tabpanel"
+                aria-labelledby="tab-highway"
+                hidden
+            >
                 <div class="setting">
                     <div class="setting-head">
                         <span id="framesLabel">Chord frames</span>
@@ -2017,6 +2071,7 @@
             const VIEW_DEFAULTS = 5; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords
             const VIEW_START = {
                 viewAngle: 30,
+                sideAngle: 0,
                 noteSpeed: 1,
                 drawDistance: 1,
                 fretWidth: 1,
@@ -2038,7 +2093,7 @@
                 guides: true,
                 ...VIEW_START,
                 viewDefaults: VIEW_DEFAULTS,
-                panel: "highway",
+                panel: "view",
             };
             try {
                 const saved = JSON.parse(
@@ -2081,6 +2136,7 @@
                     stringOrder: settings.stringOrder,
                     headstock: settings.headstock,
                     viewAngle: settings.viewAngle,
+                    sideAngle: settings.sideAngle,
                     noteSpeed: settings.noteSpeed,
                     drawDistance: settings.drawDistance,
                     fretWidth: settings.fretWidth,
@@ -2230,9 +2286,10 @@
             // The view sliders change the highway straight away, without reloading the theme's fonts
             const VIEW = {
                 viewAngle: (v) => `${v}°`,
+                sideAngle: (v) =>
+                    v ? `${Math.abs(v)}° ${v < 0 ? "left" : "right"}` : "Straight",
                 noteSpeed: (v) => `${Math.round(v * 100)}%`,
-                drawDistance: (v) =>
-                    `${Math.round(v * 100)}% · ${lookAhead(settings).toFixed(1)} s ahead`,
+                drawDistance: () => `${lookAhead(settings).toFixed(1)} s`,
                 fretWidth: (v) => `${Math.round(v * 100)}%`,
                 boardHeight: (v) => `${Math.round(v * 100)}%`,
             };
@@ -2353,7 +2410,7 @@
             showPanel(
                 document.querySelector(`[data-tab="${settings.panel}"]`)
                     ? settings.panel
-                    : "highway",
+                    : "view",
             );
             // Settings and the notation legend open as sheets from the header, one at a time
             const SHEETS = {

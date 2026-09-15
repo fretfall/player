@@ -327,23 +327,28 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Camera just behind and above the strike line, looking far down the highway, as in Tabizera: notes come up
   // out of the distance and the lanes run to a vanishing point under the header. The view angle swings it around
-  // the strike line, lower for a flatter view, higher to look down on the highway (45°: behind and above equally).
+  // the strike line, lower for a flatter view, higher to look down on the highway (45°: behind and above equally). The
+  // side angle swings it around sideways too: from the left the highway runs off to the left, and the low frets come closer.
   // The lens is shifted so the strings sit in the same place on screen however far the camera zooms out, aimed at the
   // middle of a board of standard height: a taller board grows upwards and the fret numbers under it stay put
   const span = cam.span, focus = [cam.center, (spacing * (n - 1)) / 2, 0], angle = ((t.viewAngle ?? 30) * Math.PI) / 180, reach = 0.6 * Math.SQRT2 * span;
-  const eye = [focus[0], stack + reach * Math.sin(angle), -reach * Math.cos(angle)];
-  const fwd = unit(sub([focus[0], 0, 2.2 * span], eye)), right = unit(cross([0, 1, 0], fwd)), up = cross(fwd, right);
+  const straight = [focus[0], stack + reach * Math.sin(angle), -reach * Math.cos(angle)], ahead = unit(sub([focus[0], 0, 2.2 * span], straight)), up = cross(ahead, [1, 0, 0]);
+  const side = ((t.sideAngle ?? 0) * Math.PI) / 180, [ss, cs] = [Math.sin(side), Math.cos(side)], rel = sub(straight, focus), behind = dot(rel, ahead), above = dot(rel, up);
+  const fwd = [-ss, ahead[1] * cs, ahead[2] * cs], right = [cs, ahead[1] * ss, ahead[2] * ss]; // swung around the camera's up
+  const eye = [focus[0] + above * up[0] + behind * fwd[0], focus[1] + above * up[1] + behind * fwd[1], above * up[2] + behind * fwd[2]];
   const budget = Math.min(W * 0.88, VH * (t.fill ? 1.3 : 1.05)), focal = (budget * dot(sub(focus, eye), fwd)) / span; // wide screens show more neck, not bigger frets
-  // The fret width setting stretches the neck sideways around the camera: wider frets, strings and depth as they are. The
-  // camera never looks sideways, so this only moves things across the screen. Capped so the framed hand positions fit
+  // The fret width setting stretches the picture across the screen: wider frets, strings and depth as they are, however the
+  // camera is swung. Capped so the framed hand positions fit
   const stretch = Math.min(FRET_WIDTH * (t.fretWidth ?? 1), (W * span) / (budget * Math.max(1, span - 2.5)));
   let shiftX = 0, shiftY = 0;
   const P = (x, y, z) => { // → [screen x, screen y, pixels per world unit there (across the neck, times stretch)]
-    const d = [(x - eye[0]) * stretch, y - eye[1], z - eye[2]], k = focal / Math.max(0.05, dot(d, fwd));
-    return [W / 2 + dot(d, right) * k + shiftX, VH / 2 - dot(d, up) * k + shiftY, k];
+    const d = [x - eye[0], y - eye[1], z - eye[2]], k = focal / Math.max(0.05, dot(d, fwd));
+    return [W / 2 + dot(d, right) * stretch * k + shiftX, VH / 2 - dot(d, up) * k + shiftY, k];
   };
   const [fx, fy, k0] = P(...focus);
   [shiftX, shiftY] = [W / 2 - fx, VH * (t.fill ? 0.83 : 0.81) - fy]; // the board low on screen, the highway's far end under the header (t.fill: no header, so bigger and up to near the top)
+  const [, yl] = P(cam.center - span / 2, floor, 0), [, yr] = P(cam.center + span / 2, floor, 0), [, yc] = P(cam.center, floor, 0);
+  shiftY -= Math.min(VH * 0.08, Math.max(0, yl - yc, yr - yc)); // swung, the near end of the view comes down: lift it back toward where the middle was. The same lift at any zoom, so the board holds still
   lap('setup');
 
   const path = (points, close = true) => {
@@ -463,15 +468,25 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const [left0] = P(-60, floor, 0), [left1] = P(-60, floor, far), [right0] = P(LAST_FRET + 60, floor, 0), [right1] = P(LAST_FRET + 60, floor, far);
   const bandEdge = (i) => (i % FLOOR_BANDS ? Math.round((nearY + ((farY - nearY) * i) / FLOOR_BANDS) * B) / B : i ? farY : nearY);
   const sides = (y) => [left0 + ((left1 - left0) * (y - nearY)) / (farY - nearY), right0 + ((right1 - right0) * (y - nearY)) / (farY - nearY)];
+  if (side) { // swung, the strike line slants and the floor's far ends can be beside the camera: clip the bands to the floor in front of it
+    const edge = focus[0] + (1 - dot(sub([focus[0], floor, 0], eye), fwd)) / fwd[0]; // where the floor comes to a fret width in front
+    const [l, r] = fwd[0] > 0 ? [Math.max(-60, edge), LAST_FRET + 60] : [-60, Math.min(LAST_FRET + 60, edge)];
+    g.save();
+    path([[l, floor, 0], [r, floor, 0], [r, floor, far], [l, floor, far]]);
+    g.clip();
+    g.fillStyle = floorBands.get(t)[0];
+    g.fillRect(0, nearY, W, VH - nearY); // the strike line's near end, below the middle's
+  }
   floorBands.get(t).forEach((color, i) => {
     const bottom = bandEdge(i), top = bandEdge(i + 1), [l0, r0] = sides(bottom), [l1, r1] = sides(top);
     if (top >= bottom) return;
     g.fillStyle = color;
-    if (Math.max(l0, l1) <= 0 && Math.min(r0, r1) >= W) return g.fillRect(0, top, W, bottom - top);
+    if (side || (Math.max(l0, l1) <= 0 && Math.min(r0, r1) >= W)) return g.fillRect(0, top, W, bottom - top);
     g.beginPath(); // the floor's edges show: follow them
     [[l0, bottom], [r0, bottom], [r1, top], [l1, top]].forEach(([x, y]) => g.lineTo(x, y));
     fill();
   });
+  if (side) g.restore();
   g.strokeStyle = fade(t.lane, 0.5, 0.04);
   g.lineWidth = t.laneW;
   for (let w = 0; w <= LAST_FRET; w++) line3([w, floor, 0], [w, floor, far]);
@@ -1100,11 +1115,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 
       if (note.ghost) g.globalAlpha = faded * 0.5;
-      if (t.gem === 'pill') {
-        const [lx, ly] = P(x - hw, y + hh, z), [rx, ry] = P(x + hw, y - hh, z);
+      if (t.gem === 'pill') { // a capsule along its string, which slants when the camera is swung to a side
+        const [lx, ly] = P(x - hw, y, z), [rx, ry] = P(x + hw, y, z), [, top] = P(x, y + hh, z), [, bottom] = P(x, y - hh, z);
+        const along = Math.atan2(ry - ly, rx - lx), r = Math.min(Math.abs(bottom - top), Math.hypot(rx - lx, ry - ly)) / 2, [dx, dy] = [r * Math.cos(along), r * Math.sin(along)];
         g.fillStyle = c;
         g.beginPath();
-        g.roundRect(lx, ly, rx - lx, ry - ly, (ry - ly) / 2);
+        g.arc(lx + dx, ly + dy, r, along + Math.PI / 2, along + Math.PI * 1.5);
+        g.arc(rx - dx, ry - dy, r, along - Math.PI / 2, along + Math.PI / 2);
         fill();
       } else { // a square gem: a thin box (about 3px deep at the board) with a lit top, lit from above
         const harmonic = note.harmonic || note.harmonicPinch, depth = 0.04;

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { moveCamera, bendAt } from './highway.js';
+import { moveCamera, bendAt, drawHighway } from './highway.js';
+import { parseArrangement } from './the reference game.js';
+import { LOOKS, DEFAULT_STYLE, theme } from './themes.js';
 
 const run = (anchors, until, snapshotsAt) => {
   const cam = {}, seen = {}, targets = new Set();
@@ -42,5 +44,24 @@ assert.ok(near(bendAt(release, 0.3), 1) && near(bendAt(release, 0.55), 1) && ben
 const late = { sustain: 1, bendCurve: [[0.5, 1]] }; // only when the peak is reached
 assert.ok(near(bendAt(late, 0.2), 0) && near(bendAt(late, 0.35), 0.5) && near(bendAt(late, 0.5), 1));
 assert.ok(near(bendAt({ sustain: 1, bendCurve: [[0, 1], [1, 1]] }, 0), 1) && near(bendAt({ sustain: 1, bend: 0.5 }, 0.3), 0.5)); // pre-bend; no curve
+
+// A whole frame draws at every side angle in every look: a shape the swing turns inside out must not stop the frame. The
+// canvas turns down negative radii as browsers do (a pill gem once did, and the notes after it vanished)
+const noRadius = (name, ...radii) => { if (radii.some((r) => r < 0)) throw new RangeError(`${name}: negative radius`); };
+const context = new Proxy({
+  arc: (x, y, r) => noRadius('arc', r), ellipse: (x, y, rx, ry) => noRadius('ellipse', rx, ry), roundRect: (x, y, w, h, r) => noRadius('roundRect', r),
+  measureText: () => ({ width: 10, actualBoundingBoxAscent: 5, actualBoundingBoxDescent: 0 }),
+  createLinearGradient: () => ({ addColorStop() {} }), createRadialGradient: () => ({ addColorStop() {} }),
+}, { get: (target, key) => (key in target ? target[key] : () => {}) });
+globalThis.devicePixelRatio = 2;
+const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
+const { arrangement } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>20</songLength>
+  <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
+  <levels><level difficulty="0"><notes>${Array.from({ length: 24 }, (_, i) => `<note time="${1 + i * 0.25}" string="${i % 6}" fret="${i % 3 ? 1 + ((i * 5) % 22) : 0}" />`).join('')}</notes>
+  <anchors><anchor time="0" fret="1" width="4" /><anchor time="4" fret="12" width="4" /></anchors></level></levels></song>`);
+for (const look of Object.keys(LOOKS))
+  for (let sideAngle = -20; sideAngle <= 20; sideAngle += 5)
+    for (const now of [0, 2, 4])
+      assert.doesNotThrow(() => drawHighway(canvas, arrangement, now, { ...theme({ ...DEFAULT_STYLE, look }), headstock: 'headless', sideAngle }, {}), `${look} at ${sideAngle}°, ${now} s`);
 
 console.log('ok');
