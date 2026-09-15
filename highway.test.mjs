@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { moveCamera, bendAt, drawHighway, drawTab, HEADSTOCKS, headstockParts } from './highway.js';
-import { parseArrangement } from './the reference game.js';
 import { LOOKS, DEFAULT_STYLE, theme } from './themes.js';
 
 const run = (anchors, until, snapshotsAt) => {
@@ -13,6 +12,19 @@ const run = (anchors, until, snapshotsAt) => {
   return { seen, moves: targets.size };
 };
 const shows = (v, lo, hi) => v.left <= lo && v.right >= hi;
+
+// A chart as the player takes it (from alphaTab, or a page's format such as a .pak reader): a note's techniques off unless
+// given, a chord listing its notes by index, and each hand position lasting until the next
+const NOTE = { sustain: 0, chord: null, hammerOn: false, pullOff: false, slideTo: null, slideUnpitchTo: null, bend: 0, harmonic: false, harmonicPinch: false, palmMute: false, mute: false, tremolo: false, vibrato: false, accent: false, tap: false, linkNext: false, finger: null, slap: false, pop: false, pick: null };
+function chart({ name = 'Lead', length, notes, chords = [], anchors }) {
+  const all = [...notes.map((n) => ({ ...NOTE, ...n })), ...chords.flatMap((c, i) => c.notes.map((n) => ({ ...NOTE, time: c.time, ...n, chord: i })))].sort((a, b) => a.time - b.time || a.string - b.string);
+  const built = chords.map((c) => ({ time: c.time, name: '', frets: [], fingers: [], notes: [], accent: false, palmMute: false, fretHandMute: false, highDensity: false }));
+  all.forEach((n, i) => n.chord !== null && built[n.chord].notes.push(i));
+  return {
+    name, tuning: [0, 0, 0, 0, 0, 0], centOffset: 0, capo: 0, strings: 6, notes: all, chords: built, handShapes: [], sections: [], beats: [{ time: 0, measure: 1 }],
+    anchors: anchors.map((a, i) => ({ time: a.time, endTime: anchors[i + 1]?.time ?? length, fret: a.fret, width: 4 })), phrases: [{ time: 0, endTime: length, name: '', maxDifficulty: 0 }],
+  };
+}
 
 // A big move: frets 1-4, then frets 10-13 from 10 s
 const jump = run([{ time: 0, endTime: 10, fret: 1, width: 4 }, { time: 10, endTime: 20, fret: 10, width: 4 }], 16, [5, 9.5, 14]);
@@ -57,10 +69,7 @@ globalThis.devicePixelRatio = 2;
 globalThis.OffscreenCanvas = class { getContext() { return context; } }; // the floor's strip of colour bands
 globalThis.Path2D = class { moveTo() {} lineTo() {} }; // the tab's beat lines, gathered into one path
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
-const { arrangement } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>20</songLength>
-  <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
-  <levels><level difficulty="0"><notes>${Array.from({ length: 24 }, (_, i) => `<note time="${1 + i * 0.25}" string="${i % 6}" fret="${i % 3 ? 1 + ((i * 5) % 22) : 0}" />`).join('')}</notes>
-  <anchors><anchor time="0" fret="1" width="4" /><anchor time="4" fret="12" width="4" /></anchors></level></levels></song>`);
+const arrangement = chart({ length: 20, notes: Array.from({ length: 24 }, (_, i) => ({ time: 1 + i * 0.25, string: i % 6, fret: i % 3 ? 1 + ((i * 5) % 22) : 0 })), anchors: [{ time: 0, fret: 1 }, { time: 4, fret: 12 }] });
 for (const look of Object.keys(LOOKS))
   for (let sideAngle = -20; sideAngle <= 20; sideAngle += 5)
     for (const now of [0, 2, 4])
@@ -91,11 +100,7 @@ const trailTop = (string) => { // the top of the wavy spine on screen, the chord
     beginPath: () => { points = []; moves = 0; closed = false; }, moveTo: (x, y) => { points.push(y); moves++; }, lineTo: (x, y) => points.push(y), closePath: () => { closed = true; },
     stroke: () => { if (!closed && moves === 1 && points.length > 12) top = Math.min(top, ...points); },
   }, { get: (target, key) => (key in target ? target[key] : context[key]) });
-  const { arrangement: vibrato } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>10</songLength>
-    <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
-    <levels><level difficulty="0"><notes><note time="1" string="1" fret="7" sustain="0.5" vibrato="80" /></notes>
-    <chords><chord time="1.5" chordId="0"><chordNote time="1.5" string="1" fret="5" /><chordNote time="1.5" string="${string}" fret="7" /></chord></chords>
-    <anchors><anchor time="0" fret="5" width="4" /></anchors></level></levels></song>`);
+  const vibrato = chart({ length: 10, notes: [{ time: 1, string: 1, fret: 7, sustain: 0.5, vibrato: true }], chords: [{ time: 1.5, notes: [{ string: 1, fret: 5 }, { string, fret: 7 }] }], anchors: [{ time: 0, fret: 5 }] });
   drawHighway({ ...canvas, getContext: () => recorder }, vibrato, 0.9, { ...theme(DEFAULT_STYLE), headstock: 'headless' }, {});
   return top;
 };
@@ -103,11 +108,7 @@ assert.ok(trailTop(2) > trailTop(0) + 10, 'the trail stops short of the note bel
 
 // A slide off fret 12 into a chord on the same string (The Hell Song at 0:51): once its trail comes into view it stays, all the
 // way in. Cut against the chord's note however far across the neck it was, it vanished while both were in the distance
-const { arrangement: sliding } = parseArrangement(`<song><arrangement>Rhythm</arrangement><songLength>10</songLength>
-  <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
-  <levels><level difficulty="0"><notes><note time="5" string="0" fret="12" sustain="0.22" slideUnpitchTo="4" /></notes>
-  <chords><chord time="5.26" chordId="0"><chordNote time="5.26" string="0" fret="4" /><chordNote time="5.26" string="1" fret="6" /></chord></chords>
-  <anchors><anchor time="0" fret="2" width="4" /><anchor time="5.26" fret="4" width="4" /></anchors></level></levels></song>`);
+const sliding = chart({ name: 'Rhythm', length: 10, notes: [{ time: 5, string: 0, fret: 12, sustain: 0.22, slideUnpitchTo: 4 }], chords: [{ time: 5.26, notes: [{ string: 0, fret: 4 }, { string: 1, fret: 6 }] }], anchors: [{ time: 0, fret: 2 }, { time: 5.26, fret: 4 }] });
 let spines = 0, points = 0, moves = 0, closed = false;
 const spineCounter = new Proxy({
   beginPath: () => { points = 0; moves = 0; closed = false; }, moveTo: () => { points++; moves++; }, lineTo: () => points++, closePath: () => { closed = true; },
@@ -138,12 +139,7 @@ assert.equal(texts.length, 0, 'nothing left once the song has gone by');
 // note begins, with room for the chord's bracket and the slide's slash in between
 const bars = new Map(); // row → [x, end]
 const boxes = new Proxy({ roundRect: (x, y, w, h) => h < 60 && (bars.get(y) ?? bars.set(y, []).get(y)).push([x, x + w]) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
-const { arrangement: tight } = parseArrangement(`<song><arrangement>Lead</arrangement><songLength>10</songLength>
-  <tuning string0="0" string1="0" string2="0" string3="0" string4="0" string5="0" /><ebeats><ebeat time="0" measure="1" /></ebeats>
-  <levels><level difficulty="0"><notes><note time="1" string="0" fret="3" sustain="0.3" slideTo="5" />
-  ${[1.8, 1.9, 2, 2.1].map((time, i) => `<note time="${time}" string="0" fret="${12 + i}" />`).join('')}</notes>
-  <chords><chord time="1.3" chordId="0"><chordNote time="1.3" string="0" fret="5" /><chordNote time="1.3" string="1" fret="7" /></chord></chords>
-  <anchors><anchor time="0" fret="3" width="4" /></anchors></level></levels></song>`);
+const tight = chart({ length: 10, notes: [{ time: 1, string: 0, fret: 3, sustain: 0.3, slideTo: 5 }, ...[1.8, 1.9, 2, 2.1].map((time, i) => ({ time, string: 0, fret: 12 + i }))], chords: [{ time: 1.3, notes: [{ string: 0, fret: 5 }, { string: 1, fret: 7 }] }], anchors: [{ time: 0, fret: 3 }] });
 drawTab({ ...canvas, getContext: () => boxes }, { ...tight, open: [40, 45, 50, 55, 59, 64] }, 0.5, theme(DEFAULT_STYLE));
 const lane = [...bars.values()].find((b) => b.length === 6).sort((a, b) => a[0] - b[0]);
 assert.ok(lane.slice(1).every(([x], i) => x >= lane[i][1] + 4), `bars on a string overlap: ${JSON.stringify(lane)}`);

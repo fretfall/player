@@ -1513,7 +1513,7 @@
                                 d="M3 6.5V15a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 17 15V8.5A1.5 1.5 0 0 0 15.5 7H10L8.5 5H4.5A1.5 1.5 0 0 0 3 6.5z"
                             />
                         </svg>
-                        <span class="tip" role="tooltip" id="openTip"><b>Open a song <kbd>O</kbd></b>A .pak, a Guitar Pro file, or a tab with its recording. You can also drop them anywhere</span>
+                        <span class="tip" role="tooltip" id="openTip"><b>Open a song <kbd>O</kbd></b>A Guitar Pro file, or a tab with its recording. You can also drop them anywhere</span>
                     </button>
                     <button
                         class="icon"
@@ -2207,14 +2207,14 @@
             <button class="text-button" id="bandBack">Close the band windows</button>
         </div>
         <div id="drop" hidden>
-            Drop a .pak, a Guitar Pro file, or a tab with its recording
+            Drop a Guitar Pro file, or a tab with its recording
         </div>
         <input
             type="file"
             id="file"
             hidden
             multiple
-            accept=".pak,.gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.mxl,.xml,.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac"
+            accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.mxl,.xml,.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac"
         />
         <div id="tab"></div>
 
@@ -2233,7 +2233,6 @@
                 markArpeggios,
             } from "./music.js";
             import { suggestPositions, fingerFor } from "./fingering.js";
-            import { loadSong } from "./the reference game.js";
             import {
                 LOOKS,
                 COLORS,
@@ -2262,7 +2261,6 @@
             const $ = (id) => document.getElementById(id);
             const CDN =
                 "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/";
-            const WW2OGG = "https://cdn.jsdelivr.net/npm/ww2ogg-ts@0.2.0/+esm";
             const OPEN_STRINGS = {
                 4: [28, 33, 38, 43],
                 5: [23, 28, 33, 38, 43],
@@ -3599,8 +3597,8 @@
                     announce("playing", { playing: (announcedPlaying = !!player?.playing) });
             }
 
-            // alphaTab score → the same model the reference game.js produces (seconds, string 0 = lowest), with Guitar Pro's notation
-            // named the way the highway draws it
+            // alphaTab score → the song model the highway draws, as a page's formats hand it over too (see fretfall.addFormat):
+            // seconds, string 0 = lowest, with Guitar Pro's notation named the way the highway draws it
             const GP = alphaTab.model;
             const words = (name = "") =>
                 name.replace(/([a-z])([A-Z0-9])/g, "$1 $2").toLowerCase(); // "AmiTriplet" → "ami triplet"
@@ -4480,9 +4478,9 @@
             let songReady = Promise.resolve(),
                 resolveSong = () => {},
                 opening = null; // the name of the file being opened, told with the song once it's ready
+            const formats = []; // kinds of song file a page adds, see fretfall.addFormat
 
-            // options.audio: a .pak's audio already converted to Ogg (by a library that keeps them), so it opens without
-            // the few seconds converting takes
+            // options: handed on to the format that opens a file (see fretfall.addFormat)
             async function openFiles(files, options) {
                 if (following)
                     return status("Open songs in the window the band started from");
@@ -4493,11 +4491,15 @@
                     await openFile(file, options);
             }
 
-            async function openFile(file, { audio } = {}) {
+            async function openFile(file, options = {}) {
                 if (AUDIO.test(file.name)) return addRecording(file);
                 opening = file.name;
-                const bytes = await file.arrayBuffer();
-                if (!/\.pak$/i.test(file.name)) {
+                const format = formats.find((f) =>
+                    f.extensions.some((ext) => file.name.toLowerCase().endsWith(ext)),
+                );
+                if (!format) {
+                    // Guitar Pro, MusicXML: alphaTab reads them, and plays them unless their recording follows
+                    const bytes = await file.arrayBuffer();
                     usePlayer(synthPlayer);
                     synth.paused = null;
                     builtCache = api.tickCache; // rebuild once alphaTab has the new score
@@ -4507,24 +4509,14 @@
                     status(OPENING, true); // until the frame loop has the song
                     return api.load(new Uint8Array(bytes));
                 }
-                status(
-                    audio
-                        ? OPENING
-                        : "Opening song… converting the audio takes a few seconds",
-                    true,
-                );
+                status(OPENING, true);
                 await paint();
                 try {
-                    const ww = audio ? null : await import(WW2OGG);
-                    const next = await loadSong(bytes, {
-                        wemToOgg: audio
-                            ? () => new Uint8Array(audio)
-                            : (wem) =>
-                                  ww.convertWwiseRiffToOgg(wem, {
-                                      codebooks: ww.getPackedCodebooks("aoTuV_603"),
-                                  }).ogg,
+                    const { song: next, audio } = await format.open(file, {
+                        ...options,
+                        status: (text) => status(text, true),
                     });
-                    if (!next.audio) throw new Error("no audio in this file");
+                    // Where the hand goes and which finger presses, when the chart doesn't say
                     for (const a of next.arrangements) {
                         a.open = Array.from(
                             { length: a.strings },
@@ -4554,11 +4546,7 @@
                                           : null;
                         }
                     }
-                    usePlayer(
-                        audioPlayer(
-                            new Blob([next.audio], { type: "audio/ogg" }),
-                        ),
-                    );
+                    usePlayer(audioPlayer(audio));
                     setSong(next);
                     status(null);
                     autoplay();
@@ -5265,11 +5253,27 @@
             function announce(name, detail) {
                 dispatchEvent(new CustomEvent(`fretfall:${name}`, { detail }));
             }
+            // What Open takes, on its tooltip and while files are dragged over: a page's formats first
+            function describeOpening() {
+                const kinds = [
+                    ...formats.map((f) => f.name),
+                    "a Guitar Pro file",
+                    "or a tab with its recording",
+                ].join(", ");
+                $("openTip").lastChild.textContent = `${kinds[0].toUpperCase()}${kinds.slice(1)}. You can also drop them anywhere`;
+                $("drop").textContent = `Drop ${kinds}`;
+            }
             window.fretfall = {
                 open: (files, options) => openFiles(files, options), // → done once they're open
                 pick: () => $("file").click(), // the Open dialog
                 get playing() {
                     return !!player?.playing;
+                },
+                get time() {
+                    return player?.time ?? 0; // seconds into the song
+                },
+                get length() {
+                    return song?.length ?? 0; // the song's, in seconds
                 },
                 get parts() {
                     return song?.arrangements.map((a) => a.name) ?? [];
@@ -5282,6 +5286,14 @@
                         selectArrangement(i);
                 },
                 closeSheets: () => toggleSheet(null, false),
+                // A kind of song file the player doesn't read itself: { name ("a .pak"), extensions ([".pak"]), open(file,
+                // options) → { song, audio } }. song: the model the highway draws (see songFromScore); audio: a Blob of its
+                // recording. options: what fretfall.open was given, and status(text) to say what is taking the time
+                addFormat: (format) => {
+                    formats.push(format);
+                    $("file").accept += format.extensions.map((ext) => `,${ext}`).join("");
+                    describeOpening();
+                },
             };
             announce("ready");
 
