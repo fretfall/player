@@ -1879,6 +1879,43 @@
             >
                 <div class="setting">
                     <div class="setting-head">
+                        <span id="lookLabel">Notes</span>
+                    </div>
+                    <div
+                        class="seg"
+                        data-setting="look"
+                        role="group"
+                        aria-labelledby="lookLabel"
+                    ></div>
+                </div>
+                <label class="toggle"
+                    ><span
+                        >3D notes<small
+                            >Notes a few pixels deep, lit on top</small
+                        ></span
+                    ><input id="notes3d" type="checkbox" role="switch"
+                /></label>
+                <div
+                    class="setting"
+                    title="The white line on the floor under each note and chord, where it's played"
+                >
+                    <div class="setting-head">
+                        <label for="noteLines">Note lines</label
+                        ><output id="noteLinesOut" for="noteLines"></output>
+                    </div>
+                    <input
+                        id="noteLines"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                    />
+                    <div class="scale" aria-hidden="true">
+                        <span>Hidden</span><span>Solid</span>
+                    </div>
+                </div>
+                <div class="setting">
+                    <div class="setting-head">
                         <span id="framesLabel">Chord frames</span>
                     </div>
                     <div
@@ -1913,39 +1950,12 @@
                         aria-labelledby="markingsLabel"
                     ></div>
                 </div>
-                <div
-                    class="setting"
-                    title="The white line on the floor under each note and chord, where it's played"
-                >
-                    <div class="setting-head">
-                        <label for="noteLines">Note lines</label
-                        ><output id="noteLinesOut" for="noteLines"></output>
-                    </div>
-                    <input
-                        id="noteLines"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                    />
-                    <div class="scale" aria-hidden="true">
-                        <span>Hidden</span><span>Solid</span>
-                    </div>
-                </div>
                 <label class="toggle"
                     ><span
                         >Hand position guides<small
                             >A band down the highway where your hand goes</small
                         ></span
                     ><input id="guides" type="checkbox" role="switch"
-                /></label>
-                <label class="toggle"
-                    ><span
-                        >Song intro<small
-                            >The title and "Get ready" before the first notes
-                            come into view</small
-                        ></span
-                    ><input id="songIntro" type="checkbox" role="switch"
                 /></label>
             </section>
 
@@ -1978,17 +1988,6 @@
                         aria-labelledby="stringsLabel"
                     ></div>
                 </div>
-                <div class="setting">
-                    <div class="setting-head">
-                        <span id="headstockLabel">Headstock</span>
-                    </div>
-                    <div
-                        class="cards"
-                        data-setting="headstock"
-                        role="group"
-                        aria-labelledby="headstockLabel"
-                    ></div>
-                </div>
             </section>
 
             <section
@@ -1998,24 +1997,6 @@
                 aria-labelledby="tab-style"
                 hidden
             >
-                <div class="setting">
-                    <div class="setting-head">
-                        <span id="lookLabel">Look</span>
-                    </div>
-                    <div
-                        class="seg"
-                        data-setting="look"
-                        role="group"
-                        aria-labelledby="lookLabel"
-                    ></div>
-                </div>
-                <label class="toggle"
-                    ><span
-                        >3D notes<small
-                            >Notes a few pixels deep, lit on top</small
-                        ></span
-                    ><input id="notes3d" type="checkbox" role="switch"
-                /></label>
                 <div class="setting">
                     <div class="setting-head">
                         <span id="colorsLabel">Colours</span>
@@ -2038,6 +2019,25 @@
                         aria-labelledby="fontsLabel"
                     ></div>
                 </div>
+                <div class="setting">
+                    <div class="setting-head">
+                        <span id="headstockLabel">Headstock</span>
+                    </div>
+                    <div
+                        class="cards"
+                        data-setting="headstock"
+                        role="group"
+                        aria-labelledby="headstockLabel"
+                    ></div>
+                </div>
+                <label class="toggle"
+                    ><span
+                        >Song intro<small
+                            >The title and "Get ready" before the first notes
+                            come into view</small
+                        ></span
+                    ><input id="songIntro" type="checkbox" role="switch"
+                /></label>
             </section>
 
             <section
