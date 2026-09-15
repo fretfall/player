@@ -860,7 +860,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Under every gem: slide ramps into and out of notes, slurs from a hammer-on or pull-off back to its note, ties,
   // and tails. A tail is a ribbon along its string that fades into the distance; its shape is the technique: a slide
-  // drifts along the neck, a bend or the whammy bar rises and falls with its curve, vibrato is an even wave, tremolo
+  // drifts along the neck, a bend or the whammy bar rises and falls with its curve, vibrato is an even wave up and down, tremolo
   // picking jitters, let ring is dashed
   const arc = (from, to, bulge) => { // a curve between two points on the highway, rising by bulge in the middle
     const points = Array.from({ length: 13 }, (_, j) => {
@@ -941,12 +941,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const along = (d) => {
       const sec = d - dt, zz = Z(d);
       const railed = note.bend || note.bendCurve || note.whammy; // a rail stays straight: its vibrato shows in the mark above the note
-      const wave = note.vibrato && !railed ? Math.sin((zz / 1.6) * Math.PI * 2) * (note.vibratoWide ? 0.13 : 0.07) : 0; // a steady wavelength along the highway
+      const wave = note.vibrato && !railed ? Math.sin((zz / 1.6) * Math.PI * 2) * gap * (note.vibratoWide ? 0.45 : 0.25) : 0; // the string pushed up and let back, a steady wavelength along the highway
       const jitter = note.tremolo ? (Math.floor(zz / 0.3) % 2 ? 0.05 : -0.05) : 0;
       // A bend raises the trail in a smooth S where the pitch rises, holds it up and lowers it again for a release; it rises
       // a little more than the string on the fretboard, so it reads from behind, and settles to the string at the board
       const rise = BEND_LIFT + (BEND_RISE - BEND_LIFT) * smooth(Math.min(1, zz / BEND_EASE));
-      return [slideX(note, x, sec) + wave + jitter, y + (liftAt(note, sec) * rise) / BEND_LIFT, zz];
+      return [slideX(note, x, sec) + jitter, y + wave + (liftAt(note, sec) * rise) / BEND_LIFT, zz];
     };
     if (bent && next) { // raised, the trail would show past the next note: end it where it reaches that note's bottom edge on screen
       const at = spot(next), bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, Z(next.time - now))[1] + 3, screenY = (d) => P(...along(d))[1];
