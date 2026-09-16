@@ -9,6 +9,8 @@ An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser.
 
 [**Try it**](https://fretfall.github.io/player/) — the demo is the published package with a front door of its own, served from GitHub Pages.
 
+![Notes falling down the 3D fretboard: the hand position lit on the neck, chord names beside the shapes, fingering on each note, and fret numbers painted along the highway](docs/screenshot.webp)
+
 Open a tab and play along: the notes fall down a 3D fretboard, with hand positions and fingering worked out for you. Add the
 band's recording and the player lines the tab up with it on its own.
 
