@@ -20,6 +20,11 @@ await build({ entryPoints: modules.map((m) => join(src, m)), outdir: out, format
 let html = await readFile(join(demo, 'index.html'), 'utf8');
 const css = /<style>([\s\S]*?)<\/style>/.exec(html);
 if (css) html = html.replace(css[0], `<style>${(await transform(css[1], { loader: 'css', minify: true })).code.trim()}</style>`);
+// The page's own scripts, like the demo's front door: minified as the modules are, comments and all
+for (const script of html.match(/<script type="module">[\s\S]*?<\/script>/g) ?? []) {
+  const code = script.slice(script.indexOf('>') + 1, -'</script>'.length);
+  html = html.replace(script, `<script type="module">${(await transform(code, { loader: 'js', minify: true })).code.trim()}</script>`);
+}
 html = html
   .replaceAll('../src/', '') // the page sits above the modules in the repo, next to them in the package
   .replace(/<!--[\s\S]*?-->/g, '')
