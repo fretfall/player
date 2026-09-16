@@ -1308,7 +1308,9 @@ api.playerStateChanged.on((e) => {
 api.playerFinished.on(() => announce("ended")); // the synth's end of the song, as el.onended is the recording's
 api.soundFontLoad.on((e) =>
     status(
-        `Loading instrument sounds ${Math.round((e.loaded / e.total) * 100)}%`,
+        e.total // a compressed or chunked response has no length to count against
+            ? `Loading instrument sounds ${Math.round((e.loaded / e.total) * 100)}%`
+            : "Loading instrument sounds",
         true,
     ),
 );
