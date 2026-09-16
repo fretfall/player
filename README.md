@@ -57,6 +57,7 @@ Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D<
 
 ```sh
 npm ci
+npm start         # the demo on http://localhost:4410, rebuilt from src/ on every request
 npm test          # node --test
 npm run lint      # oxlint: correctness and performance rules
 npm run build     # dist/, the published package
