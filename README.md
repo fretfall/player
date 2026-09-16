@@ -28,7 +28,8 @@ Any static file server works. Tabs are read and played by [alphaTab](https://www
 
 ## Build on it
 
-Serve the package's files and add your own page around it. The player exposes `window.fretfall` once it dispatches
+Serve the package's files and add your own page around it. The player starts with no song of its own — the page around it
+opens the first one, as `demo/index.html` does with its demo tab. The player exposes `window.fretfall` once it dispatches
 `fretfall:ready`:
 
 ```js
@@ -42,7 +43,7 @@ fretfall.part = 1;
 | Member | |
 |:--|:--|
 | `open(files, options)` / `pick()` | Open songs, or show the file dialog |
-| `playing`, `time`, `length` | Where playback is, in seconds |
+| `playing`, `time`, `length` | Where playback is, in seconds. `playing` is settable: it waits for the synth's instruments |
 | `parts`, `part` | The song's parts, and the one shown (settable) |
 | `addFormat({ name, extensions, open })` | Read another file type: `open(file)` resolves to `{ song, audio }` |
 | `closeSheets()` | Close Settings and the notation sheet |
