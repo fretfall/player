@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Fretfall">
+  <!-- the falling F: fret + fall, its middle bar come loose and landed at rest -->
+  <rect x="4" y="3" width="4.5" height="18" rx="1.5" />
+  <rect x="4" y="3" width="16" height="4.5" rx="1.5" />
+  <rect x="10.5" y="11.67" width="9" height="4.5" rx="1.5" transform="rotate(14 15 13.92)" />
+</svg>

@@ -1,0 +1,6 @@
+# Blank issues stay open for questions and anything the two templates do not fit — Discussions is off
+blank_issues_enabled: true
+contact_links:
+  - name: A tab that opens nowhere
+    url: https://www.alphatab.net
+    about: Reading .gp and .musicxml files is alphaTab's job. If the file fails in their playground too, report it there

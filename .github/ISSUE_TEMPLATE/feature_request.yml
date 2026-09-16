@@ -1,0 +1,29 @@
+name: Feature request
+description: Something the player should do and does not
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: The player stays small on purpose — no framework, no runtime dependencies, and a size budget CI enforces. So say what you are trying to do before what to build.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The practice or playing problem, not the feature. What do you do today instead?
+      placeholder: I practise with a backing track that starts a bar early, and I re-drag the offset every time I reload.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: Optional. A shape for it, if you have one.
+
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Would you build it?
+      options:
+        - label: I would like to send the pull request for this

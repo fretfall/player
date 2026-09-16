@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in the player does not do what it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you did, what you expected, and what you got instead.
+      placeholder: Opened a .gp5, pressed Space, and the highway scrolls but the synth stays silent.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If it takes a particular song, attach the file or link it — most bugs live in the tab, not the player.
+      placeholder: |
+        1. Open https://fretfall.github.io/player/
+        2. Drop the attached tab
+        3. Press Space
+    validations:
+      required: true
+
+  - type: input
+    id: where
+    attributes:
+      label: Browser and OS
+      placeholder: Firefox 142, macOS 26
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `@fretfall/player` version, or "the demo" if that is where you saw it.
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console
+      description: Anything the browser console printed. Pasted here it is formatted as code, no backticks needed.
+      render: text
