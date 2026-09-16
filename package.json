@@ -5,9 +5,9 @@
   "keywords": ["guitar", "bass", "tab", "guitar-pro", "musicxml", "note-highway", "alphatab", "practice"],
   "license": "MIT",
   "author": "Angelo Dini",
-  "homepage": "https://github.com/FinalAngel/fretfall-player#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/FinalAngel/fretfall-player.git" },
-  "bugs": "https://github.com/FinalAngel/fretfall-player/issues",
+  "homepage": "https://github.com/fretfall/player#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/fretfall/player.git" },
+  "bugs": "https://github.com/fretfall/player/issues",
   "type": "module",
   "private": true,
   "scripts": {
