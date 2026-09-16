@@ -4,8 +4,8 @@ An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser.
 
 [![CI](https://github.com/FinalAngel/fretfall-player/actions/workflows/ci.yml/badge.svg)](https://github.com/FinalAngel/fretfall-player/actions/workflows/ci.yml)
 [![Performance](https://github.com/FinalAngel/fretfall-player/actions/workflows/perf.yml/badge.svg)](https://github.com/FinalAngel/fretfall-player/actions/workflows/perf.yml)
-[![npm](https://img.shields.io/npm/v/fretfall-player?color=c8f04a&labelColor=0e1014)](https://www.npmjs.com/package/fretfall-player)
-[![license](https://img.shields.io/npm/l/fretfall-player?color=c8f04a&labelColor=0e1014)](LICENSE)
+[![npm](https://img.shields.io/npm/v/@fretfall/player?color=c8f04a&labelColor=0e1014)](https://www.npmjs.com/package/@fretfall/player)
+[![license](https://img.shields.io/npm/l/@fretfall/player?color=c8f04a&labelColor=0e1014)](LICENSE)
 
 Open a tab and play along: the notes fall down a 3D fretboard, with hand positions and fingering worked out for you. Add the
 band's recording and the player lines the tab up with it on its own.
@@ -18,8 +18,8 @@ band's recording and the player lines the tab up with it on its own.
 ## Quick start
 
 ```sh
-npm install fretfall-player
-npx serve node_modules/fretfall-player
+npm install @fretfall/player
+npx serve node_modules/@fretfall/player
 ```
 
 Any static file server works. Tabs are read and played by [alphaTab](https://www.alphatab.net), loaded from jsDelivr.
