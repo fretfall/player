@@ -1245,6 +1245,7 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
     const el = new Audio(URL.createObjectURL(src));
     el.preservesPitch = true;
     el.onplay = el.onpause = updatePlayButton;
+    el.onended = () => announce("ended"); // played out to the end, rather than paused: see the hook near the end
     return {
         get time() {
             return (el.currentTime - offset) / ratio;
@@ -1304,6 +1305,7 @@ api.playerStateChanged.on((e) => {
     synth.at = performance.now();
     updatePlayButton();
 });
+api.playerFinished.on(() => announce("ended")); // the synth's end of the song, as el.onended is the recording's
 api.soundFontLoad.on((e) =>
     status(
         `Loading instrument sounds ${Math.round((e.loaded / e.total) * 100)}%`,
@@ -3032,7 +3034,8 @@ $("bandBack").onclick = () => {
 
 // --- For a page built on the player, like a song library: open songs, choose the part, and follow along through events
 // on window, each with its facts in detail: fretfall:song (a song is ready: file, title, artist, parts, part),
-// fretfall:playing ({ playing }) and fretfall:sheet (Settings or the notation sheet: { name, open }). The page can use
+// fretfall:playing ({ playing }), fretfall:ended (played out to its end, rather than paused: what a library autoplaying a
+// setlist follows) and fretfall:sheet (Settings or the notation sheet: { name, open }). The page can use
 // the player's markup and styles too, but only this stays put as the player changes. fretfall:ready: it's here
 function announce(name, detail) {
     dispatchEvent(new CustomEvent(`fretfall:${name}`, { detail }));
@@ -3083,7 +3086,11 @@ announce("ready");
 
 usePlayer(following ? bandPlayer : synthPlayer);
 setVolume();
-if (!following)
+if (following) {
+    band.postMessage({ hello: bandPart });
+    status("Waiting for the window the band started from", true);
+} else if (window.fretfallDemo !== false)
+    // a page around the player (fretfall's library) sets window.fretfallDemo = false to start with no song of its own
     fetch("demo.atex") // preloaded in the head
         .then((r) =>
             r.ok ? r.text() : Promise.reject(new Error(r.statusText)),
@@ -3092,10 +3099,7 @@ if (!following)
         .catch((e) =>
             status(`Could not load the demo song: ${e.message}`),
         );
-else {
-    band.postMessage({ hello: bandPart });
-    status("Waiting for the window the band started from", true);
-}
+else status(null); // no song to wait for: alphaTab is only ever ready once it has one to play (see api.playerReady)
 if (new URLSearchParams(location.search).has("perf"))
     startProfiler(canvas, () => song?.length ?? 0); // see perf.js
 requestAnimationFrame(frame);
