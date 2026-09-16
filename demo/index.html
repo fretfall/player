@@ -6,7 +6,6 @@
         <title>Fretfall</title>
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link id="fonts" rel="stylesheet" href="" />
-        <link rel="preload" href="demo.atex" as="fetch" crossorigin />
         <link
             rel="preload"
             href="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"
@@ -1250,66 +1249,6 @@
             .volume-mute[aria-pressed="true"] {
                 color: var(--muted);
             }
-            /* The demo's own front door, over the empty highway until a song is opened: the player itself starts with
-               no song, so something has to offer the first one */
-            #welcome {
-                position: fixed;
-                inset: 0;
-                z-index: 4;
-                display: grid;
-                align-content: center;
-                justify-items: center;
-                gap: 14px;
-                padding: 24px;
-                text-align: center;
-                background: color-mix(in srgb, var(--ink) 82%, transparent);
-                transition:
-                    opacity 0.4s ease,
-                    visibility 0.4s;
-            }
-            #welcome[hidden] {
-                display: grid; /* fade out rather than vanish */
-                opacity: 0;
-                visibility: hidden;
-                pointer-events: none;
-            }
-            .welcome-mark {
-                width: clamp(56px, 9vw, 92px);
-                height: auto;
-                color: var(--text);
-            }
-            #welcome p {
-                margin: 0;
-                max-width: 44ch;
-                font: 400 15px/1.6 var(--ui);
-                color: var(--muted);
-            }
-            .welcome-actions {
-                display: grid;
-                justify-items: center;
-                gap: 10px;
-                margin-top: 8px;
-            }
-            .welcome-go {
-                padding: 12px 26px;
-                border: 0;
-                border-radius: 999px;
-                background: var(--accent);
-                color: var(--ink);
-                font: 700 15px var(--ui);
-                cursor: pointer;
-            }
-            .welcome-go:hover {
-                filter: brightness(1.08);
-            }
-            .welcome-actions .text-button {
-                justify-self: center;
-            }
-            #welcomeFormats {
-                max-width: 36ch;
-                font: 400 11px/1.7 var(--ui);
-                color: color-mix(in srgb, var(--muted) 62%, transparent);
-            }
             #drop {
                 position: fixed;
                 inset: 12px;
@@ -1450,6 +1389,71 @@
                 }
             }
         </style>
+        <!-- demo: the demo's front door, which the package's page goes without (see scripts/build.mjs) -->
+        <link rel="preload" href="demo.atex" as="fetch" crossorigin />
+        <style>
+            /* The demo's own front door, over the empty highway until a song is opened: the player itself starts with
+               no song, so something has to offer the first one */
+            #welcome {
+                position: fixed;
+                inset: 0;
+                z-index: 4;
+                display: grid;
+                align-content: center;
+                justify-items: center;
+                gap: 14px;
+                padding: 24px;
+                text-align: center;
+                background: color-mix(in srgb, var(--ink) 82%, transparent);
+                transition:
+                    opacity 0.4s ease,
+                    visibility 0.4s;
+            }
+            #welcome[hidden] {
+                display: grid; /* fade out rather than vanish */
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+            }
+            .welcome-mark {
+                width: clamp(56px, 9vw, 92px);
+                height: auto;
+                color: var(--text);
+            }
+            #welcome p {
+                margin: 0;
+                max-width: 44ch;
+                font: 400 15px/1.6 var(--ui);
+                color: var(--muted);
+            }
+            .welcome-actions {
+                display: grid;
+                justify-items: center;
+                gap: 10px;
+                margin-top: 8px;
+            }
+            .welcome-go {
+                padding: 12px 26px;
+                border: 0;
+                border-radius: 999px;
+                background: var(--accent);
+                color: var(--ink);
+                font: 700 15px var(--ui);
+                cursor: pointer;
+            }
+            .welcome-go:hover {
+                filter: brightness(1.08);
+            }
+            .welcome-actions .text-button {
+                justify-self: center;
+            }
+            #welcomeFormats {
+                max-width: 36ch;
+                font: 400 11px/1.7 var(--ui);
+                color: color-mix(in srgb, var(--muted) 62%, transparent);
+            }
+        </style>
+        <!-- /demo -->
     </head>
     <body>
         <canvas id="highway"></canvas>
@@ -2408,6 +2412,18 @@
         <div id="drop" hidden>
             Drop a Guitar Pro file, or a tab with its recording
         </div>
+        <input
+            type="file"
+            id="file"
+            hidden
+            multiple
+            accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.mxl,.xml,.atex,.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac"
+        />
+        <div id="tab"></div>
+
+        <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
+        <script type="module" src="../src/player.js"></script>
+        <!-- demo -->
         <div id="welcome">
             <svg
                 class="welcome-mark"
@@ -2442,17 +2458,6 @@
                 <small id="welcomeFormats"></small>
             </div>
         </div>
-        <input
-            type="file"
-            id="file"
-            hidden
-            multiple
-            accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.mxl,.xml,.atex,.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac"
-        />
-        <div id="tab"></div>
-
-        <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
-        <script type="module" src="../src/player.js"></script>
         <script type="module">
             // The demo's front door. The player ships with no song of its own, so this page is what offers the first
             // one: its own demo tab, or whatever is dropped or picked. It steps aside as soon as any song is open
@@ -2480,5 +2485,6 @@
                 fretfall.playing = true; // the click is the gesture browsers want before a page makes any sound
             };
         </script>
+        <!-- /demo -->
     </body>
 </html>
