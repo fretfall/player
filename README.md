@@ -7,6 +7,8 @@ An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser.
 [![npm](https://img.shields.io/npm/v/@fretfall/player?color=c8f04a&labelColor=0e1014)](https://www.npmjs.com/package/@fretfall/player)
 [![license](https://img.shields.io/npm/l/@fretfall/player?color=c8f04a&labelColor=0e1014)](LICENSE)
 
+[**Try it**](https://finalangel.github.io/fretfall-player/) — the demo is the published package, served from GitHub Pages.
+
 Open a tab and play along: the notes fall down a 3D fretboard, with hand positions and fingering worked out for you. Add the
 band's recording and the player lines the tab up with it on its own.
 
@@ -60,6 +62,9 @@ npm run lint      # oxlint: correctness and performance rules
 npm run build     # dist/, the published package
 npm run bench     # frame time, draw calls, sync and size of dist/
 ```
+
+`src/` is the player's modules, `demo/` the page they ship with (and its demo tab). The build flattens both into `dist/`,
+which is what npm publishes and what the demo serves — so the page next to the modules, as a page built on the player has it.
 
 No pull request may make the player slower or bigger. CI builds it and the base branch, benchmarks both in turns on the same
 runner, and fails on more than 10% frame or sync time, 5% draw calls or 1% gzipped size. A regression taken on purpose
