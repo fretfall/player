@@ -2286,8 +2286,11 @@ async function openFile(file, options = {}) {
         f.extensions.some((ext) => file.name.toLowerCase().endsWith(ext)),
     );
     if (!format) {
-        // Guitar Pro, MusicXML: alphaTab reads them, and plays them unless their recording follows
-        const bytes = await file.arrayBuffer();
+        // Guitar Pro, MusicXML, alphaTab's own tex: alphaTab reads them, and plays them unless their recording follows
+        const tex = file.name.toLowerCase().endsWith(".atex");
+        const data = tex
+            ? await file.text()
+            : new Uint8Array(await file.arrayBuffer());
         usePlayer(synthPlayer);
         synth.paused = null;
         builtCache = api.tickCache; // rebuild once alphaTab has the new score
@@ -2295,7 +2298,7 @@ async function openFile(file, options = {}) {
             (resolve) => (resolveSong = resolve),
         );
         status(OPENING, true); // until the frame loop has the song
-        return api.load(new Uint8Array(bytes));
+        return tex ? api.tex(data) : api.load(data);
     }
     status(OPENING, true);
     await paint();
@@ -2460,16 +2463,17 @@ function metronome(t) {
 // Autoplay (Settings): a song that has just opened starts playing. Not before anyone has used the page (browsers keep
 // it silent until then, so the demo on a first visit waits), and not in the band's windows, which follow this one
 let autoplayWaits = false; // for the synth's instruments to load
-const autoplay = () => {
-    if (!settings.autoplay || following || !player || player.playing) return;
-    if (navigator.userActivation?.hasBeenActive === false) return;
+// Start playing as soon as there is something to play: what Autoplay uses, and what a page around the player asks
+// for by setting fretfall.playing
+const playWhenReady = () => {
+    if (!player || player.playing) return;
     if (player === synthPlayer && !api.isReadyForPlayback) { // a Guitar Pro file opened before its instruments have loaded
         if (autoplayWaits) return;
         autoplayWaits = true;
         const ready = () => {
             api.playerReady.off(ready);
             autoplayWaits = false;
-            autoplay();
+            playWhenReady();
         };
         return api.playerReady.on(ready);
     }
@@ -2477,6 +2481,11 @@ const autoplay = () => {
     Promise.resolve(player.play()).catch(
         (e) => e.name !== "AbortError" && e.name !== "NotAllowedError" && status(e.message),
     );
+};
+const autoplay = () => {
+    if (!settings.autoplay || following) return;
+    if (navigator.userActivation?.hasBeenActive === false) return;
+    playWhenReady();
 };
 const togglePlay = () => {
     if (!player) return;
@@ -3058,6 +3067,10 @@ window.fretfall = {
     get playing() {
         return !!player?.playing;
     },
+    set playing(on) {
+        if (!on) player?.pause();
+        else if (!following) playWhenReady(); // waits for the synth's instruments if the song has just opened
+    },
     get time() {
         return player?.time ?? 0; // seconds into the song
     },
@@ -3091,17 +3104,8 @@ setVolume();
 if (following) {
     band.postMessage({ hello: bandPart });
     status("Waiting for the window the band started from", true);
-} else if (window.fretfallDemo !== false)
-    // a page around the player (fretfall's library) sets window.fretfallDemo = false to start with no song of its own
-    fetch("demo.atex") // preloaded in the head
-        .then((r) =>
-            r.ok ? r.text() : Promise.reject(new Error(r.statusText)),
-        )
-        .then((tex) => api.tex(tex))
-        .catch((e) =>
-            status(`Could not load the demo song: ${e.message}`),
-        );
-else status(null); // no song to wait for: alphaTab is only ever ready once it has one to play (see api.playerReady)
+} else status(null); // the player opens with no song of its own: the page around it hands over the first one (the demo page offers its own, see index.html).
+// Nothing to wait for either way — alphaTab is only ever ready once it has a song to play (see api.playerReady)
 if (new URLSearchParams(location.search).has("perf"))
     startProfiler(canvas, () => song?.length ?? 0); // see perf.js
 requestAnimationFrame(frame);

@@ -23,6 +23,10 @@ const GEM_DEPTH = 0.12; // how deep 3D notes are: 4 to 5 px at the board
 const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead; frets in view at the closest zoom, less the fret of slack
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
+const NUM_W = 0.31, NUM_Z = 1.7; // fret widths across the neck and down the highway a fret number painted on the floor covers
+const NUM_TILT = 0.6; // radians from upright past which the floor has turned one too far on its side to read
+const NUM_MIN_PX = 1; // px tall a number must come to on screen: below this it is a smudge, not a digit
+const NUM_GROW = 0.75; // how much of the distance a number paints back out again: 0 keeps its size on the floor, 1 on the screen
 
 export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
   const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
@@ -554,6 +558,37 @@ export function drawHighway(canvas, arr, now, t, cam) {
     unscale();
     g.textBaseline = 'middle';
   };
+  // Text painted on the floor, lying in it: the glyph's own axes are put on the floor's, so it foreshortens with the lanes
+  // it sits between. The transform is fitted to the corners the text actually covers, which over something this small is
+  // near enough the perspective itself; canvas text is vector, so it stays crisp however it's sheared. Like road markings
+  // it is drawn long down the highway, which the foreshortening squashes back to about its width
+  const floorLabel = (str, x, z, w, depth, fill, weight = 700) => {
+    // Painted bigger the further off it is, so it shrinks as gently as the numbers on notes do (see label) instead of
+    // fading to a smudge by the back of the highway: w and depth are its size where it meets the board
+    const [px, py, k] = P(x, floor, z), grow = (k0 / k) ** NUM_GROW;
+    const [ax, ay] = P(x + w * grow, floor, z), [zx, zy] = P(x, floor, z + depth * grow);
+    // Out towards the ends of the neck the floor's own up turns away from the screen's and lays a glyph on its side: past
+    // NUM_TILT it is no longer worth reading, and it fades out rather than popping as the camera swings
+    const tilt = Math.abs(Math.atan2(zx - px, py - zy)), tall = Math.hypot(zx - px, zy - py);
+    if (px < -60 || px > W + 60 || tall < NUM_MIN_PX || tilt > NUM_TILT) return;
+    const was = g.globalAlpha;
+    g.globalAlpha = was * Math.min(1, (NUM_TILT - tilt) / 0.2, (tall - NUM_MIN_PX) / 3); // and in from the far end, so nothing pops
+    const font = (fonts[weight] ??= `${weight} ${MARK_PX}px ${t.num}`);
+    setFont(font);
+    g.textAlign = 'center';
+    g.textBaseline = 'alphabetic';
+    const { middle } = measure(g, font, str);
+    g.setTransform( // font px across → w of neck; font px up → depth of highway
+      (B * (ax - px)) / MARK_PX, (B * (ay - py)) / MARK_PX,
+      (-B * (zx - px)) / MARK_PX, (-B * (zy - py)) / MARK_PX,
+      B * px, B * (py - originY),
+    );
+    g.fillStyle = fill; // no halo: sheared text can't come off the glyph cache, so stroking it as well costs a second one
+    g.fillText(str, 0, middle);
+    unscale();
+    g.globalAlpha = was;
+    g.textBaseline = 'middle';
+  };
   const [, nearY] = P(focus[0], floor, 0), [, farY] = P(focus[0], floor, far);
   const fade = (c, a0, a1) => { // the same fade for everything that asks for it until the highway's ends move: a new gradient for every trail is dear
     const span = `${nearY}|${farY}`;
@@ -642,6 +677,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     stroke();
   }
+
+  // Inlay fret numbers down the highway, as Rocksmith has them: a row on every bar line, so wherever the eye is there is a
+  // ruler near it. The frets under the hand position are left out — that band has its own number, and its notes sit on them.
+  // The last stretch before the board is faded out: there the row would land on the board's own numbers
+  if (t.fretNumbers)
+    for (let b = firstAt(arr.beats, now); b < arr.beats.length; b++) {
+      const beat = arr.beats[b], dt = beat.time - now;
+      if (dt > LOOK) break;
+      if (beat.measure < 0 || dt < 0.3) continue;
+      const a = anchorAt(anchors, beat.time), z = Z(dt);
+      g.globalAlpha = Math.min(1, (dt - 0.3) / 0.5);
+      for (const f of INLAYS) if (f < a.fret || f >= a.fret + a.width) floorLabel(String(f), f - 0.5, z, NUM_W, NUM_Z, alpha(t.inlay, 0.7));
+    }
+  g.globalAlpha = 1;
 
   // Hand positions, unless the guides are turned off: a faint band down the highway with thin edges on the
   // floor. A move starts a new band, with its index-finger fret beside it

@@ -11,6 +11,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "start": "esbuild 'src/*.js' --format=esm --outdir=demo/src --servedir=demo --serve=4410",
     "build": "node scripts/build.mjs",
     "lint": "oxlint --deny-warnings",
     "test": "node --test",
