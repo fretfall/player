@@ -1,0 +1,30 @@
+name: Release
+
+# Publishing a GitHub release tagged v<version> publishes that version to npm, with provenance, through npm's trusted
+# publishing (no token: npmjs.com → the package → Settings → Trusted publisher → this repo and release.yml)
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: The tag is the version
+        run: test "${{ github.event.release.tag_name }}" = "v$(node -p 'require("./package.json").version')"
+      - run: npm run build
+      - run: npm publish ./dist --provenance --access public

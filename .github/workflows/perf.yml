@@ -1,0 +1,41 @@
+name: Performance
+
+# A pull request may not make the player slower or bigger: its build is benchmarked against the base branch's, in turns on the
+# same runner (see scripts/bench.mjs). A regression taken on purpose passes with the perf-ok label.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  perf:
+    name: No slower, no bigger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Compare with ${{ github.base_ref }}
+        env:
+          PERF_OK: ${{ contains(github.event.pull_request.labels.*.name, 'perf-ok') }}
+        run: |
+          if [ -f base/package.json ] && node scripts/build.mjs base; then
+            node scripts/bench.mjs base/dist dist
+          else
+            echo "::notice::The base branch has no build to compare with yet"
+            node scripts/bench.mjs dist
+          fi
