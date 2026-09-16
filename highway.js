@@ -669,7 +669,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   };
   for (const m of arr.markers ?? []) if (m.time >= now && m.time <= now + LOOK && !moment(m.time).texts.includes(m.text)) moment(m.time).texts.push(m.text);
   for (const h of arr.hairpins ?? []) if (h.time >= now && h.time <= now + LOOK) moment(h.time).pins.push(h.kind);
-  const markLine = cam.center - (cam.span / 2 + 0.5) / stretch; // the same place on screen at any fret width
+  const markLine = Math.min(cam.center - (cam.span / 2 + 0.5) / stretch, -0.5); // the same place on screen at any fret width, but never over the lanes: framed high up the neck it keeps left of the nut (and the clamp below keeps it on screen)
   for (const { dt, texts, pins } of moments.values()) { // right-aligned against the line at the depth of their bar, in perspective
     // Set in one font size and scaled to its depth: a size of its own every frame would set up a new font every frame, and
     // quarter-pixel sizes (see fontSize) would make a long line of right-aligned text jump
