@@ -2621,8 +2621,8 @@ const SHORTCUTS = [
                 skip,
             ],
             [
-                ["Home"],
-                "Home",
+                ["Home", "0"],
+                "Home 0",
                 "Back to the start",
                 "Of the loop, when there is one",
                 () => player?.seek(loop?.start ?? 0),
@@ -2634,7 +2634,7 @@ const SHORTCUTS = [
                 "In 10% steps",
                 (e) => setSpeed(speed + (e.key === "-" ? -0.1 : 0.1)),
             ],
-            [["0"], "0", "Back to 100% speed", "", () => setSpeed(1)],
+            [["r"], "R", "Back to 100% speed", "", () => setSpeed(1)],
             [
                 ["l"],
                 "L",
