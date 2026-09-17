@@ -24,8 +24,9 @@ const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead;
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
 const NUM_W = 0.31, NUM_Z = 1.7; // fret widths across the neck and down the highway a fret number painted on the floor covers
-const NUM_TILT = 0.6; // radians from upright past which the floor has turned one too far on its side to read
+const NUM_TILT = 1.4; // radians from upright past which the floor has turned edge-on: a number is kept to the ends of the neck, and only goes once it is a line, not a digit
 const NUM_MIN_PX = 1; // px tall a number must come to on screen: below this it is a smudge, not a digit
+const NUM_TALL = 1.2; // how much taller than wide the floor may leave a number before it is painted over less of the highway
 const NUM_GROW = 0.75; // how much of the distance a number paints back out again: 0 keeps its size on the floor, 1 on the screen
 
 export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
@@ -438,6 +439,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const Z = (dt) => Math.max(0, dt) * SPEED; // played notes stay on the board while they fade: the camera is right behind it
   const color = (s) => t.str[s % t.str.length];
   const noteLine = t.noteLines === 0 ? null : `rgba(255, 255, 255, ${t.noteLines ?? 0.5})`; // the white line under each note and frame
+  const numberInk = +t.fretNumbers || 0; // how solid the fret numbers on the floor are painted, 0 for none (a player that still sets it true gets them solid)
 
   // Camera just behind and above the strike line, looking far down the highway, as in Tabizera: notes come up
   // out of the distance and the lanes run to a vanishing point under the header. The view angle swings it around
@@ -566,10 +568,18 @@ export function drawHighway(canvas, arr, now, t, cam) {
     // Painted bigger the further off it is, so it shrinks as gently as the numbers on notes do (see label) instead of
     // fading to a smudge by the back of the highway: w and depth are its size where it meets the board
     const [px, py, k] = P(x, floor, z), grow = (k0 / k) ** NUM_GROW;
-    const [ax, ay] = P(x + w * grow, floor, z), [zx, zy] = P(x, floor, z + depth * grow);
+    const [ax, ay] = P(x + w * grow, floor, z), wide = Math.hypot(ax - px, ay - py);
+    // The length it is painted over is cut back near the board: down there the floor is steep enough that the whole of it
+    // comes up on screen, and a glyph drawn long enough to read at the back stands up narrow and stretched (NUM_TALL)
+    let deep = depth * grow, [zx, zy] = P(x, floor, z + deep), tall = Math.hypot(zx - px, zy - py);
+    for (let pass = 0; pass < 3 && tall > wide * NUM_TALL; pass++) { // the highway falls away as it is trimmed, so the trim settles over a pass or two
+      deep *= (wide * NUM_TALL) / tall;
+      [zx, zy] = P(x, floor, z + deep);
+      tall = Math.hypot(zx - px, zy - py);
+    }
     // Out towards the ends of the neck the floor's own up turns away from the screen's and lays a glyph on its side: past
     // NUM_TILT it is no longer worth reading, and it fades out rather than popping as the camera swings
-    const tilt = Math.abs(Math.atan2(zx - px, py - zy)), tall = Math.hypot(zx - px, zy - py);
+    const tilt = Math.abs(Math.atan2(zx - px, py - zy));
     if (px < -60 || px > W + 60 || tall < NUM_MIN_PX || tilt > NUM_TILT) return;
     const was = g.globalAlpha;
     g.globalAlpha = was * Math.min(1, (NUM_TILT - tilt) / 0.2, (tall - NUM_MIN_PX) / 3); // and in from the far end, so nothing pops
@@ -680,17 +690,15 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Inlay fret numbers down the highway, as Rocksmith has them: a row on every bar line, so wherever the eye is there is a
   // ruler near it. The frets under the hand position are left out — that band has its own number, and its notes sit on them.
-  // The last stretch before the board is faded out: there the row would land on the board's own numbers
-  if (t.fretNumbers)
+  // A row stays lit the whole way in, so the ruler is still there to read at the moment its notes land
+  if (numberInk)
     for (let b = firstAt(arr.beats, now); b < arr.beats.length; b++) {
       const beat = arr.beats[b], dt = beat.time - now;
       if (dt > LOOK) break;
-      if (beat.measure < 0 || dt < 0.3) continue;
+      if (beat.measure < 0) continue;
       const a = anchorAt(anchors, beat.time), z = Z(dt);
-      g.globalAlpha = Math.min(1, (dt - 0.3) / 0.5);
-      for (const f of INLAYS) if (f < a.fret || f >= a.fret + a.width) floorLabel(String(f), f - 0.5, z, NUM_W, NUM_Z, alpha(t.inlay, 0.7));
+      for (const f of INLAYS) if (f < a.fret || f >= a.fret + a.width) floorLabel(String(f), f - 0.5, z, NUM_W, NUM_Z, alpha(t.inlay, numberInk));
     }
-  g.globalAlpha = 1;
 
   // Hand positions, unless the guides are turned off: a faint band down the highway with thin edges on the
   // floor. A move starts a new band, with its index-finger fret beside it
@@ -1341,9 +1349,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if ((muted || palm) && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, t.muted); // its mute, greyed out
       g.globalAlpha = faded;
     } else {
-      if (!open && z > 1.75 && t.fretNumbers) {
+      if (!open && numberInk) {
         const fret = note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
-        label(fret, x, floor, z - 0.55, note.grace ? 0.18 : 0.26, c); // just in front of the note's line
+        const size = note.grace ? 0.7 : 1; // painted on the floor like the inlay row, so it reads as far back as that one does, and holds until the note lands
+        floorLabel(fret, x, Math.max(0.35, z - 0.55), NUM_W * size, NUM_Z * size, alpha(c, numberInk)); // just in front of the note's line, and never so close in that it lands on the board's own numbers
       }
       if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 

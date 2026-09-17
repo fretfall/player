@@ -88,7 +88,7 @@ const STRING_ORDERS = {
     low: { label: "Low E on top" },
     high: { label: "High e on top" },
 }; // looking down at the guitar, or as in tab
-const VIEW_DEFAULTS = 7; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords, 6 the side angle, 7 fret numbers
+const VIEW_DEFAULTS = 8; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords, 6 the side angle, 7 fret numbers, 8 their opacity
 const VIEW_START = {
     viewAngle: 30,
     sideAngle: 5,
@@ -114,7 +114,7 @@ const settings = {
     tabView: false,
     tabLayout: "scroll",
     guides: true,
-    fretNumbers: true,
+    fretNumbers: 0.5,
     songIntro: true,
     noteLines: 0.5,
     notes3d: true,
@@ -133,7 +133,7 @@ try {
             delete saved[key];
     if (version < 5) delete saved.repeatMarks;
     if (version < 6) delete saved.sideAngle;
-    if (version < 7) delete saved.fretNumbers;
+    if (version < 8) delete saved.fretNumbers; // saved while it was an on/off switch
     delete saved.viewDefaults;
     if (typeof saved.noteLines !== "number") delete saved.noteLines; // saved while it was an on/off switch
     Object.assign(settings, saved);
@@ -333,6 +333,7 @@ const VIEW = {
     fretWidth: (v) => `${Math.round(v * 100)}%`,
     boardHeight: (v) => `${Math.round(v * 100)}%`,
     noteLines: (v) => `${Math.round(v * 100)}%`,
+    fretNumbers: (v) => `${Math.round(v * 100)}%`,
 };
 const showView = () => {
     for (const [key, show] of Object.entries(VIEW))
@@ -357,7 +358,7 @@ showView();
 $("resetSettings").onclick = () => {
     const { volume, volumeMuted, metronome, minimal, tabView, panel } = settings;
     Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, tabView, panel });
-    for (const key of ["guides", "fretNumbers", "notes3d", "songIntro", "mute", "autoplay"])
+    for (const key of ["guides", "notes3d", "songIntro", "mute", "autoplay"])
         $(key).checked = settings[key];
     if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
     setOffset(settings.offset);
@@ -420,7 +421,7 @@ $("volume").oninput = (e) => setVolume(+e.target.value, false);
 $("volumeButton").onclick = () => toggleVolume();
 $("volumeMute").onclick = () =>
     setVolume(settings.volume || 0.8, !settings.volumeMuted);
-for (const key of ["guides", "fretNumbers", "notes3d", "songIntro"]) {
+for (const key of ["guides", "notes3d", "songIntro"]) {
     $(key).checked = settings[key];
     $(key).onchange = (e) => {
         settings[key] = e.target.checked;

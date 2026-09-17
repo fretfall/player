@@ -123,6 +123,17 @@ for (let now = 1.5; now < 4.9; now += 1 / 30) {
 const firstShown = trailFrames.indexOf(true);
 assert.ok(firstShown >= 0 && trailFrames.slice(firstShown).every(Boolean), `the slide's trail stays once it shows: ${trailFrames.map(Number).join('')}`);
 
+// A note's fret number on the floor, the whole way in: readable from the back of the highway and still there as the note
+// lands (it used to shrink out of sight up the highway, and go out a note's length before the board)
+const numbered = chart({ length: 10, notes: [{ time: 5, string: 0, fret: 3, ghost: true }], anchors: [{ time: 0, fret: 1 }] });
+const numbers = [];
+const numberer = new Proxy({ fillText: (str) => numbers.push(str) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+for (const out of [3, 1.5, 0]) { // seconds before it is played: the back of the highway, the middle, and the moment it lands
+  numbers.length = 0;
+  drawHighway({ ...canvas, getContext: () => numberer }, numbered, 5 - out, { ...theme(DEFAULT_STYLE), headstock: 'headless', fretNumbers: true }, {});
+  assert.ok(numbers.includes('(3)'), `the note is numbered ${out} s out`); // a ghost note's brackets tell it from the board's own 3
+}
+
 // The 2D tab view draws the fret numbers of the notes coming up, and none from long ago
 const texts = [];
 const writer = new Proxy({ fillText: (str) => texts.push(str) }, { get: (target, key) => (key in target ? target[key] : context[key]) });

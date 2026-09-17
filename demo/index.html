@@ -2187,14 +2187,25 @@
                         aria-labelledby="repeatMarksLabel"
                     ></div>
                 </div>
-                <label class="toggle only-3d"
-                    ><span
-                        >Fret numbers<small
-                            >The fret of each note, on the floor in front of
-                            it</small
-                        ></span
-                    ><input id="fretNumbers" type="checkbox" role="switch"
-                /></label>
+                <div
+                    class="setting only-3d"
+                    title="The fret of each note, on the floor in front of it, and a ruler of inlay frets on every bar line"
+                >
+                    <div class="setting-head">
+                        <label for="fretNumbers">Fret numbers</label
+                        ><output id="fretNumbersOut" for="fretNumbers"></output>
+                    </div>
+                    <input
+                        id="fretNumbers"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                    />
+                    <div class="scale" aria-hidden="true">
+                        <span>Hidden</span><span>Solid</span>
+                    </div>
+                </div>
                 <div
                     class="setting"
                     title="The mute crosses and finger numbers on the notes"
