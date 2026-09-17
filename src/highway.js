@@ -680,12 +680,22 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.strokeStyle = bar ? t.measure : t.beat;
     g.lineWidth = bar ? 1.6 : 1;
     g.beginPath();
+    const arriving = []; // the one or two at the far end fade in like the notes do, each at its own depth, instead of the whole line popping into the horizon
     for (let b = firstAt(arr.beats, now); b < arr.beats.length; b++) {
       const beat = arr.beats[b], dt = beat.time - now;
       if (dt > LOOK) break;
-      if (beat.measure >= 0 === bar) lines([0, floor, Z(dt)], [LAST_FRET, floor, Z(dt)]);
+      if (beat.measure >= 0 !== bar) continue;
+      if (dt > LOOK - 0.4) arriving.push(dt);
+      else lines([0, floor, Z(dt)], [LAST_FRET, floor, Z(dt)]);
     }
     stroke();
+    for (const dt of arriving) {
+      g.globalAlpha = (LOOK - dt) / 0.4;
+      g.beginPath();
+      lines([0, floor, Z(dt)], [LAST_FRET, floor, Z(dt)]);
+      stroke();
+    }
+    g.globalAlpha = 1;
   }
 
   // Inlay fret numbers down the highway, as Rocksmith has them: a row on every bar line, so wherever the eye is there is a
@@ -697,8 +707,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (dt > LOOK) break;
       if (beat.measure < 0) continue;
       const a = anchorAt(anchors, beat.time), z = Z(dt);
+      g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4); // in with its bar line, so a row never lands on the horizon all at once
       for (const f of INLAYS) if (f < a.fret || f >= a.fret + a.width) floorLabel(String(f), f - 0.5, z, NUM_W, NUM_Z, alpha(t.inlay, numberInk));
     }
+  g.globalAlpha = 1;
 
   // Hand positions, unless the guides are turned off: a faint band down the highway with thin edges on the
   // floor. A move starts a new band, with its index-finger fret beside it
