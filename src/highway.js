@@ -1460,6 +1460,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.strokeStyle = g.fillStyle = ink;
     g.lineWidth = Math.max(1.2, 0.04 * k);
     g.textAlign = 'center';
+    const squiggle = (w, amp, cycles) => { // notation's wavy line: along a vibrato, over a tremolo's slashes
+      g.beginPath();
+      for (let j = 0; j <= 20; j++) g[j ? 'lineTo' : 'moveTo'](cx - w + (2 * w * j) / 20, above + Math.sin((j / 20) * Math.PI * 2 * cycles) * amp);
+      stroke();
+    };
     const write = (word, size, style = '700') => {
       if (size * k < 2) return; // below a pixel or two it is only noise
       scaled(word, cx, above, size * k, style, 'center');
@@ -1543,10 +1548,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     for (const word of words) if (word) write(word, word.length > 2 ? 0.22 : 0.28);
     if (note.rightFinger) write(note.rightFinger, 0.26, 'italic 700'); // picking-hand finger: p i m a c
     if (note.vibrato) { // vibrato: a short wave, taller when wide
-      const w = 0.24 * k, amp = (note.vibratoWide ? 0.07 : 0.035) * k;
-      g.beginPath();
-      for (let j = 0; j <= 20; j++) g[j ? 'lineTo' : 'moveTo'](cx - w + (2 * w * j) / 20, above + Math.sin((j / 20) * Math.PI * 4) * amp);
-      stroke();
+      squiggle(0.24 * k, (note.vibratoWide ? 0.07 : 0.035) * k, 2);
       above -= (0.16 + (note.vibratoWide ? 0.06 : 0)) * k;
     }
     if (note.pick) { // pick stroke: ⊓ down, V up
@@ -1566,9 +1568,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
       fill();
       above -= 0.24 * k;
     }
-    if (note.tremolo) { // three short slashes, as in notation
+    if (note.tremolo) { // three short slashes under a wavy line, as notation marks a tremolo that isn't counted out
       for (let j = -1; j <= 1; j++) line2(g, cx - 0.12 * k, above + (j * 0.08 + 0.05) * k, cx + 0.12 * k, above + (j * 0.08 - 0.05) * k);
-      above -= 0.34 * k;
+      above -= 0.3 * k;
+      squiggle(0.14 * k, 0.04 * k, 1.5);
+      above -= 0.14 * k;
     }
     if (slide !== null && !open) { // arrow pointing the way the slide goes
       const dir = Math.sign(slide - note.fret) || 1, x0 = cx - dir * 0.16 * k, x1 = cx + dir * 0.16 * k, yb = above + 0.07 * k, yt = above - 0.09 * k;
@@ -2063,7 +2067,12 @@ export function drawTab(canvas, arr, now, t) {
           g.arc(cx, my + 3, 1.5, 0, Math.PI * 2);
           g.fill();
         });
-        if (note.tremolo) stack(12, (my) => { for (let j = -1; j <= 1; j++) line(cx - 6, my + j * 4 + 2.5, cx + 6, my + j * 4 - 2.5); });
+        if (note.tremolo) stack(18, (my) => { // the slashes, and the wavy line over them
+          for (let j = -1; j <= 1; j++) line(cx - 6, my + j * 4 + 5.5, cx + 6, my + j * 4 + 0.5);
+          g.beginPath();
+          for (let j = 0; j <= 12; j++) g[j ? 'lineTo' : 'moveTo'](cx - 8 + (16 * j) / 12, my - 7 + Math.sin((j / 12) * Math.PI * 2) * 2);
+          g.stroke();
+        });
       });
     }
     // Over the bars: the fret numbers, then the fingers to fret them with, small beside them, then the marks, each a font at a time
