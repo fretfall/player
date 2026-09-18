@@ -187,7 +187,7 @@ const fontSize = (px) => Math.round(px * 4) / 4;
 const MARK_PX = 32; // the size floor markings are set in, before they're scaled
 const metrics = new Map();
 let measured = 0;
-const measure = (g, font, str) => { // → { width, middle: how far the ink's middle is above the baseline }; measuring sets the font
+const measure = (g, font, str) => { // → { width, middle: how far the ink's middle is above the baseline, top: how far its top is }; measuring sets the font
   let known = metrics.get(font);
   if (!known) metrics.set(font, (known = new Map()));
   let m = known.get(str);
@@ -199,7 +199,7 @@ const measure = (g, font, str) => { // → { width, middle: how far the ink's mi
     }
     g.font = font;
     const ink = g.measureText(str); // kept as numbers: a TextMetrics holds on to the browser's font data, and the frames stall collecting it
-    known.set(str, (m = { width: ink.width, middle: (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2 }));
+    known.set(str, (m = { width: ink.width, middle: (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2, top: ink.actualBoundingBoxAscent }));
   }
   return m;
 };
@@ -603,14 +603,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
     setFont(font);
     g.textAlign = 'center';
     g.textBaseline = 'alphabetic';
-    const { middle } = measure(g, font, str);
+    const { top } = measure(g, font, str); // hung from z by the top of its ink, so numbers sharing a line sit flush under it whatever their size
     g.setTransform( // font px across → w of neck; font px up → depth of highway
       (B * (ax - px)) / MARK_PX, (B * (ay - py)) / MARK_PX,
       (-B * (zx - px)) / MARK_PX, (-B * (zy - py)) / MARK_PX,
       B * px, B * (py - originY),
     );
     g.fillStyle = fill; // no halo: sheared text can't come off the glyph cache, so stroking it as well costs a second one
-    g.fillText(str, 0, middle);
+    g.fillText(str, 0, top);
     unscale();
     g.globalAlpha = was;
     g.textBaseline = 'middle';
@@ -715,7 +715,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   }
 
   // Inlay fret numbers down the highway, as Rocksmith has them: a row on every bar line, so wherever the eye is there is a
-  // ruler near it. The frets under the hand position are left out — that band has its own number, and its notes sit on them.
+  // ruler near it. The frets under the hand position are left out — its notes carry their own numbers, and sit on them.
   // A row stays lit the whole way in, so the ruler is still there to read at the moment its notes land
   if (numberInk)
     for (let b = firstAt(arr.beats, now); b < arr.beats.length; b++) {
@@ -729,7 +729,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   g.globalAlpha = 1;
 
   // Hand positions, unless the guides are turned off: a faint band down the highway with thin edges on the
-  // floor. A move starts a new band, with its index-finger fret beside it
+  // floor. A move starts a new band
   const zones = t.guides === false ? [] : anchors.filter((a) => a.endTime > now && a.time < now + LOOK);
   zones.forEach((a, i) => {
     const z0 = Z(Math.max(0, a.time - now)), z1 = Z(Math.min(LOOK, a.endTime - now)), l = a.fret - 1, r = l + a.width;
@@ -740,8 +740,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.lineWidth = ANCHOR_LANE_W * 0.6;
     for (const x of [l, r]) line3([x, floor, z0], [x, floor, z1]);
     if (i && a.time > now) line3([l, floor, z0], [r, floor, z0]);
-    // outside the band so it can't be read as a note to play
-    if (i && a.time > now + 0.3) label(String(a.fret), l - 0.2, floor, z0, 0.3, t.anchorLane, 700, 'right');
   });
 
   // Bar markings on the floor where they happen (meter, key, tempo, feel, repeats, endings, jumps, ottava, free text like
@@ -1396,7 +1394,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (!open && numberInk) {
         const fret = note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
         const size = note.grace ? 0.7 : 1; // painted on the floor like the inlay row, so it reads as far back as that one does, and holds until the note lands
-        floorLabel(fret, x, Math.max(0.35, z - 0.55), NUM_W * size, NUM_Z * size, alpha(c, numberInk)); // just in front of the note's line, and never so close in that it lands on the board's own numbers
+        floorLabel(fret, x, z, NUM_W * size, NUM_Z * size, alpha(c, numberInk)); // hung under the note's own line, so a chord's numbers read as one row
       }
       if (note.dynamicLabel) label(note.dynamicLabel, x - 0.6, floor, z, 0.3, t.text, 'italic 700', 'right'); // where the dynamic changes
 
