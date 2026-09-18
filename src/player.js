@@ -603,6 +603,13 @@ const LEGEND = [
                 ),
             ],
             [
+                "Capo",
+                "Clamped across the neck: from there the strings play open, and the dark frets behind it are out of play.",
+                svg(
+                    `<path d="M4 9h14M4 14h14M4 19h14M4 24h14" class="lt" stroke-width="1" opacity=".15"/><path d="M18 9h32M18 14h32M18 19h32M18 24h32" class="lt" stroke-width="1" opacity=".5"/><path d="M32 6v20M46 6v20" class="lt" stroke-width="1" opacity=".3"/><path d="M18 4v24" class="lt" stroke-width="4.5"/>`,
+                ),
+            ],
+            [
                 "Where to press",
                 "The spot on the fretboard lights up as the note comes close and fills in when you play it.",
                 svg(
@@ -1486,6 +1493,7 @@ function songFromScore(score, cache) {
                 lastOnString = {};
             const markers = [],
                 hairpins = [],
+                capos = staff.capo ? [{ time: 0, fret: staff.capo }] : [], // the file's own capo is simply one from the start
                 passes = {};
             let meter = "4/4",
                 key = "0:0",
@@ -1583,7 +1591,20 @@ function songFromScore(score, cache) {
                             );
                         if (!v) {
                             // beat-wide marks from the first voice only: free text, ottava, crescendo hairpins
-                            if (beat.text) mark(beat.text, t0);
+                            if (beat.text) {
+                                mark(beat.text, t0);
+                                const capo =
+                                    /^\s*capo\s*(\d+|off)\s*$/i.exec(
+                                        beat.text,
+                                    ); // as a tab writes it over the staff
+                                if (capo)
+                                    capos.push({
+                                        time: t0,
+                                        fret: /off/i.test(capo[1])
+                                            ? 0
+                                            : +capo[1],
+                                    });
+                            }
                             if (OTTAVAS[beat.ottava] !== ottava) {
                                 ottava = OTTAVAS[beat.ottava];
                                 mark(ottava ?? "loco", t0);
@@ -1860,6 +1881,25 @@ function songFromScore(score, cache) {
                     x.chord !== null &&
                     chords[x.chord].notes.push(i),
             );
+            if (staff.capo) {
+                // Guitar Pro counts a capo'd chart's frets from the capo. Everything here is where the finger goes on the
+                // board instead, so lift them onto it before the hand positions are worked out from them
+                const up = (fret) =>
+                    fret > 0 ? fret + staff.capo : fret; // an open string stays open: the capo is fretting it
+                for (const x of notes) {
+                    x.fret = up(x.fret);
+                    if (x.slideTo !== null) x.slideTo = up(x.slideTo);
+                    if (x.slideUnpitchTo !== null)
+                        x.slideUnpitchTo = up(x.slideUnpitchTo);
+                    if (typeof x.trill === "number")
+                        x.trill = up(x.trill);
+                }
+                for (const c of chords) {
+                    c.frets = c.frets.map(up);
+                    if (c.barre) c.barre.fret = up(c.barre.fret);
+                }
+                for (const h of handShapes) h.frets = h.frets.map(up);
+            }
             const suggested = suggestPositions(notes); // Guitar Pro files rarely say where the hand goes or which finger presses
             anchors.push(...suggested.anchors);
             for (const x of notes)
@@ -1889,6 +1929,7 @@ function songFromScore(score, cache) {
                 handShapes,
                 markers,
                 hairpins,
+                capos,
                 track,
             };
         });
@@ -2095,6 +2136,7 @@ function selectArrangement(i) {
         );
     const facts = [
         ["Tuning", arr.open?.length ? tuningName(arr.open) : null],
+        ["Capo", arr.capos?.[0]?.time === 0 && arr.capos[0].fret ? `fret ${arr.capos[0].fret}` : null],
         ["Tempo", song.bpm ? `${Math.round(song.bpm)} bpm` : null],
     ].filter(([, v]) => v);
     $("info").replaceChildren(

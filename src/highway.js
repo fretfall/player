@@ -23,6 +23,7 @@ const GEM_DEPTH = 0.12; // how deep 3D notes are: 4 to 5 px at the board
 const FRAME_AHEAD = 3, MIN_SPAN = 11; // seconds of hand positions framed ahead; frets in view at the closest zoom, less the fret of slack
 const WHOLE_SONG = [{ time: -Infinity, endTime: Infinity, fret: 1, width: 4 }];
 const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]; // where a fretboard has position dots
+const CAPO_BACK = 0.15; // fret widths behind its fret wire a capo clamps on, where a finger would go
 const NUM_W = 0.31, NUM_Z = 1.7; // fret widths across the neck and down the highway a fret number painted on the floor covers
 const NUM_TILT = 1.4; // radians from upright past which the floor has turned edge-on: a number is kept to the ends of the neck, and only goes once it is a line, not a digit
 const NUM_MIN_PX = 1; // px tall a number must come to on screen: below this it is a smudge, not a digit
@@ -254,6 +255,16 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const unit = (a) => a.map((v) => v / Math.hypot(...a));
 
+// The fret a capo is clamped at by `time`, 0 for none: a chart moves it as it goes ("capo 2", "capo off") and a file
+// with one of its own has it from the start. Scanned rather than searched: a song has one or two of them, not thousands
+const capoAt = (capos, time) => {
+  let fret = 0;
+  for (const c of capos ?? []) {
+    if (c.time > time) break;
+    fret = c.fret;
+  }
+  return fret;
+};
 const anchorAt = (anchors, time) => { // the last hand position to start by `time`, or the first
   let lo = 0, hi = anchors.length;
   while (lo < hi) {
@@ -355,7 +366,7 @@ function follow(cam, key, target, time, dt) {
 
 // Frame every hand position coming up in the next FRAME_AHEAD seconds: a big move zooms out to show
 // both positions, then eases back in once the old one is behind.
-function framing(anchors, now) {
+function framing(anchors, now, capo = 0) {
   let lo = Infinity, hi = -Infinity;
   for (const a of anchors) {
     if (a.endTime <= now || a.time >= now + FRAME_AHEAD) continue;
@@ -366,15 +377,16 @@ function framing(anchors, now) {
     const a = anchorAt(anchors, now);
     [lo, hi] = [a.fret - 1, a.fret - 1 + a.width];
   }
+  if (capo) lo = Math.min(lo, capo - 1); // a capo is the nut from where it sits: what the open strings sound stays in view
   const span = Math.max(MIN_SPAN, hi - lo + 2) + 1; // the extra fret of slack keeps small shifts from moving the camera
   return { lo, hi, span, center: Math.min(25 - span / 2, Math.max(span / 2 - 1, (lo + hi) / 2)) };
 }
 
 // Glides cam { center, span, left, right } toward the framing; returns the hand position right now
-export function moveCamera(cam, anchors, now, clock) {
-  const want = framing(anchors, now), view = cam.target;
+export function moveCamera(cam, anchors, now, clock, capo = 0) {
+  const want = framing(anchors, now, capo), view = cam.target;
   const outside = !view || want.lo < view.center - view.span / 2 || want.hi > view.center + view.span / 2;
-  const tooWide = view && view.span - Math.max(want.span, framing(anchors, now + FRAME_AHEAD).span) > 2; // don't zoom in just to zoom out again
+  const tooWide = view && view.span - Math.max(want.span, framing(anchors, now + FRAME_AHEAD, capo).span) > 2; // don't zoom in just to zoom out again
   if (outside || tooWide) cam.target = want;
   const ms = Math.min(clock - (cam.at ?? clock), 100);
   cam.at = clock;
@@ -431,7 +443,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
   if (!arr) return;
 
   const anchors = arr.anchors.length ? arr.anchors : WHOLE_SONG;
-  const here = moveCamera(cam, anchors, now, performance.now());
+  const capo = capoAt(arr.capos, now);
+  const here = moveCamera(cam, anchors, now, performance.now(), capo);
   const n = arr.strings, spacing = Math.min(0.5, (5 * GAP) / Math.max(1, n - 1)), gap = spacing * BOARD_HEIGHT * (t.boardHeight ?? 1), stack = gap * (n - 1); // the height setting spreads the strings, and their notes grow with them
   const ys = (s) => (t.stringOrder === 'high' ? s : n - 1 - s) * gap; // lowest string on top, like looking down at the guitar, or highest on top, like tab
   const SPEED = NOTE_SPEED * (t.noteSpeed ?? 1), LOOK = lookAhead(t);
@@ -926,6 +939,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.ellipse(px, py, 0.1 * k, 0.08 * k, 0, 0, Math.PI * 2);
     }
     fill();
+    if (capo > 0) { // behind a capo the neck is dead wood
+      g.fillStyle = alpha(t.ink, 0.5);
+      path([[0, boardLo, 0], [capo - CAPO_BACK, boardLo, 0], [capo - CAPO_BACK, boardHi, 0], [0, boardHi, 0]]);
+      fill();
+    }
     if (parts) plate(); // the headstock in front of the nut
 
     // The strike line: metal fret wires, the nut, the hand position's posts, and the strings
@@ -998,7 +1016,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // to a tenth of a device pixel, and the hand position to as little, it holds still as soon as what's left of a glide can't be seen
   const landing = (x, y) => P(x, y, 0).slice(0, 2).map((v) => Math.round(v * B * 10)).join(':');
   const view = [t.headstock, n, gap, flip, W, B, Math.round(stretch * 1e4), landing(0, boardLo), landing(LAST_FRET, boardLo), landing(0, boardHi), landing(LAST_FRET, boardHi), landing(-4, stack / 2)].join();
-  const still = !bending.size && [view, here.fret, here.width, Math.round(cam.left * 1000), Math.round(cam.right * 1000)].join();
+  const still = !bending.size && [view, here.fret, here.width, capo, Math.round(cam.left * 1000), Math.round(cam.right * 1000)].join();
   if (!still || cam.board?.key !== still || cam.board.t !== t) {
     cam.board = still && { key: still, t };
     drawBoard();
@@ -1065,6 +1083,16 @@ export function drawHighway(canvas, arr, now, t, cam) {
     stroke();
   }
   glow(false);
+  if (capo > 0) { // The capo, clamped over the strings just behind its fret wire: from there they play open. Drawn here
+    // rather than into the board's image, so it stays on top of a string lit by a note sounding on it
+    const x = capo - CAPO_BACK;
+    g.strokeStyle = t.nut;
+    g.lineWidth = Math.max(4, 0.17 * k0);
+    line3([x, boardLo - 0.16, 0], [x, boardHi + 0.16, 0]);
+    g.strokeStyle = alpha(t.ink, 0.45); // the dark rubber down its middle
+    g.lineWidth = Math.max(1, 0.05 * k0);
+    line3([x, boardLo - 0.13, 0], [x, boardHi + 0.13, 0]);
+  }
   lap('strings');
 
   // Under every frame and gem: a white line on the floor under each note, marking its beat (chords get theirs under the
