@@ -307,7 +307,7 @@ function curveAt(points, sec) {
   return value;
 }
 export const bendAt = (note, sec) => curveAt(timedCurve(note, 'bendCurve'), sec); // steps bent, sec seconds after the note starts
-const pitchAt = (note, sec) => bendAt(note, sec) + curveAt(timedCurve(note, 'whammy'), sec); // bend and whammy bar together
+const whammyAt = (note, sec) => curveAt(timedCurve(note, 'whammy'), sec); // steps the bar is pushing the pitch, sec seconds after the note starts
 const peaks = new WeakMap();
 const bendPeak = (note) => { // asked for many times a frame: worked out once
   let peak = peaks.get(note);
@@ -447,6 +447,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
   const here = moveCamera(cam, anchors, now, performance.now(), capo);
   const n = arr.strings, spacing = Math.min(0.5, (5 * GAP) / Math.max(1, n - 1)), gap = spacing * BOARD_HEIGHT * (t.boardHeight ?? 1), stack = gap * (n - 1); // the height setting spreads the strings, and their notes grow with them
   const ys = (s) => (t.stringOrder === 'high' ? s : n - 1 - s) * gap; // lowest string on top, like looking down at the guitar, or highest on top, like tab
+  // Which way a bend moves a string: the hand pushes the treble strings towards the bass ones and pulls the bass strings
+  // back the other way, for the room to do it. Either way it runs into the neck rather than off the edge of it
+  const bendWay = (string) => (string >= n / 2 ? 1 : -1) * (t.stringOrder === 'high' ? -1 : 1);
   const SPEED = NOTE_SPEED * (t.noteSpeed ?? 1), LOOK = lookAhead(t);
   const boardLo = -0.22, boardHi = stack + 0.22, floor = boardLo - 0.06, far = LOOK * SPEED;
   const Z = (dt) => Math.max(0, dt) * SPEED; // played notes stay on the board while they fade: the camera is right behind it
@@ -815,7 +818,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // A bend raises what shows the note: its trail on the highway, and its string and target on the fretboard, all by the
   // same amount, so they meet at the board
-  const liftAt = (note, sec) => pitchAt(note, sec) * gap * BEND_LIFT; // sec seconds into the note
+  // sec seconds into the note: a bend moves the string the way the hand pushes it, the bar moves every string the way the pitch goes
+  const liftAt = (note, sec) => (bendAt(note, sec) * bendWay(note.string) + whammyAt(note, sec)) * gap * BEND_LIFT;
   const noteLift = (note) => { // while it sounds
     const sec = now - note.time;
     return sec < 0 || note.fret === 0 || !(bendPeak(note) > 0) ? 0 : liftAt(note, Math.min(sec, Math.max(note.sustain, 0.15)));
@@ -1549,8 +1553,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
         for (let j = 0; j < count; j++) chevron(g, cx, top - j * step - (dir > 0 ? 0 : h), w, h, dir, repeated ? ink : c, edge);
         top -= count * step + 0.08 * k;
       };
-      if (!pre || !release) stack(-1); // a pre-bend that is let down only needs the way down
-      if (release) stack(1);
+      const way = bendWay(note.string); // the chevrons follow the string: up off the treble strings, down off the bass ones
+      if (!pre || !release) stack(-way); // a pre-bend that is let down only needs the way back
+      if (release) stack(way);
       const amount = `${pre ? 'pre ' : ''}${bendLabel(peak)}`;
       g.fillStyle = ink;
       scaled(amount, cx + w + 0.08 * k, (cy - hh * k + top) / 2, 0.22 * k, 700, 'left');
@@ -1661,9 +1666,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
     }
     const finger = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
     if (!open && finger !== null) label(finger === 0 ? 'T' : String(finger), x, y, 0, gap * 0.55, pressed ? marks : t.text, 800, 'center', !pressed || white);
-    if (!open && bendPeak(note) > 0) { // a bend: a chevron on top of its target, down for a pre-bend let down
-      const [px, py] = P(x, y + hh, 0), letDown = note.bendCurve?.[0]?.[1] > 0 && note.bendCurve.at(-1)[1] < bendPeak(note);
-      chevron(g, px, py - (letDown ? 0.14 : 0.05) * k0, 0.17 * k0 * stretch, 0.085 * k0, letDown ? 1 : -1, '#ffffff', alpha(t.ink, 0.9));
+    if (!open && bendPeak(note) > 0) { // a bend: a chevron beyond its target the way the string is pushed, turned round for a pre-bend let down
+      const way = bendWay(note.string), letDown = note.bendCurve?.[0]?.[1] > 0 && note.bendCurve.at(-1)[1] < bendPeak(note);
+      const [px, py] = P(x, y + way * hh, 0);
+      chevron(g, px, py - way * (letDown ? 0.14 : 0.05) * k0, 0.17 * k0 * stretch, 0.085 * k0, (letDown ? 1 : -1) * way, '#ffffff', alpha(t.ink, 0.9));
     }
     g.globalAlpha = 1;
   }

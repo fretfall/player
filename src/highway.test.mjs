@@ -123,6 +123,23 @@ for (let now = 1.5; now < 4.9; now += 1 / 30) {
 const firstShown = trailFrames.indexOf(true);
 assert.ok(firstShown >= 0 && trailFrames.slice(firstShown).every(Boolean), `the slide's trail stays once it shows: ${trailFrames.map(Number).join('')}`);
 
+// A bend moves the string the way a hand pushes it, and its chevrons follow: the treble strings up towards the bass ones,
+// the bass strings down the other way. A chevron is the only three-point stroke that isn't flat (the strings are the rest)
+const bendWays = (string) => {
+  const ways = [];
+  let pts = [];
+  const chevrons = new Proxy({
+    beginPath: () => { pts = []; }, moveTo: (x, y) => pts.push(y), lineTo: (x, y) => pts.push(y),
+    stroke: () => { if (pts.length === 3 && pts[0] !== pts[1]) ways.push(Math.sign(pts[0] - pts[1])); }, // + points up, - points down
+  }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+  const bent = chart({ length: 10, notes: [{ time: 1, string, fret: 7, sustain: 0.5, bendCurve: [[0, 0], [0.4, 1], [1, 1]] }], anchors: [{ time: 0, fret: 6 }] });
+  drawHighway({ ...canvas, getContext: () => chevrons }, bent, 0.6, { ...theme(DEFAULT_STYLE), headstock: 'headless' }, {});
+  return ways;
+};
+const [treble, bass] = [bendWays(5), bendWays(0)];
+assert.ok(treble.length && treble.every((w) => w > 0), `a bend on the top string points up: ${treble}`);
+assert.ok(bass.length && bass.every((w) => w < 0), `a bend on the bottom string points down: ${bass}`);
+
 // A note's fret number on the floor, the whole way in: readable from the back of the highway and still there as the note
 // lands (it used to shrink out of sight up the highway, and go out a note's length before the board)
 const numbered = chart({ length: 10, notes: [{ time: 5, string: 0, fret: 3, ghost: true }], anchors: [{ time: 0, fret: 1 }] });
