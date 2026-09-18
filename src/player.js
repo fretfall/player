@@ -2171,14 +2171,10 @@ function selectArrangement(i) {
         1,
         ...arr.phrases.map((p) => p.maxDifficulty),
     );
-    // Where a moment sits along the phrase bars and the progress line: both run from 0:00 to the end, so a
-    // recording's lead-in before the first phrase is empty space
-    const at = (sec) =>
-        `${Math.min(100, Math.max(0, (sec / song.length) * 100)).toFixed(2)}%`;
     bars = arr.phrases.map((p) => {
         const b = document.createElement("div");
-        b.style.left = at(p.time);
-        b.style.width = `calc(${at(p.endTime)} - ${at(p.time)} - 3px)`; // 3px apart
+        b.style.left = pct(p.time);
+        b.style.width = `calc(${pct(p.endTime)} - ${pct(p.time)} - 3px)`; // 3px apart
         b.style.height = `${Math.max(8, (p.maxDifficulty / hardest) * 100)}%`;
         return b;
     });
@@ -2196,13 +2192,17 @@ function selectArrangement(i) {
         `linear-gradient(90deg, ${arr.phrases
             .map(
                 (p, j) =>
-                    `color-mix(in srgb, var(--accent) ${Math.round(8 + 62 * (busy[j] / busiest))}%, var(--todo)) ${at(p.time)} ${at(p.endTime)}`,
+                    `color-mix(in srgb, var(--accent) ${Math.round(8 + 62 * (busy[j] / busiest))}%, var(--todo)) ${pct(p.time)} ${pct(p.endTime)}`,
             )
             .join(", ")})`;
     ui = {};
 }
 
-// The loop shows as a box around the phrase bars it spans, with a grip on each edge
+// Where a moment sits along the phrase bars and the progress line: both run from 0:00 to the end, so a
+// recording's lead-in before the first phrase is empty space
+const pct = (sec) =>
+    `${Math.min(100, Math.max(0, (sec / song.length) * 100)).toFixed(2)}%`;
+// The loop shows as a box with a grip on each edge, placed by its own times: snapped to the phrase bars or not
 const loopBars = (range) => {
     const inside = (b, j) =>
         !!range &&
@@ -2211,13 +2211,12 @@ const loopBars = (range) => {
     return [bars.findIndex(inside), bars.findLastIndex(inside)];
 };
 function markLoop(range = loop) {
-    const [first, last] = loopBars(range),
-        box = $("loopBox");
-    box.hidden = first < 0;
-    if (first >= 0)
+    const box = $("loopBox");
+    box.hidden = !range || !song;
+    if (!box.hidden)
         Object.assign(box.style, {
-            left: `${bars[first].offsetLeft - 3}px`,
-            width: `${bars[last].offsetLeft + bars[last].offsetWidth - bars[first].offsetLeft + 6}px`,
+            left: `calc(${pct(range.start)} - 3px)`, // the same 3px of air the bars leave between them
+            width: `calc(${pct(range.end)} - ${pct(range.start)} + 3px)`,
         });
     $("loop").setAttribute("aria-pressed", String(!!range));
     if (following && range === loop && JSON.stringify(loop) !== JSON.stringify(leader.loop))
@@ -2227,7 +2226,8 @@ function markLoop(range = loop) {
 addEventListener("resize", () => markLoop());
 // Phrase bars: a click jumps to that moment, whose time shows under the pointer (with a loop, a click moves the loop to
 // the phrase, or stretches it there with shift); pressing and dragging across them loops that stretch, and dragging a
-// grip moves just that edge. Only the pointer's x counts, so a drag can stray off the bars.
+// grip moves just that edge. A drag snaps to whole phrases; held with shift it takes the pointer's own moment instead,
+// for a loop of any length. Only the pointer's x counts, so a drag can stray off the bars.
 let phrasesBox = null; // measured as the pointer comes in: the bars don't move under it
 const timeAt = (x) =>
     Math.min(1, Math.max(0, (x - phrasesBox.left) / phrasesBox.width)) *
@@ -2247,15 +2247,17 @@ $("phrases").onpointerdown = (e) => {
     const at = phraseAt(e.clientX),
         [first, last] = loopBars(loop),
         box = $("loopBox").getBoundingClientRect();
-    const from =
-        first < 0
-            ? at
+    const grip = // a grip pivots on the other end of the loop
+        !loop || box.width === 0
+            ? null
             : Math.abs(e.clientX - box.left) < 6
-              ? last
+              ? "start"
               : Math.abs(e.clientX - box.right) < 6
-                ? first
-                : at; // a grip pivots on the other end
-    drag = { at, from, x: e.clientX, range: null };
+                ? "end"
+                : null;
+    const from = grip === "start" && last >= 0 ? last : grip === "end" && first >= 0 ? first : at;
+    const pivot = grip ? loop[grip === "start" ? "end" : "start"] : timeAt(e.clientX);
+    drag = { at, from, pivot, x: e.clientX, range: null };
     $("phrases").setPointerCapture(e.pointerId);
 };
 $("phrases").onpointermove = (e) => {
@@ -2268,11 +2270,17 @@ $("phrases").onpointermove = (e) => {
     }
     if (!drag || (!drag.range && Math.abs(e.clientX - drag.x) < 4))
         return; // a few pixels of wobble is still a click
-    const to = phraseAt(e.clientX);
-    drag.range = {
-        start: arr.phrases[Math.min(drag.from, to)].time,
-        end: arr.phrases[Math.max(drag.from, to)].endTime,
-    };
+    const to = phraseAt(e.clientX),
+        here = timeAt(e.clientX);
+    drag.range = e.shiftKey
+        ? {
+              start: Math.min(drag.pivot, here),
+              end: Math.max(drag.pivot, here, Math.min(drag.pivot, here) + 0.25), // never so narrow that the loop has nothing to play
+          }
+        : {
+              start: arr.phrases[Math.min(drag.from, to)].time,
+              end: arr.phrases[Math.max(drag.from, to)].endTime,
+          };
     markLoop(drag.range);
 };
 $("phrases").onpointerup = (e) => {
