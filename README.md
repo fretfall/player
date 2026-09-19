@@ -45,13 +45,38 @@ fretfall.part = 1;
 | Member | |
 |:--|:--|
 | `open(files, options)` / `pick()` | Open songs, or show the file dialog |
-| `playing`, `time`, `length` | Where playback is, in seconds. `playing` is settable: it waits for the synth's instruments |
+| `playing`, `time`, `length` | Where playback is, in seconds. `playing` is settable: it waits for the synth's instruments. So is `time`: a jump to there, kept within the song |
 | `parts`, `part` | The song's parts, and the one shown (settable) |
 | `addFormat({ name, extensions, open })` | Read another file type: `open(file)` resolves to `{ song, audio }` |
 | `closeSheets()` | Close Settings and the notation sheet |
 
 Events on `window`: `fretfall:ready`, `fretfall:song`, `fretfall:playing`, `fretfall:sheet`. The modules import on their own
 too, for example `music.js` for tunings and note names.
+
+### In a page of your own
+
+A page that isn't the player's, a React app's say, mounts it in an element instead. `mount.js` is written from the player's
+page by the build, so it carries the same markup and styles, kept to that element:
+
+```js
+import { mount } from '@fretfall/player/mount.js';
+
+const fretfall = await mount(element); // window.fretfall, once fretfall:ready has fired
+```
+
+- **Once a page.** The player's modules run once and there is no unmount: a second call returns the first one's promise. Keep
+  the element and hide it (`hidden`, `display: none`) rather than removing it; hidden, the player draws nothing and leaves
+  the keys alone. It plays on, so pause it first: `fretfall.playing = false`.
+- **The element needs a size**, a height above all: the player fills it, whether that is the whole screen or a hero. Inside,
+  it is a box of its own (`contain: layout`): its bar and sheets stay in it, and full screen is that box's.
+- **The ids in the player are its own** — `play`, `open`, `menu`, `settings`, `file`, `fonts` and a hundred more — so the page
+  around it must not use them; `mount()` rejects if it finds one taken. Its small-screen layouts still follow the window's
+  width, not the element's.
+- The page around it stays the page's: its styles, its title (follow `fretfall:song` to set one), keys pressed in its inputs
+  and on its buttons, and files dropped outside the player. With the focus nowhere, the shortcuts are the player's. Band
+  windows open the page's own URL with `?band=`, so that URL has to mount the player again.
+
+Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 
 Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> 2D tab · <kbd>K</kbd> metronome ·
 <kbd>F</kbd> full screen · <kbd>S</kbd> settings · <kbd>?</kbd> everything else. Add `?perf` to the URL for a frame profiler.
@@ -70,6 +95,9 @@ npm run bench     # frame time, draw calls, sync and size of dist/
 `src/` is the player's modules, `demo/` the page they ship with, and the demo's front door and tab. The build flattens both
 into `dist/`, which is what npm publishes and what the demo serves — so the page next to the modules, as a page built on the
 player has it. The front door, between `<!-- demo -->` and `<!-- /demo -->` in the page, stays out of the package.
+
+`demo/mount.html` tries the mounted player, in a page with a look and an input of its own. `mount.js` only exists once built,
+so it is served from the built demo: `DEMO=1 npm run build && npx serve dist`, then `/mount.html`.
 
 No pull request may make the player slower or bigger. CI builds it and the base branch, benchmarks both in turns on the same
 runner, and fails on more than 10% frame or sync time, 5% draw calls or 1% gzipped size. A regression taken on purpose

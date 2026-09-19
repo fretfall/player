@@ -37,6 +37,13 @@ import {
 } from "./perf.js";
 
 const $ = (id) => document.getElementById(id);
+// Where the player lives: the element it's mounted in on a page that isn't its own (see mount.js), or else the page. Found
+// once, here. What is the page's there is this element's: the classes and colours of the look, the full screen, the box
+// things are fixed to, the keys and the drops; the title stays the page's own
+const root =
+        document.querySelector("[data-fretfall]") ??
+        document.documentElement,
+    mounted = root !== document.documentElement;
 const CDN =
     "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/";
 const OPEN_STRINGS = {
@@ -181,14 +188,8 @@ function applyTheme() {
         boardHeight: settings.boardHeight,
         fill: settings.minimal, // nothing over the highway: it grows into the room
     };
-    document.documentElement.classList.toggle(
-        "minimal",
-        settings.minimal,
-    );
-    document.documentElement.classList.toggle(
-        "tab2d",
-        settings.tabView,
-    );
+    root.classList.toggle("minimal", settings.minimal);
+    root.classList.toggle("tab2d", settings.tabView);
     $("fonts").href = theme.href;
     const vars = {
         bg: theme.bg,
@@ -211,8 +212,8 @@ function applyTheme() {
         Object.fromEntries(theme.str.map((c, i) => [`s${i}`, c])),
     ); // the legend draws with these
     for (const [k, v] of Object.entries(vars))
-        document.documentElement.style.setProperty(`--${k}`, v);
-    for (const seg of document.querySelectorAll("[data-setting]"))
+        root.style.setProperty(`--${k}`, v);
+    for (const seg of root.querySelectorAll("[data-setting]"))
         for (const b of seg.children) {
             b.setAttribute(
                 "aria-pressed",
@@ -272,7 +273,7 @@ const dotsFor = (setting, value) => {
     const c = COLORS[value];
     return [c.floor0, c.lane, c.accent, c.text];
 };
-for (const seg of document.querySelectorAll("[data-setting]")) {
+for (const seg of root.querySelectorAll("[data-setting]")) {
     const setting = seg.dataset.setting,
         options = {
             look: LOOKS,
@@ -441,7 +442,7 @@ $("mute").onchange = (e) => {
     if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
 };
 const showPanel = (name) => {
-    for (const tab of document.querySelectorAll("[data-tab]")) {
+    for (const tab of root.querySelectorAll("[data-tab]")) {
         const on = tab.dataset.tab === name;
         tab.setAttribute("aria-selected", String(on));
         tab.tabIndex = on ? 0 : -1;
@@ -450,11 +451,11 @@ const showPanel = (name) => {
     settings.panel = name;
     save();
 };
-for (const tab of document.querySelectorAll("[data-tab]")) {
+for (const tab of root.querySelectorAll("[data-tab]")) {
     tab.onclick = () => showPanel(tab.dataset.tab);
     tab.onkeydown = (e) => {
         // arrow keys move between tabs
-        const tabs = [...document.querySelectorAll("[data-tab]")],
+        const tabs = [...root.querySelectorAll("[data-tab]")],
             step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
         if (!step) return;
         const next =
@@ -467,7 +468,7 @@ for (const tab of document.querySelectorAll("[data-tab]")) {
     };
 }
 showPanel(
-    document.querySelector(`[data-tab="${settings.panel}"]`)
+    root.querySelector(`[data-tab="${settings.panel}"]`)
         ? settings.panel
         : "view",
 );
@@ -501,11 +502,9 @@ const toggleMenu = (
 ) => $("menuButton").setAttribute("aria-expanded", String(open));
 const placeParts = () => {
     if (phone.matches)
-        document.querySelector(".speed").before($("arrangements"));
+        root.querySelector(".speed").before($("arrangements"));
     else
-        document
-            .querySelector(".wordmark")
-            .after($("arrangements"));
+        root.querySelector(".wordmark").after($("arrangements"));
     toggleMenu(false);
 };
 compact.onchange = phone.onchange = placeParts;
@@ -1288,6 +1287,7 @@ const api = new alphaTab.AlphaTabApi($("tab"), {
         soundFont: CDN + "soundfont/sonivox.sf2",
         enableCursor: false,
         enableUserInteraction: false,
+        scrollMode: "Off", // or it scrolls the page along with its hidden score: nothing to scroll on the player's own, mounted it's the page around it
     },
 });
 // paused: the tick the player was paused at. alphaTab 1.8 rewinds to the start on pause, so the position it reports
@@ -2008,7 +2008,8 @@ function setSong(next) {
     song = { ...next, lines: lyricLines(next.lyrics) };
     if (!following) loop = null; // a band window keeps the loop it was sent
     if (leading) band.postMessage({ song: bandSong() });
-    document.title = `${song.title || "Untitled"} – Fretfall`;
+    if (!mounted)
+        document.title = `${song.title || "Untitled"} – Fretfall`;
     const parts = song.arrangements;
     $("band").disabled = parts.length < 2;
     if (parts.length > 4) {
@@ -2447,20 +2448,20 @@ $("file").onchange = (e) => {
     openFiles(e.target.files);
     e.target.value = "";
 };
-let dragDepth = 0;
-addEventListener("dragenter", (e) => {
+let dragDepth = 0; // on the root: mounted, files dropped on the page around the player are that page's
+root.addEventListener("dragenter", (e) => {
     e.preventDefault();
     dragDepth++;
     $("drop").hidden = false;
 });
-addEventListener("dragleave", () => {
+root.addEventListener("dragleave", () => {
     if (--dragDepth <= 0) {
         dragDepth = 0;
         $("drop").hidden = true;
     }
 });
-addEventListener("dragover", (e) => e.preventDefault());
-addEventListener("drop", (e) => {
+root.addEventListener("dragover", (e) => e.preventDefault());
+root.addEventListener("drop", (e) => {
     e.preventDefault();
     dragDepth = 0;
     $("drop").hidden = true;
@@ -2585,18 +2586,19 @@ function syncLoopTools() {
     tools.hidden = !loop || box.hidden;
     if (tools.hidden) return;
     const edge = box.getBoundingClientRect(),
+        room = root.getBoundingClientRect(), // the screen, or mounted the element's box: what the tools are fixed to
         half = tools.offsetWidth / 2,
         x = Math.min(
-            innerWidth - half - 8,
-            Math.max(half + 8, edge.left + edge.width / 2),
+            room.width - half - 8,
+            Math.max(half + 8, edge.left - room.left + edge.width / 2),
         ); // centred on the loop's top edge, kept on screen
     Object.assign(tools.style, {
         left: `${x}px`,
-        top: `${edge.top}px`,
+        top: `${edge.top - room.top}px`,
     });
     tools.style.setProperty(
         "--tip",
-        x < 140 ? "0%" : x > innerWidth - 140 ? "100%" : "50%",
+        x < 140 ? "0%" : x > room.width - 140 ? "100%" : "50%",
     ); // half a tooltip from the side: it opens from that side
 }
 $("trainer").onclick = () => {
@@ -2626,7 +2628,7 @@ $("loop").onclick = toggleLoop;
 const toggleFullscreen = () =>
     document.fullscreenElement
         ? document.exitFullscreen()
-        : document.documentElement.requestFullscreen();
+        : root.requestFullscreen();
 const updateFullscreenButton = () => {
     setIcon(
         $("fullscreen"),
@@ -2637,7 +2639,7 @@ const updateFullscreenButton = () => {
 };
 $("fullscreen").onclick = toggleFullscreen;
 $("fullscreen").hidden = !document.fullscreenEnabled; // iPhones can't take a page full screen
-document.onfullscreenchange = updateFullscreenButton;
+document.addEventListener("fullscreenchange", updateFullscreenButton); // added, not set: a page the player is mounted in may listen too
 updateFullscreenButton();
 // --- Keyboard shortcuts, listed at the end of the notation sheet too: [heading, [[keys as e.key names them (letters
 // in lower case), the keys as shown, what they do, more about it, what happens]]]
@@ -2788,6 +2790,12 @@ const SHORTCUT_KEYS = new Map(
 );
 addEventListener("keydown", (e) => {
     if (
+        mounted &&
+        (!canvas.clientWidth ||
+            !(root.contains(e.target) || e.target === document.body))
+    )
+        return; // mounted: keys pressed in the page around the player, in its inputs and on its buttons, are that page's; so are all of them while the player is hidden
+    if (
         e.key !== "Escape" &&
         (e.target.tagName === "INPUT" || e.target.closest?.(".sheet"))
     )
@@ -2843,7 +2851,8 @@ band.onmessage = ({ data }) => {
                 selectArrangement(
                     Math.min(+bandPart, song.arrangements.length - 1),
                 );
-                document.title = `${arr.name} · ${document.title}`;
+                if (!mounted)
+                    document.title = `${arr.name} · ${document.title}`;
             }
             status(null);
         }
@@ -3071,7 +3080,8 @@ function frame() {
     const t = tick();
     lap("song");
     const shown = benchTime() ?? t;
-    (settings.tabView ? drawTab : drawHighway)(canvas, arr, shown, theme, cam);
+    if (!mounted || canvas.clientWidth) // no width while the page the player is mounted in hides it: nothing to draw on
+        (settings.tabView ? drawTab : drawHighway)(canvas, arr, shown, theme, cam);
     if (song && arr) updateOverlay(shown);
     lap("overlay");
     endFrame();
@@ -3080,12 +3090,12 @@ function frame() {
 // covered window gets no animation frames, and one playing sound keeps its timers), until the band's windows close
 const bandOpen = () => leading && bandWindows.some((w) => w && !w.closed);
 function keepTime() {
-    document.documentElement.classList.add("banding");
+    root.classList.add("banding");
     $("bandNote").hidden = false;
     const timer = setInterval(() => {
         if (bandOpen()) return tick();
         clearInterval(timer);
-        document.documentElement.classList.remove("banding");
+        root.classList.remove("banding");
         $("bandNote").hidden = true;
         requestAnimationFrame(frame);
     }, 50);
@@ -3124,6 +3134,10 @@ window.fretfall = {
     },
     get time() {
         return player?.time ?? 0; // seconds into the song
+    },
+    set time(t) {
+        if (song && !following) // a jump to there, kept within the song; a band window follows its first one, as with playing
+            player.seek(Math.min(song.length, Math.max(0, +t || 0)));
     },
     get length() {
         return song?.length ?? 0; // the song's, in seconds

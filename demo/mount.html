@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- The player mounted in an element of a page that isn't its own (see src/mount.js): a page with a look of its own, an
+     input to type in and a hero that isn't the whole screen. mount.js is written by the build, so this page is served from
+     the built demo, not by npm start: DEMO=1 npm run build && npx serve dist, then /mount.html. It stays out of the package -->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>A page around the player</title>
+        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+        <style>
+            body {
+                margin: 0 auto;
+                max-width: 1100px;
+                padding: 24px;
+                background: #f6f1e7;
+                color: #2b2118;
+                font: 17px/1.5 Georgia, serif;
+            }
+            header {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            h1 {
+                margin: 0 auto 0 0;
+                font-size: 28px;
+            }
+            .hero {
+                height: 70vh;
+                min-height: 420px;
+                margin: 24px 0;
+                border-radius: 12px;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>A page around the player</h1>
+            <input id="pageSearch" placeholder="Typing here is this page's" />
+            <button id="pagePlay" disabled>Play</button>
+            <button id="pageHide">Hide</button>
+        </header>
+        <div class="hero" id="hero"></div>
+        <p id="now">Mounting…</p>
+        <p style="height: 60vh">
+            The page scrolls under the player, and its keys and drops are its own outside it.
+        </p>
+        <script type="module">
+            // The ids in the player are its own (play, open, menu, settings, …): this page's are named apart from them
+            import { mount } from "../src/mount.js";
+            const $ = (id) => document.getElementById(id);
+            addEventListener("fretfall:song", (e) => ($("now").textContent = `${e.detail.title}: ${e.detail.parts.join(", ")}`));
+            addEventListener("fretfall:playing", (e) => ($("pagePlay").textContent = e.detail.playing ? "Pause" : "Play"));
+            const fretfall = await mount($("hero"));
+            if (!new URLSearchParams(location.search).has("band")) {
+                // a band window is fed by the window it was started from
+                const res = await fetch("demo.atex");
+                await fretfall.open([new File([await res.text()], "demo.atex")]);
+            }
+            $("pagePlay").disabled = false;
+            $("pagePlay").onclick = () => (fretfall.playing = !fretfall.playing);
+            $("pageHide").onclick = () => {
+                // hidden, never removed: the player is mounted once a page
+                fretfall.playing = false;
+                $("pageHide").textContent = ($("hero").hidden = !$("hero").hidden) ? "Show" : "Hide";
+            };
+        </script>
+    </body>
+</html>

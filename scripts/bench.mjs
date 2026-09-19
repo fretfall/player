@@ -2,6 +2,8 @@
 // fingering, and the download (gzip). node scripts/bench.mjs dist: the numbers. node scripts/bench.mjs base/dist dist: both,
 // run in turns so the machine's ups and downs hit them alike, and a failure if the second is slower or bigger than LIMITS
 // allow (PERF_OK=true lets it pass: a regression taken on purpose). In CI the table goes to the job summary too.
+// The download is what the player's own page downloads: mount.js, the page over again for a page that mounts the player
+// (see scripts/build.mjs), is never part of that, and has a line of its own under the table.
 import { readdir, readFile, appendFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { join, resolve } from 'node:path';
@@ -95,7 +97,8 @@ if (!isMainThread) {
   await Promise.all(workers.map((w) => w.terminate()));
 
   const median = (list) => list.toSorted((a, b) => a - b)[list.length >> 1];
-  const gzipped = async (dir) => (await Promise.all((await readdir(dir)).filter((f) => /\.(js|html)$/.test(f)).map((f) => readFile(join(dir, f))))).reduce((sum, b) => sum + gzipSync(b, { level: 9 }).length, 0);
+  const gzipped = async (dir) => (await Promise.all((await readdir(dir)).filter((f) => /\.(js|html)$/.test(f) && !f.startsWith('mount.')).map((f) => readFile(join(dir, f))))).reduce((sum, b) => sum + gzipSync(b, { level: 9 }).length, 0);
+  const mount = await readFile(join(dirs.at(-1), 'mount.js')).then((b) => `mount.js: ${gzipSync(b, { level: 9 }).length.toLocaleString('en')} bytes gzipped, not in the sum above (the player's own page never downloads it).\n\n`, () => '');
   const results = await Promise.all(dirs.map(async (dir, i) => ({ ...Object.fromEntries(Object.keys(samples[i][0]).map((key) => [key, median(samples[i].map((s) => s[key]))])), 'gzip bytes': await gzipped(dir) })));
 
   const show = (key, v) => (key.includes('draws') || key.includes('bytes') ? Math.round(v).toLocaleString('en') : v.toFixed(3));
@@ -112,7 +115,7 @@ if (!isMainThread) {
   const verdict = !base ? '' : failed.length
     ? `**Performance regression** in ${failed.join(', ')} (limits: time +${LIMITS.time * 100}%, draw calls +${LIMITS.draws * 100}%, gzip +${LIMITS.gzip * 100}%).${ok ? ' Accepted with the `perf-ok` label.' : ' Make it faster, or add the `perf-ok` label to accept it.'}`
     : 'No performance regression.';
-  const report = `### Performance\n\n${table.join('\n')}\n\n${verdict}\n`;
+  const report = `### Performance\n\n${table.join('\n')}\n\n${mount}${verdict}\n`;
   console.log(report);
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, report);
   if (failed.length && !ok) process.exitCode = 1;
