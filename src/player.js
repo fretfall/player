@@ -1302,6 +1302,24 @@ const synth = {
     tempo: [],
     paused: null,
 };
+// A track's part is read from its first staff with strings, wherever it sits: MuseScore's MusicXML puts the notation
+// staff first and the tab under it. It is played from there alone too: the staves around it are the same notes written as
+// notation, which the synth would play over them again. They are kept aside for their lyrics (see songFromScore).
+// ponytail: every staff without strings in such a track goes quiet, not only a copy of the tab; compare their notes
+// should a file ever pair a tab with other music
+const partStaff = (track) =>
+    track.staves.find((s) => s.isStringed && !s.isPercussion);
+api.scoreLoaded.on((score) => {
+    for (const track of score.tracks.filter(partStaff)) {
+        track.unplayed = track.staves.filter((s) => !s.isStringed);
+        track.staves = track.staves.filter((s) => s.isStringed);
+        track.staves.forEach((s, i) => (s.index = i));
+    }
+    // alphaTab draws the first track's tab (unseen, see #tab), and throws at a track without one, a voice over the
+    // guitar say: it is given a track with a tab to draw instead
+    const drawn = score.tracks.find(partStaff);
+    if (drawn?.index) api.renderTracks([drawn]);
+});
 api.playerPositionChanged.on((e) => {
     if (synth.paused !== null) return;
     [synth.tick, synth.at] = [e.currentTick, performance.now()];
@@ -1476,13 +1494,9 @@ function songFromScore(score, cache) {
     );
     const sec = (tick) => tickToMs(tempo, tick) / 1000;
     const arrangements = score.tracks
-        .filter(
-            (tr) =>
-                tr.staves[0].isStringed &&
-                !tr.staves[0].isPercussion,
-        )
+        .filter(partStaff)
         .map((track) => {
-            const staff = track.staves[0],
+            const staff = partStaff(track),
                 notes = [],
                 chords = [],
                 anchors = [],
@@ -1933,13 +1947,17 @@ function songFromScore(score, cache) {
                 track,
             };
         });
-    // Lyrics from the first track that has any, a syllable a beat: usually a vocal line, which gets no part of its
+    // Lyrics from the first staff that has any, a syllable a beat: usually a vocal line, which gets no part of its
     // own. They read like this: "-" joins a syllable to the next, a "+" at its end ends the line.
     const lyrics = [];
-    for (const track of score.tracks) {
+    for (const staff of score.tracks.flatMap((track) => [
+        ...track.staves,
+        ...(track.unplayed ?? []), // a tab's notation staff, which is where MuseScore writes the words
+    ])) {
         for (const mb of cache.masterBars)
-            for (const beat of track.staves[0].bars[mb.masterBar.index]
-                .voices[0].beats) {
+            for (const beat of staff.bars[
+                mb.masterBar.index
+            ].voices.flatMap((voice) => voice.beats)) {
                 if (!beat.lyrics?.[0]) continue;
                 const time = sec(mb.start + beat.playbackStart);
                 lyrics.push({
@@ -1955,6 +1973,7 @@ function songFromScore(score, cache) {
             }
         if (lyrics.length) break;
     }
+    lyrics.sort((a, b) => a.time - b.time); // sung in more voices than one: in the order they're heard
     return {
         title: score.title,
         artist: score.artist,
