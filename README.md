@@ -52,6 +52,7 @@ fretfall.part = 1;
 | `style` | The look: note shape, colour set, fonts, string colours, headstock. Settable whole or in part |
 | `addFormat({ name, extensions, open })` | Read another file type: `open(file)` resolves to `{ song, audio }` |
 | `closeSheets()` | Close Settings and the notation sheet |
+| `dock(element, more?)` | Mounted in a page: the header's controls in an element of the page's own, see below |
 
 Events on `window`: `fretfall:ready`, `fretfall:song`, `fretfall:playing`, `fretfall:sheet`. The modules import on their own
 too, for example `music.js` for tunings and note names.
@@ -78,6 +79,19 @@ const fretfall = await mount(element); // window.fretfall, once fretfall:ready h
 - The page around it stays the page's: its styles, its title (follow `fretfall:song` to set one), keys pressed in its inputs
   and on its buttons, and files dropped outside the player. With the focus nowhere, the shortcuts are the player's. Band
   windows open the page's own URL with `?band=`, so that URL has to mount the player again.
+
+#### One bar: the player's controls in the page's own
+
+A page with a bar of its own has two once the player is in it. `fretfall.dock(element)` moves the header's controls — the
+part picker, time, speed, volume, loop, play, open, help, settings and full screen — into `element`, and hides the player's
+header while they are there, so the highway starts at the top of its element. They are the player's own buttons, styled
+by its stylesheet: `element` is marked `data-fretfall` (and `data-fretfall-dock`) so that reaches it, in its own colours
+and fonts rather than the theme's — set the variables it draws with (`--chip`, `--chip-border`, `--ink`, `--text`,
+`--muted`, `--accent`, `--ui`, `--num`) on the element for your bar's, and hide or restyle what your bar does differently
+under that attribute. `fretfall.dock(element, more)` puts help, settings and full screen into `more` instead, for a bar
+with a right side of its own. The tooltips and the volume slider open under the buttons, where they stand now.
+`fretfall.dock(null)` brings everything home, and a page removing its bar has to call it first, or the controls go with
+it (`demo/mount.html` shows a dock).
 
 Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 

@@ -501,12 +501,48 @@ const toggleMenu = (
     open = $("menuButton").ariaExpanded !== "true",
 ) => $("menuButton").setAttribute("aria-expanded", String(open));
 const placeParts = () => {
+    if (docks.length) return; // docked, the page's bar places them
     if (phone.matches)
         root.querySelector(".speed").before($("arrangements"));
     else
         root.querySelector(".wordmark").after($("arrangements"));
     toggleMenu(false);
 };
+// Docked (fretfall.dock): the header's controls in an element of the page around the player, its own bar say, so the
+// page has one bar and the highway the row. Bound by id, they work wherever they stand. The element becomes a root of
+// the mounted styles (data-fretfall) so they reach the controls, in the stylesheet's own colours and fonts (the theme's
+// are set on this root: the page's bar sets the variables it wants on its element); data-fretfall-dock keeps mount.js's
+// size container and the page-level rules off it (scope.mjs). The menu and its button stay home: the page's bar decides
+// what folds
+const barTools = [
+    $("arrangements"),
+    ...root.querySelectorAll(
+        ".bar > .group:last-child > :not(#menuButton, #menu), #menu > *",
+    ),
+];
+const MORE = new Set(["legendButton", "settingsButton", "fullscreen"]); // the menu's last three, for a bar with a right side of its own
+let docks = [],
+    homes = []; // the page's elements holding the tools, and where each tool stood: [parent, next sibling]
+function dockTools(element, more = element) {
+    for (let i = homes.length; i--; )
+        homes[i][0].insertBefore(barTools[i], homes[i][1]); // last first, so its next sibling is back already
+    for (const el of docks)
+        for (const name of ["data-fretfall", "data-fretfall-dock"])
+            el.removeAttribute(name);
+    docks = element ? [...new Set([element, more])] : [];
+    homes = docks.length
+        ? barTools.map((el) => [el.parentNode, el.nextSibling])
+        : [];
+    for (const el of docks)
+        for (const name of ["data-fretfall", "data-fretfall-dock"])
+            el.setAttribute(name, "");
+    if (docks.length)
+        for (const el of barTools)
+            (MORE.has(el.id) ? more : element).append(el);
+    root.querySelector(".bar").hidden = docks.length > 0;
+    root.toggleAttribute("data-docked", docks.length > 0); // what sat under the bar moves up (the page's CSS)
+    placeParts();
+}
 compact.onchange = phone.onchange = placeParts;
 placeParts();
 $("menuButton").onclick = () => toggleMenu();
@@ -2811,9 +2847,12 @@ addEventListener("keydown", (e) => {
     if (
         mounted &&
         (!canvas.clientWidth ||
-            !(root.contains(e.target) || e.target === document.body))
+            !(
+                e.target.closest?.("[data-fretfall]") ||
+                e.target === document.body
+            ))
     )
-        return; // mounted: keys pressed in the page around the player, in its inputs and on its buttons, are that page's; so are all of them while the player is hidden
+        return; // mounted: keys pressed in the page around the player, in its inputs and on its buttons, are that page's (a dock's are the player's); so are all of them while the player is hidden
     if (
         e.key !== "Escape" &&
         (e.target.tagName === "INPUT" || e.target.closest?.(".sheet"))
@@ -3218,6 +3257,9 @@ window.fretfall = {
             selectArrangement(i);
     },
     closeSheets: () => toggleSheet(null, false),
+    // The header's controls in an element of the page's own, and the sheet and full screen buttons in `more` if given;
+    // null brings them home (see dockTools)
+    dock: dockTools,
     // A kind of song file the player doesn't read itself: { name ("a .pak"), extensions ([".pak"]), open(file,
     // options) → { song, audio } }. song: the model the highway draws (see songFromScore); audio: a Blob of its
     // recording. options: what fretfall.open was given, and status(text) to say what is taking the time

@@ -3,7 +3,9 @@
 // become the element itself (:root.minimal …, :root:fullscreen … go on working: the class and the full screen are the
 // element's there); any other selector goes under :where(element), which weighs nothing. @media, @supports, @container and
 // @layer are scoped inside; @keyframes, @font-face, @property and the like stay as they are. What is sized by the screen
-// (vw, vh) is sized by the element instead (cqw, cqh: the element is a size container, see src/mount.js)
+// (vw, vh) is sized by the element instead (cqw, cqh: the element is a size container, see src/mount.js).
+// A dock (fretfall.dock: the header's controls in an element of the page's own) is a root of these styles too, so its
+// controls are styled and :root's variables reach them; but html and body are the page's box, never a dock's
 
 // → past the string or comment that starts at i, or i
 const skip = (css, i) => {
@@ -17,13 +19,13 @@ const skip = (css, i) => {
   return end < 0 ? css.length : end + 2;
 };
 
-const scopeSelector = (selector, root) =>
+const scopeSelector = (selector, root, dock) =>
   selector.includes(':root') ? selector.replaceAll(':root', root)
-  : /^(html|body)(?![\w-])/.test(selector) ? selector.replace(/^(html|body)(?![\w-])(\s*>?\s*body(?![\w-]))?/, root)
+  : /^(html|body)(?![\w-])/.test(selector) ? selector.replace(/^(html|body)(?![\w-])(\s*>?\s*body(?![\w-]))?/, `${root}:not(${dock})`)
   : `:where(${root}) ${selector}`;
 
 // A selector list, split on its commas outside (), [] and strings; html, body → the element once
-function scopeSelectors(list, root) {
+function scopeSelectors(list, root, dock) {
   const selectors = [];
   let depth = 0, start = 0;
   for (let i = 0; i < list.length; i++) {
@@ -37,10 +39,10 @@ function scopeSelectors(list, root) {
     }
   }
   selectors.push(list.slice(start));
-  return [...new Set(selectors.map((s) => scopeSelector(s.trim(), root)))].join(',');
+  return [...new Set(selectors.map((s) => scopeSelector(s.trim(), root, dock)))].join(',');
 }
 
-export function scope(css, root = '[data-fretfall]') {
+export function scope(css, root = '[data-fretfall]', dock = '[data-fretfall-dock]') {
   let out = '';
   for (let i = 0; i < css.length; ) {
     let open = i; // the rule's {, or the ; of an @import
@@ -57,8 +59,8 @@ export function scope(css, root = '[data-fretfall]') {
       end = Math.max(end + 1, next);
     }
     const prelude = css.slice(i, open).replace(/\/\*[\s\S]*?\*\//g, '').trim(), body = css.slice(open + 1, end - 1);
-    out += !prelude.startsWith('@') ? `${scopeSelectors(prelude, root)}{${body.replace(/(\d)v([wh])\b/g, '$1cq$2')}}`
-      : /^@(media|supports|container|layer)\b/.test(prelude) ? `${prelude}{${scope(body, root)}}`
+    out += !prelude.startsWith('@') ? `${scopeSelectors(prelude, root, dock)}{${body.replace(/(\d)v([wh])\b/g, '$1cq$2')}}`
+      : /^@(media|supports|container|layer)\b/.test(prelude) ? `${prelude}{${scope(body, root, dock)}}`
       : css.slice(i, end).trim();
     i = end;
   }

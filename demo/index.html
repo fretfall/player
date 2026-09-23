@@ -314,6 +314,19 @@
                 background: var(--accent);
                 opacity: 0.9;
             }
+            /* Docked in a page's own bar, this bar is hidden: what sat under it moves up by its height, at every width. */
+            :root[data-docked] #phrases {
+                top: 18px;
+            }
+            :root[data-docked] #progress {
+                top: 78px;
+            }
+            :root[data-docked] #lyrics {
+                top: 108px;
+            }
+            :root[data-docked] .sheet {
+                top: 18px;
+            }
             #lyrics {
                 position: fixed;
                 left: 40px;
@@ -571,16 +584,26 @@
                 visibility: visible;
                 transform: none;
             }
-            /* In the header they open underneath, and not over the panel a button has opened there */
-            .bar :is(.icon, .speed) {
+            /* In the header they open underneath, and not over the panel a button has opened there. The same docked:
+               :root[data-fretfall-dock] is an element of the page around the player holding the header's controls
+               (fretfall.dock), a root of these styles once they are mounted (scripts/scope.mjs), laid out as the group was */
+            :root:where([data-fretfall-dock]) {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .bar :is(.icon, .speed),
+            :root:where([data-fretfall-dock]) :is(.icon, .speed) {
                 position: relative;
             }
-            .bar .tip {
+            .bar .tip,
+            :root:where([data-fretfall-dock]) .tip {
                 top: calc(100% + 10px);
                 bottom: auto;
                 transform: translateY(-4px);
             }
-            .bar [aria-expanded="true"] > .tip {
+            .bar [aria-expanded="true"] > .tip,
+            :root:where([data-fretfall-dock]) [aria-expanded="true"] > .tip {
                 display: none;
             }
             #loopTools .tip {
@@ -1272,6 +1295,9 @@
                 .time {
                     display: none;
                 }
+                :root:where([data-fretfall-dock]) .time {
+                    display: block;
+                } /* docked, the page's bar decides what folds */
                 #menuButton {
                     display: grid;
                 }

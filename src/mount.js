@@ -14,8 +14,9 @@ async function start(element) {
   // The player's root is an element of its own inside the page's: the page sizes and places its element however it likes
   // (a class, a cascade layer), and none of that competes with the player's styles. It stands in for the player's page:
   // what is fixed to the screen there is fixed to its box here (contain), what is sized by the screen is sized by it
-  // (a size container, for the cqw and cqh that vw and vh became), and its layers stay among themselves (contain again)
-  const style = Object.assign(document.createElement('style'), { textContent: `${PAGE_CSS}[data-fretfall]{contain:layout;container-type:size}` });
+  // (a size container, for the cqw and cqh that vw and vh became), and its layers stay among themselves (contain again).
+  // Not a dock (fretfall.dock): an element of the page's bar sized by what it holds, which a size container would collapse
+  const style = Object.assign(document.createElement('style'), { textContent: `${PAGE_CSS}[data-fretfall]:not([data-fretfall-dock]){contain:layout;container-type:size}` });
   const fonts = Object.assign(document.createElement('link'), { id: 'fonts', rel: 'stylesheet' }); // the themes': see applyTheme in player.js
   if (!element.isConnected) throw new Error('mount(element): the element has to be in the page');
   element.innerHTML = `<div data-fretfall>${PAGE_HTML}</div>`;

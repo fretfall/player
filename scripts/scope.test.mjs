@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { scope } from './scope.mjs';
 
-// :root, and html or body at the start, are the element; the rest goes under it without weighing more than on the page
+// :root, and html or body at the start, are the element; the rest goes under it without weighing more than on the page.
+// html and body are the page's box, so their rules stay off a dock (which :root's, the variables, reach)
 assert.equal(scope(':root{--bg:#000}'), '[data-fretfall]{--bg:#000}');
-assert.equal(scope('html,\nbody { height: 100% }'), '[data-fretfall]{ height: 100% }');
-assert.equal(scope('body{margin:0}html body .bar{top:0}body>.bar{top:0}'), '[data-fretfall]{margin:0}[data-fretfall] .bar{top:0}[data-fretfall]>.bar{top:0}');
+assert.equal(scope('html,\nbody { height: 100% }'), '[data-fretfall]:not([data-fretfall-dock]){ height: 100% }');
+assert.equal(scope('body{margin:0}html body .bar{top:0}body>.bar{top:0}'), '[data-fretfall]:not([data-fretfall-dock]){margin:0}[data-fretfall]:not([data-fretfall-dock]) .bar{top:0}[data-fretfall]:not([data-fretfall-dock])>.bar{top:0}');
+assert.equal(scope('body{margin:0}', '#player', '.dock'), '#player:not(.dock){margin:0}');
 assert.equal(scope('*{box-sizing:border-box}[hidden]{display:none!important}'), ':where([data-fretfall]) *{box-sizing:border-box}:where([data-fretfall]) [hidden]{display:none!important}');
 assert.equal(scope('.bodywork,button{color:red}'), ':where([data-fretfall]) .bodywork,:where([data-fretfall]) button{color:red}');
 assert.equal(scope(':root.minimal .bar,:root:not(.tab2d) .only-2d{display:none}'), '[data-fretfall].minimal .bar,[data-fretfall]:not(.tab2d) .only-2d{display:none}');

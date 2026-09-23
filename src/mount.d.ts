@@ -43,6 +43,13 @@ export interface Fretfall {
   addFormat(format: FretfallFormat<any>): void;
   /** Close Settings and the notation sheet. */
   closeSheets(): void;
+  /**
+   * Move the header's controls (the part picker, time, speed, volume, loop, play, open, help, settings, full screen)
+   * into `element`, an element of the page's own bar say, and hide the header meanwhile: the page has one bar and
+   * the highway the row. Help, settings and full screen go into `more` instead when given. Both are marked
+   * `data-fretfall` and `data-fretfall-dock`, so the player's styles reach the controls. `null` brings them home.
+   */
+  dock(element: HTMLElement | null, more?: HTMLElement): void;
 }
 
 export interface FretfallSong {
