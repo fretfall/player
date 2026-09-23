@@ -714,7 +714,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     g.globalAlpha = 1;
   }
 
-  // Inlay fret numbers down the highway, as Rocksmith has them: a row on every bar line, so wherever the eye is there is a
+  // Inlay fret numbers down the highway: a row on every bar line, so wherever the eye is there is a
   // ruler near it. The frets under the hand position are left out — its notes carry their own numbers, and sit on them.
   // A row stays lit the whole way in, so the ruler is still there to read at the moment its notes land
   if (numberInk)
