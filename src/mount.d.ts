@@ -22,6 +22,20 @@ export interface Fretfall {
   time: number;
   /** The song's length in seconds, 0 without a song. */
   readonly length: number;
+  /** How fast it plays: 1 is the song's own tempo. Settable, in the player's steps of a tenth from 0.1 to 1.5. */
+  speed: number;
+  /**
+   * What the instrument looks like: the note shape (`look`), the colour set (`colors`), the fonts, the string colours
+   * (`strings`) and the headstock. Settable whole or in part; a name the player does not know is ignored, so add a
+   * colour set of your own to `COLORS` in `themes.js` before naming it here.
+   */
+  style: { look: string; colors: string; fonts: string; strings: string; headstock: string };
+  /**
+   * What the part shown is asking for, or null without a song: `open`, the open strings' midi notes lowest string
+   * first, and every note as `time` and `sustain` in seconds, `string` (0 is the lowest), `fret`, and the `midi` note
+   * it sounds. A copy, made on each read: read it once a song, not each frame.
+   */
+  readonly notes: { open: number[]; notes: { time: number; sustain: number; string: number; fret: number; midi: number }[] } | null;
   /** The names of the song's parts. */
   readonly parts: string[];
   /** The part shown, -1 without one. Settable. */

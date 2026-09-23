@@ -47,6 +47,9 @@ fretfall.part = 1;
 | `open(files, options)` / `pick()` | Open songs, or show the file dialog |
 | `playing`, `time`, `length` | Where playback is, in seconds. `playing` is settable: it waits for the synth's instruments. So is `time`: a jump to there, kept within the song |
 | `parts`, `part` | The song's parts, and the one shown (settable) |
+| `notes` | What the part shown asks for: the open strings, and each note's time, string, fret and midi note. A copy each read |
+| `speed` | How fast it plays, 1 being the song's own tempo. Settable, in the player's steps of a tenth from 0.1 to 1.5 |
+| `style` | The look: note shape, colour set, fonts, string colours, headstock. Settable whole or in part |
 | `addFormat({ name, extensions, open })` | Read another file type: `open(file)` resolves to `{ song, audio }` |
 | `closeSheets()` | Close Settings and the notation sheet |
 

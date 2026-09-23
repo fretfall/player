@@ -3161,6 +3161,52 @@ window.fretfall = {
     get length() {
         return song?.length ?? 0; // the song's, in seconds
     },
+    get speed() {
+        return speed; // 1 is the song's own tempo
+    },
+    get style() {
+        // What the instrument looks like: the note shape, the colours, the fonts, the string colours, the headstock
+        return {
+            look: settings.look,
+            colors: settings.colors,
+            fonts: settings.fonts,
+            strings: settings.strings,
+            headstock: settings.headstock,
+        };
+    },
+    set style(next) {
+        // Each name has to be one this player knows (a page may add its own colour set to COLORS first)
+        for (const [key, options] of Object.entries({
+            look: LOOKS,
+            colors: COLORS,
+            fonts: FONTS,
+            strings: STRINGS,
+            headstock: HEADSTOCKS,
+        }))
+            if (next?.[key] && options[next[key]]) settings[key] = next[key];
+        save();
+        applyTheme();
+    },
+    set speed(v) {
+        setSpeed(+v || 1); // the player's own steps and limits: 10% to 150%, in tenths
+    },
+    get notes() {
+        // What the part shown is asking for, so a page can listen to a guitar and say whether it was played: the open
+        // strings' notes, low to high as the fretboard is drawn, and every note as seconds into the song, string,
+        // fret, and the midi note it sounds. A copy, made on each read: read it once a song, not each frame.
+        if (!song || !arr) return null;
+        const open = [...(arr.open ?? [])];
+        return {
+            open,
+            notes: arr.notes.map((n) => ({
+                time: n.time,
+                sustain: n.sustain,
+                string: n.string,
+                fret: n.fret,
+                midi: (open[n.string] ?? 0) + n.fret,
+            })),
+        };
+    },
     get parts() {
         return song?.arrangements.map((a) => a.name) ?? [];
     },
