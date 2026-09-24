@@ -87,7 +87,7 @@ export function markRepeats(notes, chords, gap = 1) {
 // let-ring notes sounding until the string is played again (4 s at most), a dynamic only where it changes (f is where a
 // Guitar Pro file starts), and a barre where one finger holds three or more strings at the same fret.
 export function annotate(notes, chords) {
-  const last = {};
+  const last = {}, from = {}; // the note before on each string, and the fret its tied chain set out from
   let dynamic = 'f';
   notes.forEach((n, i) => {
     const before = last[n.string];
@@ -110,9 +110,19 @@ export function annotate(notes, chords) {
         // stops a hair before the next one starts and the chain shows a gap at every join
         p.sustain = Math.max(p.sustain, n.time - p.time);
       }
+      // A slide that goes up and comes straight back. The chart ends the tied chain at the top and starts a note on the
+      // fret it set out from a few hundredths of a second later, with nothing of its own to play — a hand coming back,
+      // not a second pick. The chain slides back to it and it carries the ring on, as the rest of the chain does
+      const plain = (x) => (x.slideTo ?? x.slideUnpitchTo ?? null) === null && !x.bend && !x.bendCurve && !x.hammerOn && !x.pullOff;
+      if (!n.tied && p.tied && n.chord === null && plain(n) && n.fret === from[n.string] && n.time - (p.time + p.sustain) < 0.1) {
+        p.slideTo = n.fret;
+        p.slideSpan = n.time - p.time;
+        n.tied = true;
+      }
     }
     n.dynamicLabel = n.dynamic && n.dynamic !== dynamic ? n.dynamic : null;
     if (n.dynamic) dynamic = n.dynamic;
+    if (!n.tied) from[n.string] = n.fret; // a fresh pick is where the next chain sets out from
     last[n.string] = i;
   });
   for (const n of Object.values(last).map((i) => notes[i])) if (n.letRing) n.sustain = Math.max(n.sustain, 2);
