@@ -1166,12 +1166,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       if (note.slideIn) line3([x + (note.slideIn === 'below' ? -1.4 : 1.4), y - hh, Math.max(0, z - 1)], [x + (note.slideIn === 'below' ? -hw : hw), y, z]);
       if (note.slideOut) line3([x + (note.slideOut === 'up' ? hw : -hw), y, z], [x + (note.slideOut === 'up' ? 1.4 : -1.4), y - hh, z + 1]);
       g.setLineDash([]);
-      if (typeof note.tieTo === 'number') { // a dashed arc to the note it is tied to
-        const to = arr.notes[note.tieTo], q = spot(to);
-        g.setLineDash([5, 4]);
-        arc([x, y + hh, z], [q.x, q.y + hh, Z(to.time - now)], gap * 0.9);
-        g.setLineDash([]);
-      }
       g.globalAlpha = 1;
     }
 
@@ -1265,14 +1259,14 @@ export function drawHighway(canvas, arr, now, t, cam) {
       glow(false);
     } else {
       glow(!note.letRing, c, 6, true);
-      g.fillStyle = fade(c, note.letRing ? 0.4 : 0.75, note.letRing ? 0.15 : 0.3); // plain to see from the far end, not only as it arrives
+      g.fillStyle = fade(c, note.letRing ? 0.5 : 0.9, note.letRing ? 0.2 : 0.45); // plain to see from the far end, not only as it arrives
       path([...spine.map(([px, py, pz]) => [px - 0.09, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + 0.09, py, pz])]);
       fill();
       glow(false);
     }
     if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
-      g.strokeStyle = fade(note.letRing ? c : '#ffffff', 0.75, 0.3);
-      g.lineWidth = note.letRing ? 2 : 1.5;
+      g.strokeStyle = fade(note.letRing ? c : '#ffffff', 1, 0.55);
+      g.lineWidth = 2;
       g.setLineDash(note.letRing ? [7, 6] : []);
       path(spine, false);
       stroke();
