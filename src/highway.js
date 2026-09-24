@@ -1498,7 +1498,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     let onTop = cy - hh * k; // the top of the gem, and then of what sits on it
     const tapped = note.tap && !note.tapLeft; // with the picking hand: its arrow stands for the legato too
     if ((note.hammerOn || note.pullOff) && !tapped) { // a white triangle on the note, pointing down to hammer on and up to pull off
-      const scale = note.grace ? 0.6 : 1, w = 0.2 * k * stretch * scale, h = 0.38 * gap * k * scale, [tip, base] = note.hammerOn ? [onTop + 0.4 * h, onTop - 0.6 * h] : [onTop - 0.6 * h, onTop + 0.4 * h];
+      const scale = note.grace ? 0.6 : 1, w = 0.34 * k * stretch * scale, h = 0.72 * gap * k * scale, [tip, base] = note.hammerOn ? [onTop + 0.15 * h, onTop - 0.85 * h] : [onTop - 0.85 * h, onTop + 0.15 * h];
       g.beginPath();
       g.moveTo(cx - w, base);
       g.lineTo(cx + w, base);
@@ -1506,10 +1506,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.closePath();
       g.fillStyle = repeated ? ink : '#ffffff';
       g.strokeStyle = alpha(t.ink, 0.9);
-      g.lineWidth = Math.max(1.5, 0.03 * k);
+      g.lineWidth = Math.max(2, 0.04 * k);
       stroke();
       fill();
-      onTop -= 0.6 * h;
+      onTop -= 0.85 * h;
       above = Math.min(above, onTop - 0.14 * k);
       g.strokeStyle = g.fillStyle = ink;
       g.lineWidth = Math.max(1.2, 0.04 * k);
