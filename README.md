@@ -95,8 +95,12 @@ by its stylesheet: `element` is marked `data-fretfall` (and `data-fretfall-dock`
 and fonts rather than the theme's — set the variables it draws with (`--chip`, `--chip-border`, `--ink`, `--text`,
 `--muted`, `--accent`, `--ui`, `--num`) on the element for your bar's, and hide or restyle what your bar does differently
 under that attribute. `fretfall.dock(element, more)` puts help, settings and full screen into `more` instead, for a bar
-with a right side of its own. The tooltips and the volume slider open under the buttons, where they stand now.
-`fretfall.dock(null)` brings everything home, and a page removing its bar has to call it first, or the controls go with
+with a right side of its own. The tooltips and the volume slider open under the buttons, where they stand now; under
+900 px wide the slider opens at the right edge of the volume button's nearest positioned ancestor, so give your bar
+`position: relative`. Keep `element` (and `more`) for the tools alone: the stylesheet reaches every child of an element
+marked `data-fretfall`, so anything else of yours in there picks up the player's rules. Keys pressed on the tools are the
+player's, on the rest of the page the page's. Full screen shows the player alone, so the tools come home meanwhile and go
+back when it ends. `fretfall.dock(null)` brings everything home, and a page removing its bar has to call it first, or the controls go with
 it (`demo/mount.html` shows a dock).
 
 #### Controls of your own

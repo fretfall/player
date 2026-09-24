@@ -523,7 +523,7 @@ const placeParts = () => {
 const barTools = [
     $("arrangements"),
     ...root.querySelectorAll(
-        ".bar > .group:last-child > :not(#menuButton, #menu), #menu > *",
+        ".bar > .group:last-child > :not(#menuButton, #menu), #menu > :not(.divider)",
     ),
 ];
 const MORE = new Set(["legendButton", "settingsButton", "fullscreen"]); // the menu's last three, for a bar with a right side of its own
@@ -2707,6 +2707,17 @@ $("fullscreen").onclick = toggleFullscreen;
 $("fullscreen").hidden = !document.fullscreenEnabled; // iPhones can't take a page full screen
 document.addEventListener("fullscreenchange", () => tellControls());
 document.addEventListener("fullscreenchange", updateFullscreenButton); // added, not set: a page the player is mounted in may listen too
+// Full screen shows the player alone, so docked tools come home meanwhile and go back to the page's elements after
+let undocked = null;
+document.addEventListener("fullscreenchange", () => {
+    if (document.fullscreenElement === root && docks.length) {
+        undocked = [docks[0], docks.at(-1)];
+        dockTools(null);
+    } else if (!document.fullscreenElement && undocked) {
+        if (!docks.length) dockTools(...undocked); // unless the page docked them elsewhere meanwhile
+        undocked = null;
+    }
+});
 updateFullscreenButton();
 // --- Keyboard shortcuts, listed at the end of the notation sheet too: [heading, [[keys as e.key names them (letters
 // in lower case), the keys as shown, what they do, more about it, what happens]]]
@@ -2860,11 +2871,12 @@ addEventListener("keydown", (e) => {
         mounted &&
         (!canvas.clientWidth ||
             !(
-                e.target.closest?.("[data-fretfall]") ||
+                root.contains(e.target) ||
+                barTools.some((t) => t.contains(e.target)) ||
                 e.target === document.body
             ))
     )
-        return; // mounted: keys pressed in the page around the player, in its inputs and on its buttons, are that page's (a dock's are the player's); so are all of them while the player is hidden
+        return; // mounted: keys pressed in the page around the player, in its inputs and on its buttons, are that page's (the player's docked tools are the player's, the rest of a dock element the page's); so are all of them while the player is hidden
     if (
         e.key !== "Escape" &&
         (e.target.tagName === "INPUT" || e.target.closest?.(".sheet"))
