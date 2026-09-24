@@ -1495,7 +1495,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
     };
     let onTop = cy - hh * k; // the top of the gem, and then of what sits on it
     const tapped = note.tap && !note.tapLeft; // with the picking hand: its arrow stands for the legato too
-    if ((note.hammerOn || note.pullOff) && !tapped) { // a white triangle on the note, pointing down to hammer on and up to pull off
+    // A tied note is the one before, still ringing. Whatever the chart marks on it, it is not struck again, so no
+    // hammer-on or pull-off triangle and no tap arrow — they would float over a ribbon with no gem under them. What it
+    // is still doing, a vibrato or a bend, keeps its mark
+    if ((note.hammerOn || note.pullOff) && !tapped && !note.tied) { // a white triangle on the note, pointing down to hammer on and up to pull off
       const scale = note.grace ? 0.6 : 1, w = 0.34 * k * stretch * scale, h = 0.72 * gap * k * scale, [tip, base] = note.hammerOn ? [onTop + 0.15 * h, onTop - 0.85 * h] : [onTop - 0.85 * h, onTop + 0.15 * h];
       g.beginPath();
       g.moveTo(cx - w, base);
@@ -1512,7 +1515,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.strokeStyle = g.fillStyle = ink;
       g.lineWidth = Math.max(1.2, 0.04 * k);
     }
-    if (tapped) { // tapped with the picking hand: an arrowhead in the note's colour pointing down onto it
+    if (tapped && !note.tied) { // tapped with the picking hand: an arrowhead in the note's colour pointing down onto it
       const scale = note.grace ? 0.6 : 1, w = 0.28 * k * stretch * scale, h = 0.62 * gap * k * scale, tip = onTop + 0.15 * h, top = tip - h;
       g.beginPath();
       g.moveTo(cx, tip);
