@@ -94,6 +94,11 @@ export function annotate(notes, chords) {
     if (before !== undefined) {
       const p = notes[before];
       if (p.letRing) p.sustain = Math.max(p.sustain, Math.min(n.time - p.time, 4));
+      // A note that starts already bent, at the pitch the one before ended on and on the same fret, is that same string
+      // still pushed over: the hand never let it come back, whatever the sustain says, so the rail carries through
+      const bentTo = (x) => x.bendCurve?.at(-1)?.[1] ?? x.bend ?? 0,
+        bentFrom = (x) => x.bendCurve?.[0]?.[1] ?? 0;
+      if (bentFrom(n) > 0 && p.fret === n.fret && bentTo(p) === bentFrom(n)) p.sustain = Math.max(p.sustain, n.time - p.time);
       if (p.linkNext) {
         p.tieTo = i;
         n.tied = true; // held on from the note before: the same ring, carried on, never picked again
