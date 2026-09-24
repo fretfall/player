@@ -810,8 +810,11 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // A slide glides from x along the neck over its note's length (a quarter second at least), easing in and out. Its trail
   // follows it, and so do its gem and its target on the fretboard while it sounds: a sliding chord moves with its slide
   const slideX = (note, x, sec) => { // sec seconds into the note; an open string keeps to its bar (its slide is an arch, see the trails)
-    const to = note.slideTo ?? note.slideUnpitchTo ?? null, p = Math.min(1, Math.max(0, sec / Math.max(note.sustain, 0.25)));
-    return to === null || note.fret === 0 ? x : x + (to - 0.5 - x) * p * p * (3 - 2 * p);
+    const span = note.slideSpan ?? Math.max(note.sustain, 0.25); // tied onward: it has to be there when the next takes over
+    const to = note.slideTo ?? note.slideUnpitchTo ?? null, p = Math.min(1, Math.max(0, sec / span));
+    // The hand leaves late and arrives early, the way a real one does, so the curve swings across rather than drifting:
+    // smootherstep, which holds at both ends and crosses hard in the middle
+    return to === null || note.fret === 0 ? x : x + (to - 0.5 - x) * p * p * p * (p * (p * 6 - 15) + 10);
   };
 
   // A bend raises what shows the note: its trail on the highway, and its string and target on the fretboard, all by the

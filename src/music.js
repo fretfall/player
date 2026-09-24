@@ -97,6 +97,10 @@ export function annotate(notes, chords) {
       if (p.linkNext) {
         p.tieTo = i;
         n.tied = true; // held on from the note before: the same ring, carried on, never picked again
+        // A slide tied onward has to arrive by the time the note it is tied to takes over, however short that is;
+        // left to its own sustain (and the quarter second a slide is given at least) it is still on its way, and the
+        // two halves of the slide meet at different frets
+        if ((p.slideTo ?? p.slideUnpitchTo ?? null) !== null) p.slideSpan = n.time - p.time;
       }
     }
     n.dynamicLabel = n.dynamic && n.dynamic !== dynamic ? n.dynamic : null;
