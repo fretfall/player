@@ -2467,6 +2467,7 @@ async function addRecording(file) {
     await songReady;
     if (!song)
         return status("Open the tab first, then its recording");
+    const s = song; // another song opened meanwhile takes over: this recording is not its
     status("Lining the recording up with the tab…", true);
     await paint();
     try {
@@ -2475,6 +2476,7 @@ async function addRecording(file) {
             1,
             11025,
         ).decodeAudioData(await file.arrayBuffer()); // 11 kHz is plenty to find attacks
+        if (song !== s) return;
         const mono = new Float32Array(decoded.length);
         for (let c = 0; c < decoded.numberOfChannels; c++)
             decoded
