@@ -1293,7 +1293,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const muted = note.mute || chord?.fretHandMute, palm = note.palmMute || chord?.palmMute;
     const c = color(note.string);
     const hw = (open ? (a.width - 0.2) / 2 : 0.34) * (note.grace ? 0.6 : 1), hh = (open ? 0.12 : 0.42) * gap * (note.grace ? 0.6 : 1); // grace notes are small
-    const slide = note.slideTo ?? note.slideUnpitchTo ?? null;
 
     if (dt < -0.15) continue;
     const faded = dt < 0 ? Math.max(0, 1 + dt / 0.15) : Math.min(1, (LOOK - dt) / 0.4); // fade in at the far end, out once played
@@ -1598,13 +1597,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       above -= 0.3 * k;
       squiggle(0.14 * k, 0.04 * k, 1.5);
       above -= 0.14 * k;
-    }
-    if (slide !== null && !open) { // arrow pointing the way the slide goes
-      const dir = Math.sign(slide - note.fret) || 1, x0 = cx - dir * 0.16 * k, x1 = cx + dir * 0.16 * k, yb = above + 0.07 * k, yt = above - 0.09 * k;
-      line2(g, x0, yb, x1, yt);
-      line2(g, x1, yt, x1 - dir * 0.1 * k, yt);
-      line2(g, x1, yt, x1, yt + 0.1 * k);
-      above -= 0.3 * k;
     }
     g.globalAlpha = 1;
   }
