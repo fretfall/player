@@ -50,11 +50,17 @@ fretfall.part = 1;
 | `notes` | What the part shown asks for: the open strings, and each note's time, string, fret and midi note. A copy each read |
 | `speed` | How fast it plays, 1 being the song's own tempo. Settable, in the player's steps of a tenth from 0.1 to 1.5 |
 | `style` | The look: note shape, colour set, fonts, string colours, headstock. Settable whole or in part |
+| `volume`, `muted` | 0 to 1, and the mute. Settable; a volume of 0 is muted, and setting one asks for sound again |
+| `loop` | `{ start, end }` in seconds, or `null`. Settable: kept inside the song, and anything else clears it |
+| `metronome` | The click, on the chart's beats. Settable |
+| `sheet` | Which sheet is open: `'settings'`, `'legend'` or `null`. Settable |
+| `fullscreen` | Settable — set it from your own button's click, as browsers want a gesture behind it |
+| `controls` | Everything above that a control toggles, in one object, for a bar of your own to draw itself from |
 | `addFormat({ name, extensions, open })` | Read another file type: `open(file)` resolves to `{ song, audio }` |
 | `closeSheets()` | Close Settings and the notation sheet |
 | `dock(element, more?)` | Mounted in a page: the header's controls in an element of the page's own, see below |
 
-Events on `window`: `fretfall:ready`, `fretfall:song`, `fretfall:playing`, `fretfall:sheet`. The modules import on their own
+Events on `window`: `fretfall:ready`, `fretfall:song`, `fretfall:playing`, `fretfall:sheet`, `fretfall:controls`. The modules import on their own
 too, for example `music.js` for tunings and note names.
 
 ### In a page of your own
@@ -92,6 +98,20 @@ under that attribute. `fretfall.dock(element, more)` puts help, settings and ful
 with a right side of its own. The tooltips and the volume slider open under the buttons, where they stand now.
 `fretfall.dock(null)` brings everything home, and a page removing its bar has to call it first, or the controls go with
 it (`demo/mount.html` shows a dock).
+
+#### Controls of your own
+
+`dock()` moves the player's controls into your bar. To build your own instead, everything they do is on the hook —
+`playing`, `time`, `speed`, `volume`, `muted`, `loop`, `metronome`, `part`, `sheet`, `fullscreen`, `pick()` — so your
+buttons drive the player without reaching into its markup. `fretfall.controls` is the lot in one object, and
+`fretfall:controls` fires whenever any of them changes, whoever changed it: one listener, one re-render, rather than an
+event per knob. The player's own controls stay in step, so you can dock some and build others.
+
+```js
+const bar = () => { const c = fretfall.controls; play.textContent = c.playing ? 'Pause' : 'Play'; /* … */ };
+addEventListener('fretfall:controls', bar);
+play.onclick = () => (fretfall.playing = !fretfall.playing);
+```
 
 Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 

@@ -40,6 +40,23 @@ export interface Fretfall {
   readonly parts: string[];
   /** The part shown, -1 without one. Settable. */
   part: number;
+  /** How loud, 0 to 1. Settable; a volume of 0 is muted, and setting one asks for sound again. */
+  volume: number;
+  /** The mute, which a volume of 0 also turns on. Settable. */
+  muted: boolean;
+  /** What is looping, in seconds, or null. Settable: kept inside the song, and anything else clears it. */
+  loop: { start: number; end: number } | null;
+  /** The click on the chart's beats. Settable. */
+  metronome: boolean;
+  /** Which sheet is open, or null. Settable. */
+  sheet: 'settings' | 'legend' | null;
+  /** Settable — set it from your own button's click, as browsers want a gesture behind it. */
+  fullscreen: boolean;
+  /**
+   * Everything a control toggles, in one object, for a bar of the page's own to draw itself from. `fretfall:controls`
+   * fires whenever any of it changes, whoever changed it — the page's buttons or the player's own.
+   */
+  readonly controls: FretfallControls;
   addFormat(format: FretfallFormat<any>): void;
   /** Close Settings and the notation sheet. */
   closeSheets(): void;
@@ -50,6 +67,19 @@ export interface Fretfall {
    * `data-fretfall` and `data-fretfall-dock`, so the player's styles reach the controls. `null` brings them home.
    */
   dock(element: HTMLElement | null, more?: HTMLElement): void;
+}
+
+export interface FretfallControls {
+  playing: boolean;
+  speed: number;
+  volume: number;
+  muted: boolean;
+  loop: { start: number; end: number } | null;
+  metronome: boolean;
+  parts: string[];
+  part: number;
+  sheet: 'settings' | 'legend' | null;
+  fullscreen: boolean;
 }
 
 export interface FretfallSong {

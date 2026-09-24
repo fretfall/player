@@ -11,6 +11,10 @@ import {
     markArpeggios,
 } from "./music.js";
 import { suggestPositions, fingerFor } from "./fingering.js";
+
+// Set once the player is up. The controls settle all through start-up, before the hook exists and with nothing
+// listening yet, and tellControls runs on each of them: declared here so it is never read before it is set
+let announcing = false;
 import {
     LOOKS,
     COLORS,
@@ -413,6 +417,7 @@ function setVolume(
     );
     player?.setVolume(loudness());
     save();
+    tellControls();
 }
 const toggleVolume = (open = $("volumePanel").hidden) => {
     $("volumePanel").hidden = !open;
@@ -485,6 +490,7 @@ function toggleSheet(name, open = $(name).hidden) {
         $(button).setAttribute("aria-expanded", String(show));
         if (changed) announce("sheet", { name: sheet, open: show });
     }
+    tellControls();
 }
 for (const [sheet, button] of Object.entries(SHEETS)) {
     $(button).onclick = () => toggleSheet(sheet);
@@ -1444,6 +1450,7 @@ function updatePlayButton() {
         : "Play"; // data-label: its name in the small-screen menu
     if (!!player?.playing !== announcedPlaying)
         announce("playing", { playing: (announcedPlaying = !!player?.playing) });
+        tellControls();
 }
 
 // alphaTab score → the song model the highway draws, as a page's formats hand it over too (see fretfall.addFormat):
@@ -2181,6 +2188,7 @@ function explainTuning(fact, open) {
 function selectArrangement(i) {
     if (arr?.track) api.changeTrackMute([arr.track], false);
     arr = song.arrangements[i];
+    queueMicrotask(tellControls); // once the picker and the camera have caught up
     if (arr.track) api.changeTrackMute([arr.track], settings.mute);
     for (const key in cam) delete cam[key];
     const picker = $("arrangements");
@@ -2278,6 +2286,7 @@ function markLoop(range = loop) {
     if (following && range === loop && JSON.stringify(loop) !== JSON.stringify(leader.loop))
         band.postMessage({ do: "loop", loop }); // looped here: the band's first window loops everyone
     syncLoopTools();
+    tellControls();
 }
 addEventListener("resize", () => markLoop());
 // Phrase bars: a click jumps to that moment, whose time shows under the pointer (with a loop, a click moves the loop to
@@ -2607,6 +2616,7 @@ function toggleTool(key) {
     save();
     audioClock();
     $(key).setAttribute("aria-pressed", String(settings[key]));
+    tellControls();
 }
 for (const key of ["metronome", "minimal", "tabView"]) {
     $(key).setAttribute("aria-pressed", String(settings[key]));
@@ -2669,6 +2679,7 @@ function setSpeed(v) {
     player?.setSpeed(speed);
     $("speed").textContent = `${Math.round(speed * 100)}%`;
     syncLoopTools();
+    tellControls();
 }
 function toggleLoop() {
     const p = arr?.phrases.findLast((x) => x.time <= songTime());
@@ -2694,6 +2705,7 @@ const updateFullscreenButton = () => {
 };
 $("fullscreen").onclick = toggleFullscreen;
 $("fullscreen").hidden = !document.fullscreenEnabled; // iPhones can't take a page full screen
+document.addEventListener("fullscreenchange", () => tellControls());
 document.addEventListener("fullscreenchange", updateFullscreenButton); // added, not set: a page the player is mounted in may listen too
 updateFullscreenButton();
 // --- Keyboard shortcuts, listed at the end of the notation sheet too: [heading, [[keys as e.key names them (letters
@@ -3170,6 +3182,27 @@ $("bandBack").onclick = () => {
 function announce(name, detail) {
     dispatchEvent(new CustomEvent(`fretfall:${name}`, { detail }));
 }
+// --- Controls a page can build its own of. Everything the header's controls do is on the hook as well, so a bar of the
+// page's own drives the player without reaching into its markup: `controls` is what such a bar
+// draws itself from, and fretfall:controls says it changed — one listener, one re-render, rather than an event per knob.
+// Only what a control toggles is in it; time and length move on their own and have accessors of their own
+function controlState() {
+    return {
+        playing: !!player?.playing,
+        speed,
+        volume: settings.volume,
+        muted: settings.volumeMuted,
+        loop: loop ? { start: loop.start, end: loop.end } : null,
+        metronome: settings.metronome,
+        parts: song?.arrangements.map((a) => a.name) ?? [],
+        part: song ? song.arrangements.indexOf(arr) : -1,
+        sheet: Object.keys(SHEETS).find((name) => !$(name).hidden) ?? null,
+        fullscreen: !!document.fullscreenElement,
+    };
+}
+function tellControls() {
+    if (announcing) announce("controls", controlState());
+}
 // What Open takes, on its tooltip and while files are dragged over: a page's formats first
 function describeOpening() {
     const kinds = [
@@ -3229,6 +3262,50 @@ window.fretfall = {
     set speed(v) {
         setSpeed(+v || 1); // the player's own steps and limits: 10% to 150%, in tenths
     },
+    get volume() {
+        return settings.volume; // 0 to 1, what the slider holds; muted is a switch of its own
+    },
+    set volume(v) {
+        setVolume(Math.min(1, Math.max(0, +v || 0)), false); // as the slider does: asking for a volume asks for sound
+    },
+    get muted() {
+        return settings.volumeMuted;
+    },
+    set muted(on) {
+        setVolume(settings.volume, !!on);
+    },
+    get metronome() {
+        return settings.metronome;
+    },
+    set metronome(on) {
+        if (!!on !== settings.metronome) toggleTool("metronome");
+    },
+    get loop() {
+        return loop ? { start: loop.start, end: loop.end } : null; // a copy: a loop is set whole, never edited in place
+    },
+    set loop(range) {
+        const start = Math.max(0, +range?.start || 0),
+            end = Math.min(song?.length ?? 0, +range?.end || 0);
+        loop = range && end > start ? { start, end } : null; // anything else clears it, as the loop button does
+        markLoop();
+    },
+    get sheet() {
+        return Object.keys(SHEETS).find((name) => !$(name).hidden) ?? null; // "settings", "legend", or null
+    },
+    set sheet(name) {
+        if (name === null || name in SHEETS) toggleSheet(name, name !== null);
+    },
+    get fullscreen() {
+        return !!document.fullscreenElement;
+    },
+    set fullscreen(on) {
+        if (!!on === !!document.fullscreenElement) return;
+        if (on) root.requestFullscreen(); // set it from the page's own click: the browser wants a gesture behind it
+        else document.exitFullscreen();
+    },
+    get controls() {
+        return controlState(); // everything a bar of the page's own draws itself from; fretfall:controls says it changed
+    },
     get notes() {
         // What the part shown is asking for, so a page can listen to a guitar and say whether it was played: the open
         // strings' notes, low to high as the fretboard is drawn, and every note as seconds into the song, string,
@@ -3269,6 +3346,7 @@ window.fretfall = {
         describeOpening();
     },
 };
+announcing = true;
 announce("ready");
 
 usePlayer(following ? bandPlayer : synthPlayer);
