@@ -265,6 +265,26 @@ const capoAt = (capos, time) => {
   }
   return fret;
 };
+// A hand position too brief to be one: a sixtieth of a second at the far end of a slide is the chart saying where the
+// slide starts, not somewhere the hand goes and settles. The camera already holds still through moves this small (see
+// moveCamera), so the box on the board, the lane down the highway and the inlay numbers hold with it rather than
+// lurching there and back. Framing is left on the chart's own positions, so a note under a brief one still gets shown
+const STEADY = 0.15;
+const steadied = new WeakMap();
+const steady = (anchors) => {
+  let out = steadied.get(anchors);
+  if (!out) {
+    out = [];
+    for (const a of anchors) {
+      const last = out[out.length - 1];
+      if (last && a.endTime - a.time < STEADY) last.endTime = a.endTime; // too brief: the hand stays where it was
+      else out.push({ ...a });
+    }
+    steadied.set(anchors, out);
+  }
+  return out;
+};
+
 const anchorAt = (anchors, time) => { // the last hand position to start by `time`, or the first
   let lo = 0, hi = anchors.length;
   while (lo < hi) {
@@ -392,7 +412,7 @@ export function moveCamera(cam, anchors, now, clock, capo = 0) {
   cam.at = clock;
   follow(cam, 'span', cam.target.span, cam.target.span > cam.span ? 0.8 : 1.4, ms / 1000); // out a little sooner than in
   follow(cam, 'center', cam.target.center, 1, ms / 1000);
-  const here = anchorAt(anchors, now);
+  const here = anchorAt(steady(anchors), now); // the box holds through a position too brief to be one
   cam.left = ease(cam.left, here.fret - 1, ms, 90);
   cam.right = ease(cam.right, here.fret - 1 + here.width, ms, 90);
   return here;
@@ -722,7 +742,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       const beat = arr.beats[b], dt = beat.time - now;
       if (dt > LOOK) break;
       if (beat.measure < 0) continue;
-      const a = anchorAt(anchors, beat.time), z = Z(dt);
+      const a = anchorAt(steady(anchors), beat.time), z = Z(dt);
       g.globalAlpha = Math.min(1, (LOOK - dt) / 0.4); // in with its bar line, so a row never lands on the horizon all at once
       for (const f of INLAYS) if (f < a.fret || f >= a.fret + a.width) floorLabel(String(f), f - 0.5, z, NUM_W, NUM_Z, alpha(t.inlay, numberInk));
     }
@@ -730,7 +750,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Hand positions, unless the guides are turned off: a faint band down the highway with thin edges on the
   // floor. A move starts a new band
-  const zones = t.guides === false ? [] : anchors.filter((a) => a.endTime > now && a.time < now + LOOK);
+  const zones = t.guides === false ? [] : steady(anchors).filter((a) => a.endTime > now && a.time < now + LOOK);
   zones.forEach((a, i) => {
     const z0 = Z(Math.max(0, a.time - now)), z1 = Z(Math.min(LOOK, a.endTime - now)), l = a.fret - 1, r = l + a.width;
     g.fillStyle = fade(t.anchorFill, t.anchorOpacity, 0.02);
