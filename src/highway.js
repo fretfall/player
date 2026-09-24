@@ -28,7 +28,7 @@ const NUM_W = 0.31, NUM_Z = 1.7; // fret widths across the neck and down the hig
 const NUM_TILT = 1.4; // radians from upright past which the floor has turned edge-on: a number is kept to the ends of the neck, and only goes once it is a line, not a digit
 const NUM_MIN_PX = 1; // px tall a number must come to on screen: below this it is a smudge, not a digit
 const NUM_TALL = 1.2; // how much taller than wide the floor may leave a number before it is painted over less of the highway
-const NUM_GROW = 0.75; // how much of the distance a number paints back out again: 0 keeps its size on the floor, 1 on the screen
+const NUM_FLOOR_PX = 18; // px across a number is held to once the highway would paint it smaller: two digits still read at a glance
 
 export const rounded = (u0, u1, v0, v1, round) => { // a rectangle with rounded corners, as points round its outline
   const [ua, ub, va, vb] = [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)], r = Math.min(round, (ub - ua) / 2, (vb - va) / 2);
@@ -601,9 +601,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // near enough the perspective itself; canvas text is vector, so it stays crisp however it's sheared. Like road markings
   // it is drawn long down the highway, which the foreshortening squashes back to about its width
   const floorLabel = (str, x, z, w, depth, fill, weight = 700) => {
-    // Painted bigger the further off it is, so it shrinks as gently as the numbers on notes do (see label) instead of
-    // fading to a smudge by the back of the highway: w and depth are its size where it meets the board
-    const [px, py, k] = P(x, floor, z), grow = (k0 / k) ** NUM_GROW;
+    // Paint on the road obeys the road: a number keeps its size on the floor (w and depth are that size) and shrinks with
+    // the highway, so it reads as painted where it lies rather than floating over it. It stops shrinking only where it
+    // would go under what can be read at a glance, and holds there — so it is never larger than the ones nearer in,
+    // which is what painting it back out towards a fixed size on screen used to do
+    const [px, py] = P(x, floor, z);
+    const [nx, ny] = P(x + w, floor, z), natural = Math.hypot(nx - px, ny - py); // what the highway alone would give it
+    const grow = natural > 0.01 ? Math.max(1, NUM_FLOOR_PX / natural) : 1;
     const [ax, ay] = P(x + w * grow, floor, z), wide = Math.hypot(ax - px, ay - py);
     // The length it is painted over is cut back near the board: down there the floor is steep enough that the whole of it
     // comes up on screen, and a glyph drawn long enough to read at the back stands up narrow and stretched (NUM_TALL)
@@ -618,7 +622,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const tilt = Math.abs(Math.atan2(zx - px, py - zy));
     if (px < -60 || px > W + 60 || tall < NUM_MIN_PX || tilt > NUM_TILT) return;
     const was = g.globalAlpha;
-    g.globalAlpha = was * Math.min(1, (NUM_TILT - tilt) / 0.2, (tall - NUM_MIN_PX) / 3); // and in from the far end, so nothing pops
+    // Held at the floor it recedes in tone rather than size, the way paint does through haze, so the far rows still sit
+    // behind the near ones; and in from the far end, so nothing pops
+    g.globalAlpha = was * Math.min(1, (NUM_TILT - tilt) / 0.2, (tall - NUM_MIN_PX) / 3) * Math.max(0.45, grow ** -0.5);
     const font = (fonts[weight] ??= `${weight} ${MARK_PX}px ${t.num}`);
     setFont(font);
     g.textAlign = 'center';
