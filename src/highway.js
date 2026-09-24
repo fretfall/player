@@ -1527,7 +1527,9 @@ export function drawHighway(canvas, arr, now, t, cam) {
     // hammer-on or pull-off triangle and no tap arrow — they would float over a ribbon with no gem under them. What it
     // is still doing, a vibrato or a bend, keeps its mark
     if ((note.hammerOn || note.pullOff) && !tapped && !note.tied) { // a white triangle on the note, pointing down to hammer on and up to pull off
-      const scale = note.grace ? 0.6 : 1, w = 0.34 * k * stretch * scale, h = 0.72 * gap * k * scale, [tip, base] = note.hammerOn ? [onTop + 0.15 * h, onTop - 0.85 * h] : [onTop - 0.85 * h, onTop + 0.15 * h];
+      // On the note itself, not above it: pointing down onto it to hammer on, up off it to pull off
+      const scale = note.grace ? 0.6 : 1, w = 0.34 * k * stretch * scale, h = 0.72 * gap * k * scale;
+      const [tip, base] = note.hammerOn ? [cy + h / 2, cy - h / 2] : [cy - h / 2, cy + h / 2];
       g.beginPath();
       g.moveTo(cx - w, base);
       g.lineTo(cx + w, base);
@@ -1538,9 +1540,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.lineWidth = Math.max(2, 0.04 * k);
       stroke();
       fill();
-      onTop -= 0.85 * h;
-      above = Math.min(above, onTop - 0.14 * k);
-      g.strokeStyle = g.fillStyle = ink;
+      g.strokeStyle = g.fillStyle = ink; // it sits on the gem, so nothing above it has to move up
       g.lineWidth = Math.max(1.2, 0.04 * k);
     }
     if (tapped && !note.tied) { // tapped with the picking hand: an arrowhead in the note's colour pointing down onto it
@@ -1604,10 +1604,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
     ];
     for (const word of words) if (word) write(word, word.length > 2 ? 0.22 : 0.28);
     if (struck && note.rightFinger) write(note.rightFinger, 0.26, 'italic 700'); // picking-hand finger: p i m a c
-    if (note.vibrato) { // vibrato: a short wave, taller when wide
-      squiggle(0.24 * k, (note.vibratoWide ? 0.07 : 0.035) * k, 2);
-      above -= (0.16 + (note.vibratoWide ? 0.06 : 0)) * k;
-    }
     if (note.pick) { // pick stroke: ⊓ down, V up
       const w = 0.09 * k, h = 0.13 * k;
       g.beginPath();
