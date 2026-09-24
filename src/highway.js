@@ -526,13 +526,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const [w, h] = palm ? [hw * 0.85, hh * 0.8] : [Math.min(hw, 0.34) * 0.4, hh * 0.55];
     const dark = palm && !white && !color; // a black palm mute's X; a fret-hand mute's is white on its dark edge either way
     if (!color) { // the dark edge
-      g.strokeStyle = alpha(t.ink, dark ? 0.85 : 0.7);
-      g.lineWidth = dark ? Math.max(2, 0.06 * k) : Math.max(3.5, 0.1 * k);
+      g.strokeStyle = alpha(t.ink, dark ? 0.85 : palm ? 0.7 : 0.45);
+      g.lineWidth = dark ? Math.max(2, 0.06 * k) : palm ? Math.max(3.5, 0.1 * k) : Math.max(2.5, 0.07 * k);
       xMark(x, y, z, w, h);
     }
     if (dark) return;
-    g.strokeStyle = color ?? '#ffffff';
-    g.lineWidth = Math.max(color ? 2 : 1.8, 0.05 * k);
+    g.strokeStyle = color ?? (palm ? '#ffffff' : alpha('#ffffff', 0.5));
+    g.lineWidth = Math.max(color ? 2 : palm ? 1.8 : 1.2, (palm ? 0.05 : 0.035) * k);
     xMark(x, y, z, w, h);
   };
   // size in world units at the strike line. Text on the floor shrinks with distance far more gently than the
