@@ -1566,16 +1566,20 @@ export function drawHighway(canvas, arr, now, t, cam) {
       fill();
       above -= 0.16 * k;
     }
-    if (note.accent && (note.accent === 'tenuto' || !chord?.accent)) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3); // an accented chord's frame shows it
+    // How a note is struck — the accent, the pinch, the slap, the hand that hit it — belongs to the moment of picking,
+    // so a tied note carries none of it (as with its triangle above). What it goes on doing — a trill, the bar, a wah,
+    // the harmonic it rings as — it keeps
+    const struck = !note.tied;
+    if (struck && note.accent && (note.accent === 'tenuto' || !chord?.accent)) write({ heavy: '^', tenuto: '–' }[note.accent] ?? '>', 0.3); // an accented chord's frame shows it
     const words = [
-      note.tapLeft ? 'm.g.' : '', // a tap with the fretting hand, which Guitar Pro tells apart (the picking hand's has its arrow)
-      TEXT_MARKS[note.harmonicType] ?? (note.harmonicPinch ? 'PH' : ''),
-      note.slap ? 'slap' : note.pop ? 'pop' : '', note.golpe ? `golpe (${note.golpe})` : '', note.rasgueado ? `rasg. ${note.rasgueado}` : '',
+      struck && note.tapLeft ? 'm.g.' : '', // a tap with the fretting hand, which Guitar Pro tells apart (the picking hand's has its arrow)
+      TEXT_MARKS[note.harmonicType] ?? (struck && note.harmonicPinch ? 'PH' : ''),
+      struck && (note.slap ? 'slap' : note.pop ? 'pop' : ''), struck && note.golpe ? `golpe (${note.golpe})` : '', struck && note.rasgueado ? `rasg. ${note.rasgueado}` : '',
       typeof note.trill === 'number' ? `tr ${note.trill}` : '', note.ornament ?? '', note.fade ?? '', note.whammy ? 'w/bar' : '',
       note.wah === 'open' ? 'o' : note.wah === 'closed' ? '+' : '',
     ];
     for (const word of words) if (word) write(word, word.length > 2 ? 0.22 : 0.28);
-    if (note.rightFinger) write(note.rightFinger, 0.26, 'italic 700'); // picking-hand finger: p i m a c
+    if (struck && note.rightFinger) write(note.rightFinger, 0.26, 'italic 700'); // picking-hand finger: p i m a c
     if (note.vibrato) { // vibrato: a short wave, taller when wide
       squiggle(0.24 * k, (note.vibratoWide ? 0.07 : 0.035) * k, 2);
       above -= (0.16 + (note.vibratoWide ? 0.06 : 0)) * k;
