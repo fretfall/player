@@ -95,7 +95,7 @@ for (const headstock of Object.keys(HEADSTOCKS))
 
 // A vibrato trail running into a chord ends at the bottom of the chord's note lying across it on the string below, not over it
 const trailTop = (string) => { // the top of the wavy spine on screen, the chord's fret 7 note on this string
-  let points = [], moves = 0, closed = false, top = Infinity; // a trail's spine: one open line of many points (lanes and beat lines are many short ones in a path)
+  let points = [], moves = 0, closed = false, top = Infinity; // a trail's outline: one open line of many points (lanes and beat lines are many short ones in a path)
   const recorder = new Proxy({
     beginPath: () => { points = []; moves = 0; closed = false; }, moveTo: (x, y) => { points.push(y); moves++; }, lineTo: (x, y) => points.push(y), closePath: () => { closed = true; },
     stroke: () => { if (!closed && moves === 1 && points.length > 12) top = Math.min(top, ...points); },

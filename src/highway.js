@@ -1286,21 +1286,22 @@ export function drawHighway(canvas, arr, now, t, cam) {
       glow(false);
     } else {
       glow(!note.letRing, c, 6, true);
+      // The same rail a bend rides on, so a bend that turns into a slide, or a slide that rings on, keeps one width the
+      // whole way instead of changing shape where the technique changes. A slide off the end (slideUnpitchTo, no target
+      // pitch) is the hand letting go, so its rail narrows away to nothing over its second half
+      const wide = (j) => (falls ? RAIL * Math.min(1, 2 * (1 - j / (spine.length - 1))) : RAIL);
+      // Left open, so the one path serves twice: filled for the ribbon, then stroked for its two bright edges — which is
+      // where the white line down the middle used to be. A trail is drawn for every note that rings, so it is worth the
+      // path it saves
+      path([...spine.map(([px, py, pz], j) => [px - wide(j), py, pz]), ...spine.map(([px, py, pz], j) => [px + wide(j), py, pz]).reverse()], false);
       g.fillStyle = falls ? fade(c, 0.9, 0) : fade(c, note.letRing ? 0.5 : 0.9, note.letRing ? 0.2 : 0.45); // plain to see from the far end, not only as it arrives
-      // A slide off the end (slideUnpitchTo, no target pitch) is the hand letting go, not a move to another fret: the
-      // ribbon narrows away to nothing over its second half rather than arriving somewhere at full width
-      const half = (j) => (falls ? 0.09 * Math.min(1, 2 * (1 - j / (spine.length - 1))) : 0.09);
-      path([...spine.map(([px, py, pz], j) => [px - half(j), py, pz]), ...spine.map(([px, py, pz], j) => [px + half(j), py, pz]).reverse()]);
       fill();
-      glow(false);
-    }
-    if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
-      g.strokeStyle = falls ? fade('#ffffff', 0.85, 0) : fade(note.letRing ? c : '#ffffff', 1, 0.55); // a slide off dies away with its ribbon
+      g.strokeStyle = falls ? fade(shade(c, 0.6), 0.85, 0) : fade(shade(c, 0.6), 1, 0.5);
       g.lineWidth = 2;
       g.setLineDash(note.letRing ? [7, 6] : []);
-      path(spine, false);
       stroke();
       g.setLineDash([]);
+      glow(false);
     }
   }
   lap('trails');
