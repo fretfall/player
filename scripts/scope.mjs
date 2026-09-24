@@ -20,7 +20,8 @@ const skip = (css, i) => {
 };
 
 const scopeSelector = (selector, root, dock) =>
-  selector.includes(':root') ? selector.replaceAll(':root', root)
+  selector === ':root' ? `${root}:not(${dock}),:where(${dock})` // on a dock it weighs nothing: the page's own rule on its element wins
+  : selector.includes(':root') ? selector.replaceAll(':root', root)
   : /^(html|body)(?![\w-])/.test(selector) ? selector.replace(/^(html|body)(?![\w-])(\s*>?\s*body(?![\w-]))?/, `${root}:not(${dock})`)
   : `:where(${root}) ${selector}`;
 

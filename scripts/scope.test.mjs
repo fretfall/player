@@ -3,7 +3,8 @@ import { scope } from './scope.mjs';
 
 // :root, and html or body at the start, are the element; the rest goes under it without weighing more than on the page.
 // html and body are the page's box, so their rules stay off a dock (which :root's, the variables, reach)
-assert.equal(scope(':root{--bg:#000}'), '[data-fretfall]{--bg:#000}');
+// :root's own rule weighs nothing on a dock, so the page recolours its dock with a rule of its own on that element
+assert.equal(scope(':root{--bg:#000}'), '[data-fretfall]:not([data-fretfall-dock]),:where([data-fretfall-dock]){--bg:#000}');
 assert.equal(scope('html,\nbody { height: 100% }'), '[data-fretfall]:not([data-fretfall-dock]){ height: 100% }');
 assert.equal(scope('body{margin:0}html body .bar{top:0}body>.bar{top:0}'), '[data-fretfall]:not([data-fretfall-dock]){margin:0}[data-fretfall]:not([data-fretfall-dock]) .bar{top:0}[data-fretfall]:not([data-fretfall-dock])>.bar{top:0}');
 assert.equal(scope('body{margin:0}', '#player', '.dock'), '#player:not(.dock){margin:0}');
