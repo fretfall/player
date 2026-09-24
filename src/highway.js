@@ -1177,7 +1177,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     // A link in a tied chain keeps its trail however short it is: the ring carries on either side of it, and the gap
     // where a held fret sits between two slides is the join, not a note too brief to bother drawing
     const linked = note.tied || typeof note.tieTo === 'number';
-    if ((tail <= 0.2 && !linked) || dt + tail <= 0 || (chord && !moves) || frameOnly(note)) continue; // chords sustain without trails: their frames already show the beats
+    if ((tail <= 0.2 && !linked) || dt + tail <= 0 || (chord && !moves && !linked) || frameOnly(note)) continue; // chords sustain without trails: their frames already show the beats — unless one is tied onward, where the trail is the only thing carrying it to what it ties to
     if (open && slide) { // a slide from an open string: an arch from its bar to the fret it lands on when the note ends
       g.strokeStyle = c;
       g.lineWidth = 2.5;
