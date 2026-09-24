@@ -31,7 +31,7 @@ import {
     headstockParts,
     spline,
 } from "./highway.js";
-import { onsetEnvelope, align } from "./sync.js";
+import { onsetEnvelope, align, snapOffset } from "./sync.js";
 import {
     startProfiler,
     startFrame,
@@ -1283,7 +1283,13 @@ let song = null,
     player = null,
     speed = 1,
     loop = null,
-    announcedPlaying = false; // told with fretfall:playing, see the hook near the end
+    announcedPlaying = false,
+    // The open song's own nudge in ms: a page that keeps one per song sets it with fretfall.offset once the song is open,
+    // and a new song starts at 0. It lives in the players' clocks (time and seek), so the loop, a seek and a band window
+    // all go by it; Audio delay, the device's, stays in songTime. heard: the recording's attacks and how it was lined
+    // up, kept for fretfall.snap()
+    songOffset = 0,
+    heard = null; // told with fretfall:playing, see the hook near the end
 
 // A band window (?band=part, see Band below) draws another window's player instead of playing one of its own
 const bandPart = new URLSearchParams(location.search).get("band"),
@@ -1297,7 +1303,7 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
     el.onended = () => announce("ended"); // played out to the end, rather than paused: see the hook near the end
     return {
         get time() {
-            return (el.currentTime - offset) / ratio;
+            return (el.currentTime - offset) / ratio - songOffset / 1000;
         },
         get playing() {
             return !el.paused;
@@ -1305,7 +1311,7 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
         play: () => el.play(),
         pause: () => el.pause(),
         seek: (t) => {
-            el.currentTime = Math.max(0, offset + ratio * t);
+            el.currentTime = Math.max(0, offset + ratio * (t + songOffset / 1000));
         },
         setSpeed: (v) => {
             el.playbackRate = v;
@@ -1388,9 +1394,9 @@ api.error.on((e) =>
 );
 
 const synthPlayer = {
-    // position events arrive every few ms; extrapolate between them, never far past the last one
+    // position events arrive every few ms; extrapolate between them, never far past the last one. Less the song's nudge
     get time() {
-        return synth.tempo.length
+        return (synth.tempo.length
             ? (tickToMs(synth.tempo, synth.tick) +
                   (synth.playing && synth.heard && synth.paused === null
                       ? Math.min(
@@ -1399,7 +1405,7 @@ const synthPlayer = {
                         ) * api.playbackSpeed
                       : 0)) /
                   1000
-            : 0;
+            : 0) - songOffset / 1000;
     },
     get playing() {
         return synth.playing;
@@ -1412,13 +1418,13 @@ const synthPlayer = {
     pause: () => {
         synth.tick = synth.paused = msToTick(
             synth.tempo,
-            synthPlayer.time * 1000,
+            (synthPlayer.time + songOffset / 1000) * 1000,
         ); // right where the highway is
         synth.at = performance.now();
         api.pause();
     },
     seek: (t) => {
-        synth.tick = msToTick(synth.tempo, Math.max(0, t) * 1000);
+        synth.tick = msToTick(synth.tempo, Math.max(0, t + songOffset / 1000) * 1000);
         synth.at = performance.now();
         synth.heard = false; // the synth refills its buffers from here
         if (synth.paused !== null) synth.paused = synth.tick;
@@ -2068,6 +2074,8 @@ function setSong(next) {
         markArpeggios(a.notes, a.handShapes ?? []);
     }
     song = { ...next, lines: lyricLines(next.lyrics) };
+    songOffset = 0;
+    heard = null;
     if (!following) loop = null; // a band window keeps the loop it was sent
     if (leading) band.postMessage({ song: bandSong() });
     if (!mounted)
@@ -2494,10 +2502,9 @@ async function addRecording(file) {
                 ),
             ),
         ].sort((a, b) => a - b);
-        const sync = align(
-            onsetEnvelope(mono, decoded.sampleRate),
-            onsets,
-        );
+        const envelope = onsetEnvelope(mono, decoded.sampleRate);
+        const sync = align(envelope, onsets);
+        heard = { envelope, sync, first: onsets[0] };
         usePlayer(audioPlayer(file, sync));
         status(
             sync.confidence >= 2
@@ -3336,6 +3343,19 @@ window.fretfall = {
                 midi: (open[n.string] ?? 0) + n.fret,
             })),
         };
+    },
+    get offset() {
+        return songOffset; // ms, the open song's own, on top of Audio delay
+    },
+    set offset(ms) {
+        songOffset = Number.isFinite(+ms) ? +ms : 0; // later notes for a positive nudge, as Audio delay does
+    },
+    // The nudge that puts the tab's first note on its attack in the recording (see snapOffset), set and returned; null
+    // without a recording lined up here, or a silent one
+    snap() {
+        const ms = heard && snapOffset(heard.envelope, heard.sync, heard.first);
+        if (ms != null) songOffset = ms;
+        return ms ?? null;
     },
     get parts() {
         return song?.arrangements.map((a) => a.name) ?? [];

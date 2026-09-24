@@ -55,6 +55,9 @@
             <button id="pagePlay" disabled>Play</button>
             <button id="pageHide">Hide</button>
             <button id="pageDock" disabled>Dock</button>
+            <!-- the song's own nudge (fretfall.offset), as a page keeping one per song would offer it -->
+            <label>Nudge <input id="pageOffset" type="range" min="-500" max="500" step="10" value="0" disabled /> <output id="pageOffsetOut">0 ms</output></label>
+            <button id="pageSnap" disabled>Snap</button>
         </header>
         <!-- the player's controls come here, docked: one bar, the page's (fretfall.dock) -->
         <div class="dock" id="pageBar" hidden></div>
@@ -76,6 +79,15 @@
                 await fretfall.open([new File([await res.text()], "demo.atex")]);
             }
             $("pagePlay").disabled = $("pageDock").disabled = false;
+            $("pageOffset").disabled = $("pageSnap").disabled = false;
+            const nudged = (ms) => ($("pageOffsetOut").value = `${ms} ms`);
+            $("pageOffset").oninput = (e) => nudged((fretfall.offset = +e.target.value));
+            $("pageSnap").onclick = () => {
+                // null with no recording lined up: drop the tab's recording on the player first
+                const ms = fretfall.snap();
+                if (ms !== null) nudged(($("pageOffset").value = ms));
+            };
+            addEventListener("fretfall:song", () => nudged(($("pageOffset").value = 0))); // a new song starts at 0
             $("pagePlay").onclick = () => (fretfall.playing = !fretfall.playing);
             $("pageDock").onclick = () => {
                 // the player's controls in this page's own bar, and its header gone meanwhile; null brings them home

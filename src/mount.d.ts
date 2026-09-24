@@ -36,6 +36,18 @@ export interface Fretfall {
    * it sounds. A copy, made on each read: read it once a song, not each frame.
    */
   readonly notes: { open: number[]; notes: { time: number; sustain: number; string: number; fret: number; midi: number }[] } | null;
+  /**
+   * The open song's own nudge in milliseconds, on top of the player's alignment of a recording and its Audio delay
+   * setting (the device's): positive makes the notes arrive later. Settable once the song is open; a new song starts at 0.
+   * It moves the song's clock: `time`, seeks and the loop go by it.
+   */
+  offset: number;
+  /**
+   * Sets `offset` so the tab's first note lands on its attack in the recording, and returns it; `null` without a
+   * recording the player lined up itself. Near where the player's fit puts that note when the fit is sure; else the
+   * recording's first loud sound, which a count-in can be: a starting point to nudge from.
+   */
+  snap(): number | null;
   /** The names of the song's parts. */
   readonly parts: string[];
   /** The part shown, -1 without one. Settable. */

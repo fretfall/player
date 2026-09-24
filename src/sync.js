@@ -111,3 +111,18 @@ export function align({ env, hop, start }, onsets, { minRatio = 0.9, maxRatio = 
   const mean = fine.reduce((a, b) => a + b, 0) / Math.max(1, fine.length);
   return { offset: best.offset, ratio: best.ratio, confidence: mean ? best.score / mean : 0 };
 }
+
+// The nudge in ms (positive: the notes later) that puts the chart's first note, at chart time `first`, on its attack in
+// the recording. A confident fit says where that is to within a few tenths of a second, so the loudest attack within
+// 0.3 s of there; a doubtful one says nothing, so the first loud attack, which a count-in can win. null when silent.
+export function snapOffset({ env, hop, start }, { offset, ratio, confidence }, first) {
+  const loudest = env.reduce((a, b) => Math.max(a, b), 0);
+  if (!loudest) return null;
+  let at, best = 0;
+  if (confidence >= 2) {
+    const near = offset + ratio * first, to = Math.min(env.length - 1, Math.floor((near + 0.3 - start) / hop));
+    for (let f = Math.max(0, Math.ceil((near - 0.3 - start) / hop)); f <= to; f++) if (env[f] > best) [best, at] = [env[f], start + f * hop];
+  }
+  at ??= start + env.findIndex((v) => v >= loudest / 4) * hop;
+  return Math.round(((at - offset) / ratio - first) * 1000);
+}

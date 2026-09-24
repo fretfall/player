@@ -48,6 +48,7 @@ fretfall.part = 1;
 | `playing`, `time`, `length` | Where playback is, in seconds. `playing` is settable: it waits for the synth's instruments. So is `time`: a jump to there, kept within the song |
 | `parts`, `part` | The song's parts, and the one shown (settable) |
 | `notes` | What the part shown asks for: the open strings, and each note's time, string, fret and midi note. A copy each read |
+| `offset`, `snap()` | The open song's own nudge in ms, on top of how the player lined its recording up and of Audio delay (the device's): positive makes the notes later. Settable once the song is open; a new song starts at 0. It moves the song's clock: `time`, seeks and the loop go by it. `snap()` sets it so the tab's first note lands on its attack in the recording and returns it (`null` without a recording lined up here): near where the player's fit puts that note when the fit is sure, else the recording's first loud sound, which a count-in can be |
 | `speed` | How fast it plays, 1 being the song's own tempo. Settable, in the player's steps of a tenth from 0.1 to 1.5 |
 | `style` | The look: note shape, colour set, fonts, string colours, headstock. Settable whole or in part |
 | `volume`, `muted` | 0 to 1, and the mute. Settable; a volume of 0 is muted, and setting one asks for sound again |
