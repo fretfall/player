@@ -1197,6 +1197,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       }
     }
     const d0 = Math.max(dt, 0), bent = note.bend || note.bendCurve || note.whammy;
+    const falls = slide !== null && note.slideTo === null; // slid off rather than slid to: it dies away where it stops
     let d1 = Math.min(dt + tail, LOOK, next ? next.time - now : Infinity);
     if (d1 <= d0) continue;
     const along = (d) => {
@@ -1265,13 +1266,16 @@ export function drawHighway(canvas, arr, now, t, cam) {
       glow(false);
     } else {
       glow(!note.letRing, c, 6, true);
-      g.fillStyle = fade(c, note.letRing ? 0.5 : 0.9, note.letRing ? 0.2 : 0.45); // plain to see from the far end, not only as it arrives
-      path([...spine.map(([px, py, pz]) => [px - 0.09, py, pz]), ...spine.slice().reverse().map(([px, py, pz]) => [px + 0.09, py, pz])]);
+      g.fillStyle = falls ? fade(c, 0.9, 0) : fade(c, note.letRing ? 0.5 : 0.9, note.letRing ? 0.2 : 0.45); // plain to see from the far end, not only as it arrives
+      // A slide off the end (slideUnpitchTo, no target pitch) is the hand letting go, not a move to another fret: the
+      // ribbon narrows away to nothing over its second half rather than arriving somewhere at full width
+      const half = (j) => (falls ? 0.09 * Math.min(1, 2 * (1 - j / (spine.length - 1))) : 0.09);
+      path([...spine.map(([px, py, pz], j) => [px - half(j), py, pz]), ...spine.map(([px, py, pz], j) => [px + half(j), py, pz]).reverse()]);
       fill();
       glow(false);
     }
     if (note.letRing || slide !== null || (!bent && (note.vibrato || note.tremolo))) { // a bright spine traces the shape, dashed while ringing
-      g.strokeStyle = fade(note.letRing ? c : '#ffffff', 1, 0.55);
+      g.strokeStyle = falls ? fade('#ffffff', 0.85, 0) : fade(note.letRing ? c : '#ffffff', 1, 0.55); // a slide off dies away with its ribbon
       g.lineWidth = 2;
       g.setLineDash(note.letRing ? [7, 6] : []);
       path(spine, false);
