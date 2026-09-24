@@ -94,7 +94,10 @@ export function annotate(notes, chords) {
     if (before !== undefined) {
       const p = notes[before];
       if (p.letRing) p.sustain = Math.max(p.sustain, Math.min(n.time - p.time, 4));
-      if (p.linkNext) p.tieTo = i;
+      if (p.linkNext) {
+        p.tieTo = i;
+        n.tied = true; // held on from the note before: the same ring, carried on, never picked again
+      }
     }
     n.dynamicLabel = n.dynamic && n.dynamic !== dynamic ? n.dynamic : null;
     if (n.dynamic) dynamic = n.dynamic;

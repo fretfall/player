@@ -1101,7 +1101,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // frame; the note lines setting sets how white, down to none), and a stem from each fretted note down to it
   for (const note of visible) {
     const dt = note.time - now, z = Z(dt), chord = chordOf(note), { a, open, x: from, y } = spot(note), x = slideX(note, from, -dt);
-    if (dt < -0.15 || Math.abs(P(x, y, z)[0] - W / 2) > W / 2 + 200) continue;
+    if (dt < -0.15 || note.tied || Math.abs(P(x, y, z)[0] - W / 2) > W / 2 + 200) continue; // tied: no beat of its own
     const hw = open ? (a.width - 0.2) / 2 : 0.34;
     g.globalAlpha = dt < 0 ? Math.max(0, 1 + dt / 0.15) : Math.min(1, (LOOK - dt) / 0.4);
     if (!chord && noteLine) {
@@ -1210,7 +1210,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
     // Past that note on screen means above its bottom edge while over it from side to side: a trail beside it (a slide on its
     // way there, a bend beside a chord's other notes) shows in full. A trail that starts past it, the two a few pixels apart
     // in the distance, isn't cut either: cut to nothing, it would vanish until they came close and then grow back
-    if (next && (bent || across(stop, end))) {
+    if (next && !next.tied && (bent || across(stop, end))) { // a tied note draws no gem, so there is nothing to keep clear of: the trail runs straight on into it
       const at = spot(stop), zs = Z(stop.time - now), half = at.open ? (at.a.width - 0.2) / 2 : 0.34;
       const bottom = P(at.x, at.y - (at.open ? 0.12 : 0.42) * gap, zs)[1] + 3, [l] = P(at.x - half, at.y, zs), [r] = P(at.x + half, at.y, zs);
       const past = (d) => {
@@ -1362,6 +1362,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       continue;
     }
     const repeated = note.repeat || chord?.highDensity;
+    // A tied note is the one before, still ringing: the trail draws where it slid or bent to, and a gem here would say
+    // strike it again. Its marks still stack above, so a vibrato or a bend held through the tie keeps them
     if (repeated) { // the same chord again: just outlines on its beat, lit as they arrive
       const near = z < NEAR;
       g.globalAlpha *= near ? 0.9 : 0.4;
@@ -1373,7 +1375,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       glow(false);
       if ((muted || palm) && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, t.muted); // its mute, greyed out
       g.globalAlpha = faded;
-    } else {
+    } else if (!note.tied) {
       if (!open && numberInk) {
         const fret = note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
         const size = note.grace ? 0.7 : 1; // painted on the floor like the inlay row, so it reads as far back as that one does, and holds until the note lands
