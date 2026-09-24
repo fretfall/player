@@ -1272,16 +1272,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
       stroke();
       g.setLineDash([]);
     }
-    if (slide !== null && d1 >= Math.min(dt + tail, LOOK) - 0.001) { // where the slide ends, unless the trail was cut short
-      const [ex, ey, ez] = along(dt + tail);
-      g.strokeStyle = c;
-      g.lineWidth = 2;
-      g.setLineDash(note.slideTo === null ? [5, 4] : []);
-      if (open) gem(slide - 0.5, ey, ez, 0.34, 0.42 * gap); // where the arch lands, a fret's width
-      else gem(ex, ey, ez, hw, hh);
-      stroke();
-      g.setLineDash([]);
-    }
   }
   lap('trails');
 
