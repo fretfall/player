@@ -750,9 +750,13 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   // Hand positions, unless the guides are turned off: a faint band down the highway with thin edges on the
   // floor. A move starts a new band
-  const zones = t.guides === false ? [] : steady(anchors).filter((a) => a.endTime > now && a.time < now + LOOK);
+  // The hand is in one position at a time, so one band: from the board to where that position ends. The positions
+  // after it are not drawn — stacked up the highway they read as one lane running the whole way, which says the hand
+  // stays where it is when it does not
+  const holding = t.guides === false ? null : steady(anchors).find((a) => a.endTime > now); // the one the hand is in
+  const zones = holding ? [holding] : [];
   zones.forEach((a, i) => {
-    const z0 = Z(Math.max(0, a.time - now)), z1 = Z(Math.min(LOOK, a.endTime - now)), l = a.fret - 1, r = l + a.width;
+    const z0 = Z(0), z1 = Z(Math.min(LOOK, a.endTime - now)), l = a.fret - 1, r = l + a.width;
     g.fillStyle = fade(t.anchorFill, t.anchorOpacity, 0.02);
     path([[l, floor, z0], [r, floor, z0], [r, floor, z1], [l, floor, z1]]);
     fill();
