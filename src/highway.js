@@ -1416,6 +1416,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
     const [cx, cy, k] = P(x, y, z);
     if (cx < -200 || cx > W + 200 || frameOnly(note)) {
+      // a chord shown by its frame alone still says it is palm-muted: the X where its note would be, at half height where the mute carries on
+      if (palm && cx >= -200 && cx <= W + 200 && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? (a.width - 0.2) / 2 : 0.34, (open ? 0.12 : 0.42) * gap * (note.palmAgain ? 0.5 : 1), true, t.muted);
       g.globalAlpha = 1;
       continue;
     }
