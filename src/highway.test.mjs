@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { moveCamera, bendAt, drawHighway, drawTab, HEADSTOCKS, headstockParts } from './highway.js';
+import { moveCamera, bendAt, drawHighway, drawTab, drawSheet, HEADSTOCKS, headstockParts } from './highway.js';
 import { LOOKS, DEFAULT_STYLE, theme } from './themes.js';
 
 const run = (anchors, until, snapshotsAt) => {
@@ -68,7 +68,7 @@ const context = new Proxy({
 globalThis.devicePixelRatio = 2;
 globalThis.OffscreenCanvas = class { getContext() { return context; } }; // the floor's strip of colour bands
 const rects = []; // the tab's rhythm: its beams and the rests written as a bar, both filled from one path
-globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} rect(x, y, w) { rects.push([Math.round(x), Math.round(w)]); } }; // the tab's beat lines and its rhythm, each gathered into one path
+globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} ellipse() {} quadraticCurveTo() {} rect(x, y, w) { rects.push([Math.round(x), Math.round(w)]); } }; // the tab's beat lines and its rhythm, each gathered into one path
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
 const arrangement = chart({ length: 20, notes: Array.from({ length: 24 }, (_, i) => ({ time: 1 + i * 0.25, string: i % 6, fret: i % 3 ? 1 + ((i * 5) % 22) : 0 })), anchors: [{ time: 0, fret: 1 }, { time: 4, fret: 12 }] });
 for (const look of Object.keys(LOOKS))
@@ -236,5 +236,15 @@ assert.ok(AROUND.every((mark) => everything.includes(mark)), `the lot is written
 assert.ok(AROUND.every((mark) => plain.includes(mark)) && plain.length < everything.length, 'no fingering, the rest as it was');
 assert.ok(!AROUND.some((mark) => bare.includes(mark)), `nothing written around a note: ${[...new Set(bare)]}`);
 assert.ok(notated.notes.filter((note) => note.time >= 1.5 && note.time < 3.5).map((note) => String(note.fret)).some((fret) => bare.includes(fret)), 'the fret numbers stay');
+
+// The notation page: the numbers on their strings and the strings named, a rest written, and the beat being played boxed
+const beatBoxes = [];
+const boxer = new Proxy({ fillText: (str) => texts.push(str), roundRect: (x, y, w, h) => h > 40 && h < 200 && beatBoxes.push([x, w]) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+texts.length = rects.length = 0;
+const page = { ...timed, notes: [{ ...NOTE, time: 1, string: 2, fret: 2 }, { ...NOTE, time: 1.5, string: 0, fret: 3 }], rhythm: [[1, 4, false], [1.5, 4, false], [2, 1, true]].map(([time, value, rest]) => ({ time, value, dots: 0, rest, tuplet: 0 })) };
+drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, theme(DEFAULT_STYLE), {});
+assert.ok(['2', '3', 'E', 'A'].every((str) => texts.includes(str)), `numbers and string names written: ${[...new Set(texts)]}`);
+assert.ok(rects.length >= 1, 'the whole rest is written as its bar');
+assert.equal(beatBoxes.length, 1, 'one beat boxed');
 
 console.log('ok');

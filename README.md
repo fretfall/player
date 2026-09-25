@@ -15,7 +15,7 @@ Open a tab and play along: the notes fall down a 3D fretboard, with hand positio
 band's recording and the player lines the tab up with it on its own.
 
 - **Formats**: `.gp`, `.gp3`–`.gp5`, `.gpx`, `.musicxml`, `.mxl`, plus `.mp3`, `.m4a`, `.ogg`, `.wav`, `.flac` recordings
-- **Practice**: phrase loops, speed control with a speed trainer, metronome, 3D highway or tablature
+- **Practice**: phrase loops, speed control with a speed trainer, metronome, 3D highway, tablature, or notation over the tablature
 - **Band**: every part in a window of its own, all in time
 - **Lean**: plain HTML and ES modules, no framework, no runtime dependencies, about 58 kB gzipped
 
@@ -54,6 +54,7 @@ fretfall.part = 1;
 | `volume`, `muted` | 0 to 1, and the mute. Settable; a volume of 0 is muted, and setting one asks for sound again |
 | `loop` | `{ start, end }` in seconds, or `null`. Settable: kept inside the song, and anything else clears it |
 | `metronome` | The click, on the chart's beats. Settable |
+| `view`, `minimal`, `band()` | What the notes are drawn as — `'highway'`, `'tablature'` or `'notation'` — and the view alone with the lyrics; both settable. `band()` opens every other part in a window of its own |
 | `sheet` | Which sheet is open: `'settings'`, `'legend'` or `null`. Settable |
 | `fullscreen` | Settable — set it from your own button's click, as browsers want a gesture behind it |
 | `controls` | Everything above that a control toggles, in one object, for a bar of your own to draw itself from |
@@ -90,7 +91,7 @@ const fretfall = await mount(element); // window.fretfall, once fretfall:ready h
 #### One bar: the player's controls in the page's own
 
 A page with a bar of its own has two once the player is in it. `fretfall.dock(element)` moves the header's controls — the
-part picker, time, speed, volume, loop, play, open, help, settings and full screen — into `element`, and hides the player's
+part picker, the view switch, time, speed, volume, loop, play, open, metronome, band, minimal, help, settings and full screen — into `element`, and hides the player's
 header while they are there, so the highway starts at the top of its element. They are the player's own buttons, styled
 by its stylesheet: `element` is marked `data-fretfall` (and `data-fretfall-dock`) so that reaches it, in its own colours
 and fonts rather than the theme's — set the variables it draws with (`--chip`, `--chip-border`, `--ink`, `--text`,
@@ -107,7 +108,7 @@ it (`demo/mount.html` shows a dock).
 #### Controls of your own
 
 `dock()` moves the player's controls into your bar. To build your own instead, everything they do is on the hook —
-`playing`, `time`, `speed`, `volume`, `muted`, `loop`, `metronome`, `part`, `sheet`, `fullscreen`, `pick()` — so your
+`playing`, `time`, `speed`, `volume`, `muted`, `loop`, `metronome`, `part`, `sheet`, `fullscreen`, `view`, `minimal`, `band()`, `pick()` — so your
 buttons drive the player without reaching into its markup. `fretfall.controls` is the lot in one object, and
 `fretfall:controls` fires whenever any of them changes, whoever changed it: one listener, one re-render, rather than an
 event per knob. The player's own controls stay in step, so you can dock some and build others.
@@ -120,7 +121,7 @@ play.onclick = () => (fretfall.playing = !fretfall.playing);
 
 Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 
-Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>K</kbd> metronome ·
+Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>N</kbd> notation · <kbd>K</kbd> metronome ·
 <kbd>F</kbd> full screen · <kbd>S</kbd> settings · <kbd>?</kbd> everything else. Add `?perf` to the URL for a frame profiler.
 
 ## Develop

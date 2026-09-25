@@ -29,7 +29,7 @@ const context = new Proxy({}, {
 });
 globalThis.devicePixelRatio = 2;
 globalThis.OffscreenCanvas = class { getContext() { return context; } };
-globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} rect() {} };
+globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} ellipse() {} quadraticCurveTo() {} rect() {} };
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
 
 // A busy four minutes: eighths across the strings with slides, bends and mutes, a chord on every bar, a new hand position
@@ -79,12 +79,12 @@ if (!isMainThread) {
   };
   const timed = (run, times = 1) => { const start = performance.now(); for (let i = 0; i < times; i++) run(); return (performance.now() - start) / times; };
   parentPort.on('message', () => {
-    const h = frames(highway.drawHighway), t = frames(highway.drawTab);
+    const h = frames(highway.drawHighway), t = frames(highway.drawTab), n = highway.drawSheet ? frames(highway.drawSheet) : { ms: 0, draws: 0 }; // a build before the notation page has nothing to measure
     parentPort.postMessage({
-      'highway ms/frame': h.ms, 'tab ms/frame': t.ms,
+      'highway ms/frame': h.ms, 'tab ms/frame': t.ms, 'notation ms/frame': n.ms,
       'sync ms': timed(() => sync.align(sync.onsetEnvelope(audio, RATE), onsets)),
       'fingering ms': timed(() => fingering.suggestPositions(notes), 100),
-      'highway draws/frame': h.draws, 'tab draws/frame': t.draws,
+      'highway draws/frame': h.draws, 'tab draws/frame': t.draws, 'notation draws/frame': n.draws,
     });
   });
 } else {

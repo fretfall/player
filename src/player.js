@@ -26,6 +26,7 @@ import {
 import {
     drawHighway,
     drawTab,
+    drawSheet,
     lookAhead,
     HEADSTOCKS,
     headstockParts,
@@ -91,6 +92,14 @@ const TAB_LAYOUTS = {
     scroll: { label: "Scroll" },
     pages: { label: "Pages" },
 }; // the tablature: notes scrolling to the play line, or a page of bars at a time
+const SHEET_SCROLLS = {
+    follow: { label: "Follow" },
+    manual: { label: "Manual" },
+}; // the notation page: turns with the beat, or only by the wheel
+const PAPERS = {
+    dark: { label: "Dark" },
+    light: { label: "Light" },
+}; // the notation page: the theme's dark card, or white paper
 const TAB_MARKS = {
     all: { label: "Everything" },
     plain: { label: "No fingering" },
@@ -127,9 +136,11 @@ const settings = {
     autoplay: false,
     metronome: false,
     minimal: false,
-    tabView: false,
+    view: "highway", // or the tablature, or the notation page
     tabLayout: "scroll",
     tabMarks: "all",
+    paper: "dark",
+    sheetScroll: "follow",
     guides: true,
     fretNumbers: 0.5,
     songIntro: true,
@@ -152,6 +163,12 @@ try {
     if (version < 6) delete saved.sideAngle;
     if (version < 8) delete saved.fretNumbers; // saved while it was an on/off switch
     delete saved.viewDefaults;
+    if ("tabView" in saved) { // saved as two switches, before the view was one setting
+        saved.view = saved.notation ? "notation" : saved.tabView ? "tablature" : "highway";
+        delete saved.tabView;
+        delete saved.notation;
+    }
+    if (!["highway", "tablature", "notation"].includes(saved.view)) delete saved.view;
     if (typeof saved.noteLines !== "number") delete saved.noteLines; // saved while it was an on/off switch
     Object.assign(settings, saved);
 } catch {}
@@ -165,6 +182,8 @@ for (const [key, options, fallback] of [
     ["markings", MARKINGS, "black"],
     ["tabLayout", TAB_LAYOUTS, "scroll"],
     ["tabMarks", TAB_MARKS, "all"],
+    ["paper", PAPERS, "dark"],
+    ["sheetScroll", SHEET_SCROLLS, "follow"],
     ["stringOrder", STRING_ORDERS, "low"],
     ["headstock", HEADSTOCKS, "inline"],
 ])
@@ -190,6 +209,8 @@ function applyTheme() {
         markings: settings.markings,
         tabLayout: settings.tabLayout,
         tabMarks: settings.tabMarks,
+        paper: settings.paper,
+        sheetScroll: settings.sheetScroll,
         stringOrder: settings.stringOrder,
         headstock: settings.headstock,
         viewAngle: settings.viewAngle,
@@ -201,7 +222,9 @@ function applyTheme() {
         fill: settings.minimal, // nothing over the highway: it grows into the room
     };
     root.classList.toggle("minimal", settings.minimal);
-    root.classList.toggle("tab2d", settings.tabView);
+    root.classList.toggle("tab2d", settings.view !== "highway");
+    root.classList.toggle("notation", settings.view === "notation");
+    for (const b of $("view").children) b.setAttribute("aria-pressed", String(b.value === settings.view));
     $("fonts").href = theme.href;
     const vars = {
         bg: theme.bg,
@@ -297,6 +320,8 @@ for (const seg of root.querySelectorAll("[data-setting]")) {
             markings: MARKINGS,
             tabLayout: TAB_LAYOUTS,
             tabMarks: TAB_MARKS,
+            paper: PAPERS,
+            sheetScroll: SHEET_SCROLLS,
             stringOrder: STRING_ORDERS,
             headstock: HEADSTOCKS,
         }[setting];
@@ -370,8 +395,8 @@ for (const key in VIEW) {
 showView();
 // Everything in the settings dialog back to its default. The volume, the toolbar's switches and the open tab stay
 $("resetSettings").onclick = () => {
-    const { volume, volumeMuted, metronome, minimal, tabView, panel } = settings;
-    Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, tabView, panel });
+    const { volume, volumeMuted, metronome, minimal, view, panel } = settings;
+    Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, view, panel });
     for (const key of ["guides", "notes3d", "songIntro", "mute", "autoplay"])
         $(key).checked = settings[key];
     if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
@@ -531,8 +556,9 @@ const placeParts = () => {
 // what folds
 const barTools = [
     $("arrangements"),
+    $("view"),
     ...root.querySelectorAll(
-        ".bar > .group:last-child > :not(#menuButton, #menu), #menu > :not(.divider)",
+        ".bar > .group:last-child > :not(#menuButton, #menu, #minimalBack), #menu > :not(.divider)",
     ),
 ];
 const MORE = new Set(["legendButton", "settingsButton", "fullscreen"]); // the menu's last three, for a bar with a right side of its own
@@ -1206,11 +1232,21 @@ const TAB_LEGEND = [
         ],
     ],
     [
+        "Notation",
+        [
+            [
+                "Page",
+                "With Notation on (N), the tab as a page: a row of whole bars a system, the fret numbers cut into their strings, the rhythm on stems under each system and rests on it, ties as arcs, the bar numbers with a dot a beat along the top, and the tempo, sections and text over the bars. The beat being played is boxed; the page keeps that system second from the top.",
+                svg(`${[5, 11, 17, 23].map((y) => `<path d="M2 ${y}h52" class="lt" stroke-width=".6" opacity=".4"/>`).join("")}<rect x="12" y="7" width="8" height="8" class="fi"/>${tx(16, 11, "5", 7, "ft")}<rect x="30" y="13" width="8" height="8" class="fi"/>${tx(34, 17, "3", 7, "ft")}<path d="M16 24v5M34 24v5M16 29h18" class="lt" stroke-width="1.2"/><rect x="9" y="3" width="15" height="28" rx="3" class="la" stroke-width="1" fill="none" opacity=".9"/>`),
+            ],
+        ],
+    ],
+    [
         "Along the top",
         [
             [
                 "Rhythm",
-                "How long each beat lasts, over the staff as a tab writes it: a stem down to its note head, beamed with the beats it shares a beat with, flagged on its own, and a rest where nothing is played. The time signature stands at the head of the staff.",
+                "How long each beat lasts, over the staff as a tab writes it: a stem down to its note head, beamed with the beats it shares a beat with, flagged on its own, and a rest where nothing is played. The time signature stands at the head of the staff. With Notation on, all of this is written on the staff's own stems instead.",
                 svg(
                     `<path d="M4 10h30" class="lt" stroke-width="2.5" opacity=".5"/>${[4, 14, 24, 34].map((x) => `<path d="M${x} 10v10" class="lt" stroke-width="1" opacity=".5"/><circle cx="${x}" cy="21" r="2" class="fm" opacity=".5"/>`).join("")}<path d="M44 11l4 5l-4 5l5 5" class="lt" stroke-width="1" opacity=".5" fill="none"/>`,
                 ),
@@ -1274,7 +1310,7 @@ $("legendFind").oninput = (e) => {
 let shortcutRows = () => [];
 const showLegend = () => {
     $("legendList").replaceChildren(
-        ...legendRows(settings.tabView ? TAB_LEGEND : LEGEND),
+        ...legendRows(settings.view === "highway" ? LEGEND : TAB_LEGEND),
         ...shortcutRows(),
         Object.assign(document.createElement("p"), {
             className: "legend-empty",
@@ -1581,6 +1617,7 @@ function songFromScore(score, cache) {
                 hairpins = [],
                 rhythm = [],
                 meters = [],
+                keys = [],
                 capos = staff.capo ? [{ time: 0, fret: staff.capo }] : [], // the file's own capo is simply one from the start
                 passes = {};
             let meter = "4/4",
@@ -1623,6 +1660,7 @@ function songFromScore(score, cache) {
                     meters.push({ time: start, text: barMeter }); // the tab staff's own head, the first bar's included
                 const barKey = `${bar.keySignature}:${bar.keySignatureType}`,
                     mode = bar.keySignatureType ? "minor" : "major";
+                if (keys.at(-1)?.fifths !== bar.keySignature) keys.push({ time: start, fifths: bar.keySignature }); // the staff's signature
                 if (barKey !== key) {
                     mark(
                         `${KEYS[mode][bar.keySignature + 7]} ${mode}`,
@@ -2036,6 +2074,7 @@ function songFromScore(score, cache) {
                 hairpins,
                 rhythm,
                 meters,
+                keys,
                 capos,
                 track,
             };
@@ -2671,7 +2710,7 @@ function toggleTool(key) {
     $(key).setAttribute("aria-pressed", String(settings[key]));
     tellControls();
 }
-for (const key of ["metronome", "minimal", "tabView"]) {
+for (const key of ["metronome", "minimal"]) {
     $(key).setAttribute("aria-pressed", String(settings[key]));
     $(key).onclick = () => toggleTool(key);
 }
@@ -2680,13 +2719,19 @@ const toggleMinimal = () => {
     applyTheme();
     markLoop(); // the loop's box is measured on the phrase bars, which weren't showing
 };
-$("minimal").onclick = toggleMinimal;
-const toggleTabView = () => {
-    toggleTool("tabView");
+$("minimal").onclick = $("minimalBack").onclick = toggleMinimal;
+// The view: the highway, the tablature or the notation page, from the bar's switch or its keys, which take a view
+// back to the highway when pressed again
+const chooseView = (name) => {
+    if (name === settings.view) return;
+    settings.view = name;
+    save();
     applyTheme();
     showLegend();
+    tellControls();
 };
-$("tabView").onclick = toggleTabView;
+for (const b of $("view").children) b.onclick = () => chooseView(b.value);
+const toggleView = (name) => chooseView(settings.view === name ? "highway" : name);
 // The speed trainer works on a loop played slower than it could be: without both it switches off, which is
 // also how it stops once it has sped up to 100%. Both sit on the loop, with an X that clears it
 let training = false;
@@ -2874,7 +2919,8 @@ const SHORTCUTS = [
                 "Just the notes and the lyrics",
                 toggleMinimal,
             ],
-            [["d"], "D", "Tablature", "Or back to the 3D highway", toggleTabView],
+            [["d"], "D", "Tablature", "Or back to the 3D highway", () => toggleView("tablature")],
+            [["n"], "N", "Notation", "The tab as a page of systems, or back to the highway", () => toggleView("notation")],
             [["f"], "F", "Full screen", "", toggleFullscreen],
             [["o"], "O", "Open a song", "", () => $("open").click()],
             [["s"], "S", "Settings", "", () => toggleSheet("settings")],
@@ -3052,6 +3098,16 @@ addEventListener(
 // --- Frame loop
 const canvas = $("highway"),
     cam = {};
+// The wheel over the notation page scrolls it; the draw keeps it on the page and, following, turns it with the beat
+canvas.addEventListener(
+    "wheel",
+    (e) => {
+        if (settings.view !== "notation" || cam.sheetY === undefined) return;
+        cam.sheetY += e.deltaY; // in the page's own units, near enough a pixel each
+        e.preventDefault();
+    },
+    { passive: false },
+);
 const songTime = () =>
     player ? player.time - settings.offset / 1000 : 0;
 
@@ -3216,7 +3272,7 @@ function frame() {
     lap("song");
     const shown = benchTime() ?? t;
     if (!mounted || canvas.clientWidth) // no width while the page the player is mounted in hides it: nothing to draw on
-        (settings.tabView ? drawTab : drawHighway)(canvas, arr, shown, theme, cam);
+        ({ highway: drawHighway, tablature: drawTab, notation: drawSheet })[settings.view](canvas, arr, shown, theme, cam);
     if (song && arr) updateOverlay(shown);
     lap("overlay");
     endFrame();
@@ -3263,6 +3319,8 @@ function controlState() {
         part: song ? song.arrangements.indexOf(arr) : -1,
         sheet: Object.keys(SHEETS).find((name) => !$(name).hidden) ?? null,
         fullscreen: !!document.fullscreenElement,
+        view: settings.view,
+        minimal: settings.minimal,
     };
 }
 function tellControls() {
@@ -3353,6 +3411,22 @@ window.fretfall = {
             end = Math.min(song?.length ?? 0, +range?.end || 0);
         loop = range && end > start ? { start, end } : null; // anything else clears it, as the loop button does
         markLoop();
+    },
+    get view() {
+        return settings.view; // "highway", "tablature" or "notation"
+    },
+    set view(name) {
+        if (["highway", "tablature", "notation"].includes(name)) chooseView(name);
+    },
+    get minimal() {
+        return settings.minimal; // the view alone, with the lyrics: no bar, no phrases
+    },
+    set minimal(on) {
+        if (!!on !== settings.minimal) toggleMinimal();
+    },
+    // Every other part in a window of its own, all in time (see band); nothing in a window that is itself following
+    band() {
+        if (!following) $("band").click();
     },
     get sheet() {
         return Object.keys(SHEETS).find((name) => !$(name).hidden) ?? null; // "settings", "legend", or null

@@ -487,14 +487,12 @@
                 visibility: visible;
                 transition-delay: 0s;
             }
-            #tools {
-                position: fixed;
-                z-index: 3;
-                right: 32px;
-                bottom: 6px;
+            .seg.views {
+                margin-left: 4px;
             }
-            #tools .icon {
-                position: relative;
+            .seg.views button {
+                padding: 5px 11px;
+                font-size: 12px;
             }
             .icon:disabled {
                 cursor: default;
@@ -617,19 +615,26 @@
             #loopTools .icon:focus-visible > .tip {
                 transform: translate(calc(-1 * var(--tip, 50%)), 0);
             }
-            :root:fullscreen :is(#info, #tools > :not(#minimal)) {
+            :root:fullscreen #info {
                 display: none;
             }
             /* Minimal view: the highway and the lyrics, and the button that brings the rest back */
-            :root.minimal
-                :is(
-                    .bar,
-                    #phrases,
-                    #progress,
-                    #loopTools,
-                    #info,
-                    #tools > :not(#minimal)
-                ) {
+            :root.minimal :is(.bar > :not(#minimalBack), #phrases, #progress, #loopTools, #info) {
+                display: none;
+            }
+            /* Minimal view: the bar keeps one button, the way back */
+            :root.minimal .bar {
+                background: none;
+                border: 0;
+                box-shadow: none;
+                pointer-events: none;
+            }
+            :root.minimal #minimalBack {
+                display: inline-flex;
+                pointer-events: auto;
+                margin-left: auto;
+            }
+            #minimalBack {
                 display: none;
             }
             /* Tablature: the settings only the 3D highway uses make way */
@@ -640,6 +645,11 @@
             :root.tab2d .only-3d + .only-3d + h3 {
                 padding-top: 0;
                 border-top: 0;
+            }
+            /* Notation: what the page doesn't draw makes way, and its paper setting appears */
+            :root.notation .not-notation,
+            :root:not(.notation) .only-notation {
+                display: none;
             }
             :root.minimal #lyrics {
                 top: 24px;
@@ -1513,6 +1523,16 @@
                     role="group"
                     aria-label="Arrangement"
                 ></div>
+                <div
+                    class="seg views"
+                    id="view"
+                    role="group"
+                    aria-label="View"
+                >
+                    <button value="highway" aria-pressed="true">Highway</button>
+                    <button value="tablature" aria-pressed="false">Tablature</button>
+                    <button value="notation" aria-pressed="false">Notation</button>
+                </div>
             </div>
             <div class="group">
                 <span class="time" id="time">0:00 / 0:00</span>
@@ -1593,6 +1613,14 @@
                         <output id="volumeOut" for="volume"></output>
                     </div>
                 </div>
+                <button
+                    class="icon"
+                    id="minimalBack"
+                    aria-label="Back from the minimal view"
+                    title="Back from the minimal view (H)"
+                >
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10s2.5-4.5 7-4.5 7 4.5 7 4.5-2.5 4.5-7 4.5-7-4.5-7-4.5z"/><circle cx="10" cy="10" r="2"/></svg>
+                </button>
                 <button
                     class="icon"
                     id="menuButton"
@@ -1676,6 +1704,90 @@
                             ><b>Open a song <kbd>O</kbd></b
                             >A Guitar Pro file, or a tab with its recording. You
                             can also drop them anywhere</span
+                        >
+                    </button>
+                    <div class="divider"></div>
+                    <button
+                        class="icon"
+                        id="metronome"
+                        aria-pressed="false"
+                        aria-label="Metronome"
+                        aria-describedby="metronomeTip"
+                    >
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M7.8 3h4.4l3.3 13.5h-11z" />
+                            <path d="M5.6 12.5h8.8M10 12.5l4-7" />
+                        </svg>
+                        <span class="tip" role="tooltip" id="metronomeTip"
+                            ><b>Metronome <kbd>K</kbd></b
+                            >A click on every beat, higher on the first of each
+                            bar</span
+                        >
+                    </button>
+                    <button
+                        class="icon"
+                        id="band"
+                        aria-label="Play as a band"
+                        aria-describedby="bandTip"
+                        disabled
+                    >
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="7.5" cy="7" r="2.5" />
+                            <path d="M3 16.5a4.5 4.5 0 0 1 9 0" />
+                            <circle cx="13.8" cy="7.5" r="2" />
+                            <path d="M13.5 12.2a3.8 3.8 0 0 1 4 4.3" />
+                        </svg>
+                        <span class="tip" role="tooltip" id="bandTip"
+                            ><b>Play as a band</b>Opens every part in a window of its
+                            own, side by side, all in time. Play, pause, jump and loop
+                            from any of them; the sound comes from this window, which
+                            stays open behind them</span
+                        >
+                    </button>
+                    <button
+                        class="icon"
+                        id="minimal"
+                        aria-pressed="false"
+                        aria-label="Minimal view"
+                        aria-describedby="minimalTip"
+                    >
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path
+                                d="M2.5 10s2.8-5 7.5-5 7.5 5 7.5 5-2.8 5-7.5 5-7.5-5-7.5-5z"
+                            />
+                            <circle cx="10" cy="10" r="2.2" />
+                        </svg>
+                        <span class="tip" role="tooltip" id="minimalTip"
+                            ><b>Minimal view <kbd>H</kbd></b
+                            >Just the highway and the lyrics: the header, phrase bars
+                            and song info make way. Press again to bring them back</span
                         >
                     </button>
                     <div class="divider"></div>
@@ -1817,117 +1929,6 @@
             <div id="lines"></div>
         </div>
         <div id="info"></div>
-        <div id="tools" class="group" role="group" aria-label="Practice tools">
-            <button
-                class="icon"
-                id="metronome"
-                aria-pressed="false"
-                aria-label="Metronome"
-                aria-describedby="metronomeTip"
-            >
-                <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <path d="M7.8 3h4.4l3.3 13.5h-11z" />
-                    <path d="M5.6 12.5h8.8M10 12.5l4-7" />
-                </svg>
-                <span class="tip" role="tooltip" id="metronomeTip"
-                    ><b>Metronome <kbd>K</kbd></b
-                    >A click on every beat, higher on the first of each
-                    bar</span
-                >
-            </button>
-            <button
-                class="icon"
-                id="band"
-                aria-label="Play as a band"
-                aria-describedby="bandTip"
-                disabled
-            >
-                <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <circle cx="7.5" cy="7" r="2.5" />
-                    <path d="M3 16.5a4.5 4.5 0 0 1 9 0" />
-                    <circle cx="13.8" cy="7.5" r="2" />
-                    <path d="M13.5 12.2a3.8 3.8 0 0 1 4 4.3" />
-                </svg>
-                <span class="tip" role="tooltip" id="bandTip"
-                    ><b>Play as a band</b>Opens every part in a window of its
-                    own, side by side, all in time. Play, pause, jump and loop
-                    from any of them; the sound comes from this window, which
-                    stays open behind them</span
-                >
-            </button>
-            <button
-                class="icon"
-                id="tabView"
-                aria-pressed="false"
-                aria-label="Tablature"
-                aria-describedby="tabViewTip"
-            >
-                <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                >
-                    <path d="M2.5 5h15M2.5 10h15M2.5 15h15" />
-                    <path d="M7 3v14" stroke-width="2.2" />
-                </svg>
-                <span class="tip" role="tooltip" id="tabViewTip"
-                    ><b>Tablature <kbd>D</kbd></b
-                    >The notes as tab: fret numbers on flat strings with the
-                    rhythm over them, coming in from the right to the play
-                    line. Press again for the 3D highway</span
-                >
-            </button>
-            <button
-                class="icon"
-                id="minimal"
-                aria-pressed="false"
-                aria-label="Minimal view"
-                aria-describedby="minimalTip"
-            >
-                <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <path
-                        d="M2.5 10s2.8-5 7.5-5 7.5 5 7.5 5-2.8 5-7.5 5-7.5-5-7.5-5z"
-                    />
-                    <circle cx="10" cy="10" r="2.2" />
-                </svg>
-                <span class="tip" role="tooltip" id="minimalTip"
-                    ><b>Minimal view <kbd>H</kbd></b
-                    >Just the highway and the lyrics: the header, phrase bars
-                    and song info make way. Press again to bring them back</span
-                >
-            </button>
-        </div>
         <div
             id="settings"
             class="sheet"
@@ -2088,8 +2089,8 @@
                         </div>
                     </div>
                 </div>
-                <h3>Notes</h3>
-                <div class="pair">
+                <h3 class="not-notation">Notes</h3>
+                <div class="pair not-notation">
                     <div class="setting">
                         <div class="setting-head">
                             <label for="noteSpeed">Note speed</label
@@ -2142,7 +2143,7 @@
                 hidden
             >
                 <div
-                    class="setting only-2d"
+                    class="setting only-2d not-notation"
                     title="Notes scrolling in to the play line, or a page of bars that holds still while the play line moves across it"
                 >
                     <div class="setting-head">
@@ -2153,6 +2154,34 @@
                         data-setting="tabLayout"
                         role="group"
                         aria-labelledby="tabLayoutLabel"
+                    ></div>
+                </div>
+                <div
+                    class="setting only-notation"
+                    title="The page the notation is written on: the theme's dark card, or white paper"
+                >
+                    <div class="setting-head">
+                        <span id="paperLabel">Paper</span>
+                    </div>
+                    <div
+                        class="seg"
+                        data-setting="paper"
+                        role="group"
+                        aria-labelledby="paperLabel"
+                    ></div>
+                </div>
+                <div
+                    class="setting only-notation"
+                    title="Whether the page turns with the beat, keeping the system being played second from the top, or only when you scroll it"
+                >
+                    <div class="setting-head">
+                        <span id="sheetScrollLabel">Scroll</span>
+                    </div>
+                    <div
+                        class="seg"
+                        data-setting="sheetScroll"
+                        role="group"
+                        aria-labelledby="sheetScrollLabel"
                     ></div>
                 </div>
                 <div
@@ -2169,7 +2198,7 @@
                         aria-labelledby="tabMarksLabel"
                     ></div>
                 </div>
-                <div class="setting">
+                <div class="setting not-notation">
                     <div class="setting-head">
                         <span id="lookLabel">Notes</span>
                     </div>
@@ -2248,7 +2277,7 @@
                     </div>
                 </div>
                 <div
-                    class="setting"
+                    class="setting not-notation"
                     title="The finger numbers on a note, and the fret numbers in the tab. The mutes' crosses are white either way"
                 >
                     <div class="setting-head">
@@ -2261,7 +2290,7 @@
                         aria-labelledby="markingsLabel"
                     ></div>
                 </div>
-                <label class="toggle"
+                <label class="toggle not-notation"
                     ><span
                         >Hand position guides<small
                             >Where your hand goes: a band down the highway, or

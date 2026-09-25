@@ -60,6 +60,12 @@ export interface Fretfall {
   loop: { start: number; end: number } | null;
   /** The click on the chart's beats. Settable. */
   metronome: boolean;
+  /** What the notes are drawn as: the 3D highway, the tablature, or the notation page. Settable. */
+  view: 'highway' | 'tablature' | 'notation';
+  /** The view alone with the lyrics, the bar and the phrases hidden. Settable. */
+  minimal: boolean;
+  /** Opens every other part in a window of its own, all in time. Nothing in a window that is itself following. */
+  band(): void;
   /** Which sheet is open, or null. Settable. */
   sheet: 'settings' | 'legend' | null;
   /** Settable — set it from your own button's click, as browsers want a gesture behind it. */
@@ -92,6 +98,8 @@ export interface FretfallControls {
   part: number;
   sheet: 'settings' | 'legend' | null;
   fullscreen: boolean;
+  view: 'highway' | 'tablature' | 'notation';
+  minimal: boolean;
 }
 
 export interface FretfallSong {
