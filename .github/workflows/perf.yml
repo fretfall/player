@@ -1,7 +1,10 @@
 name: Performance
 
-# A pull request may not make the player slower or bigger: its build is benchmarked against the base branch's, in turns on the
-# same runner (see scripts/bench.mjs). A regression taken on purpose passes with the perf-ok label.
+# A pull request may not make the player ask the canvas for more work, or make the download heavier: its build is benchmarked
+# against the base branch's, in turns on the same runner (see scripts/bench.mjs). What fails the job is exact — the operations
+# each surface draws over a fixed song at a frozen frame clock, and the gzipped bytes — and any rise at all fails it. Frame
+# time is in the table but fails nothing: a shared runner's noise is wider than any gate worth setting on it. A regression
+# taken on purpose passes with the perf-ok label.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -15,7 +18,7 @@ concurrency:
 
 jobs:
   perf:
-    name: No slower, no bigger
+    name: No more drawing, no bigger
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

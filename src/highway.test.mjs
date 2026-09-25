@@ -124,6 +124,27 @@ for (let now = 1.5; now < 4.9; now += 1 / 30) {
 const firstShown = trailFrames.indexOf(true);
 assert.ok(firstShown >= 0 && trailFrames.slice(firstShown).every(Boolean), `the slide's trail stays once it shows: ${trailFrames.map(Number).join('')}`);
 
+// The camera glides on the wall clock, so what a frame draws depends on how fast the machine ran the loop. A caller that
+// needs the same song time to draw the same frame every time (scripts/bench.mjs, whose counts are a hard gate) sets
+// cam.clock and gets that instead; the browser leaves it unset and keeps performance.now()
+const framesAt = (ms) => {
+  let drawn = 0;
+  const counter = new Proxy({ fill: () => drawn++, stroke: () => drawn++, fillText: () => drawn++ }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+  const cam = {}, look = { ...theme(DEFAULT_STYLE), headstock: 'headless' };
+  for (let f = 0; f < 60; f++) { // past the move to fret 12 at 4 s, so the camera is gliding
+    cam.clock = f * ms;
+    drawHighway({ ...canvas, getContext: () => counter }, arrangement, f / 8, look, cam);
+  }
+  return { drawn, at: cam.at, center: cam.center };
+};
+const frozen = framesAt(1000 / 60);
+assert.deepEqual(framesAt(1000 / 60), frozen, 'a frozen frame clock draws the same frames every time');
+assert.equal(frozen.at, 59 * (1000 / 60), 'the glide runs off cam.clock');
+assert.ok(Math.abs(framesAt(4).center - frozen.center) > 0.01, 'and a slower frame clock is a slower glide, so it is really the clock that drives it');
+const onTheWall = {};
+drawHighway({ ...canvas, getContext: () => context }, arrangement, 1, { ...theme(DEFAULT_STYLE), headstock: 'headless' }, onTheWall);
+assert.ok(Math.abs(onTheWall.at - performance.now()) < 100, 'with no cam.clock, the browser still glides on performance.now()');
+
 // A bend moves the string the way a hand pushes it, and its chevrons follow: the treble strings up towards the bass ones,
 // the bass strings down the other way. A chevron is the only three-point stroke that isn't flat (the strings are the rest)
 const bendWays = (string) => {

@@ -456,7 +456,9 @@ function clearCanvas(canvas) {
   return { g, W, B };
 }
 
-// cam is kept by the caller between frames; reset it to {} to snap to a new song
+// cam is kept by the caller between frames; reset it to {} to snap to a new song. Camera smoothing runs off the wall clock,
+// so a caller that needs the same song time to draw the same frame every time (scripts/bench.mjs) sets cam.clock to a frame
+// clock of its own, in ms; the browser leaves it unset and gets performance.now().
 export function drawHighway(canvas, arr, now, t, cam) {
   const { g: onCanvas, W, B } = clearCanvas(canvas);
   let g = onCanvas; // the board is drawn into an image of its own now and then (see there)
@@ -464,7 +466,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
   const anchors = arr.anchors.length ? arr.anchors : WHOLE_SONG;
   const capo = capoAt(arr.capos, now);
-  const here = moveCamera(cam, anchors, now, performance.now(), capo);
+  const here = moveCamera(cam, anchors, now, cam.clock ?? performance.now(), capo);
   const n = arr.strings, spacing = Math.min(0.5, (5 * GAP) / Math.max(1, n - 1)), gap = spacing * BOARD_HEIGHT * (t.boardHeight ?? 1), stack = gap * (n - 1); // the height setting spreads the strings, and their notes grow with them
   const ys = (s) => (t.stringOrder === 'high' ? s : n - 1 - s) * gap; // lowest string on top, like looking down at the guitar, or highest on top, like tab
   // Which way a bend moves a string: the hand pushes the treble strings towards the bass ones and pulls the bass strings

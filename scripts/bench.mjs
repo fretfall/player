@@ -1,7 +1,27 @@
-// What a change costs: the highway's and the tab's frame time and draw calls over a whole song, lining a recording up, the
-// fingering, and the download (gzip). node scripts/bench.mjs dist: the numbers. node scripts/bench.mjs base/dist dist: both,
-// run in turns so the machine's ups and downs hit them alike, and a failure if the second is slower or bigger than LIMITS
-// allow (PERF_OK=true lets it pass: a regression taken on purpose). In CI the table goes to the job summary too.
+// What a change costs the player, over a whole song: what each surface asks the canvas to do, what the download weighs
+// (gzip), and how long a frame takes. node scripts/bench.mjs dist: the numbers. node scripts/bench.mjs base/dist dist: both,
+// run in turns so the machine's ups and downs hit them alike, and a failure if the second asks the canvas for more or
+// downloads heavier than the first (PERF_OK=true lets it pass: a regression taken on purpose). In CI the table goes to the
+// job summary too.
+//
+// What can fail the build, and why only this. The operation counts and the gzip bytes are exact: the same code gives the
+// same integer on any machine, every time, so any rise at all is a real regression and fails. Frame time is not: on a
+// shared runner the noise floor is wider than the differences worth catching, and a gate on it gave opposite verdicts on
+// byte-identical code five runs in a row. So frame time is printed and marked advisory here, and fails nothing. Reading it
+// is still worth it — a count that holds while the time doubles is a change in what the work costs, not in how much of it
+// there is.
+//
+// For the counts to be exact the frame has to be exact. The camera glides on the wall clock, so how fast the machine ran the
+// loop would change what is on screen and with it what is drawn; the bench hands drawHighway a frame clock of its own
+// (cam.clock) that ticks a fixed 1/60 s a frame. The browser leaves cam.clock unset and keeps performance.now(). Every count
+// is checked against every round of the same worker before the two builds are compared: a count that moves inside one build
+// is a bug in this freeze, and says so.
+//
+// Not gated: per-frame allocations. Measured as a heap delta over the frame loop with --expose-gc (the cheap way), the
+// highway read 42.1 kB a frame against 41.1 for a byte-identical copy of itself, and 41.5 against 57.0 on the next run: a
+// collection landing inside the window moves it by more than any change worth catching. That is the unenforceable gate this
+// bench just got rid of, so it is left out. A row that needs a tolerance does not belong beside counters that are exact.
+//
 // The download is what the player's own page downloads: mount.js, the page over again for a page that mounts the player
 // (see scripts/build.mjs), is never part of that, and has a line of its own under the table.
 import { readdir, readFile, appendFile } from 'node:fs/promises';
@@ -10,26 +30,55 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
-const LIMITS = { time: 0.1, draws: 0.05, gzip: 0.01 }; // share worse than the base: timings are noisy, counts and bytes aren't
-const ROUNDS = 15, FRAMES = 600, SONG = 240, BPM = 150;
+const ROUNDS = 15, FRAMES = 600, SONG = 240, BPM = 150, FRAME_MS = 1000 / 60; // the bench's own frame clock: a frozen 60 Hz
+const SURFACES = ['highway', 'tab', 'notation'];
 
-// A canvas that draws nothing: its methods only count, so the time is the player's own code
+// A canvas that draws nothing: its methods only count, so the time is the player's own code. What is counted is split the
+// way src/perf.js splits the profiler's panel — fills, strokes, text, images, gradients, text measured, and glow (anything
+// drawn with a shadow blur, often the dearest by far) — plus the operations a path is built from, on the context and on
+// Path2D alike. save() and restore() do nothing here, so a shadow blur lasts until the code clears it: read glow as a figure
+// to compare a change against, not as what a browser would count.
 let counting = null;
-const DRAWS = new Set(['fill', 'stroke', 'fillText', 'strokeText', 'fillRect', 'drawImage', 'createLinearGradient', 'createRadialGradient']);
+const KINDS = {
+  fill: 'fill', fillRect: 'fill', stroke: 'stroke', strokeRect: 'stroke', fillText: 'text', strokeText: 'text',
+  drawImage: 'image', createLinearGradient: 'gradient', createRadialGradient: 'gradient', createPattern: 'gradient',
+  measureText: 'measure',
+  moveTo: 'path', lineTo: 'path', arc: 'path', arcTo: 'path', ellipse: 'path', quadraticCurveTo: 'path',
+  bezierCurveTo: 'path', rect: 'path', roundRect: 'path', closePath: 'path',
+};
+const LABELS = { fill: 'fill calls', stroke: 'stroke calls', text: 'text calls', image: 'image draws', gradient: 'gradients', measure: 'text measures', path: 'path ops', glow: 'glow calls' };
+const KEYS = Object.keys(LABELS);
+const GLOWS = new Set(['fill', 'stroke', 'text', 'image']); // a gradient made or a width measured draws nothing, so it can't glow
+const zeroes = () => Object.fromEntries(KEYS.map((k) => [k, 0]));
+
 const gradient = { addColorStop() {} }, metrics = { width: 10, actualBoundingBoxAscent: 5, actualBoundingBoxDescent: 1 };
-const context = new Proxy({}, {
-  get: (target, key) => {
-    if (!(key in target)) {
+const target = {};
+const context = new Proxy(target, {
+  get: (t, key) => {
+    if (!(key in t)) {
       const value = key === 'measureText' ? () => metrics : key.startsWith('create') ? () => gradient : () => {};
-      target[key] = DRAWS.has(key) ? (...args) => { if (counting) counting.n++; return value(...args); } : value;
+      const kind = KINDS[key];
+      t[key] = kind
+        ? (...args) => {
+          if (counting) {
+            counting[kind]++;
+            if (GLOWS.has(kind) && t.shadowBlur > 0) counting.glow++; // off the plain object, not the proxy: an unset property must stay unset
+          }
+          return value(...args);
+        }
+        : value;
     }
-    return target[key];
+    return t[key];
   },
-  set: (target, key, value) => { target[key] = value; return true; },
+  set: (t, key, value) => { t[key] = value; return true; },
 });
+const pathOp = () => { if (counting) counting.path++; };
 globalThis.devicePixelRatio = 2;
 globalThis.OffscreenCanvas = class { getContext() { return context; } };
-globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} ellipse() {} quadraticCurveTo() {} rect() {} };
+globalThis.Path2D = class {
+  moveTo() { pathOp(); } lineTo() { pathOp(); } arc() { pathOp(); } arcTo() { pathOp(); } ellipse() { pathOp(); }
+  quadraticCurveTo() { pathOp(); } bezierCurveTo() { pathOp(); } rect() { pathOp(); } roundRect() { pathOp(); } closePath() { pathOp(); }
+};
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
 
 // A busy four minutes: eighths across the strings with slides, bends and mutes, a chord on every bar, a new hand position
@@ -68,23 +117,28 @@ if (!isMainThread) {
   const url = (file) => pathToFileURL(join(dir, file)).href;
   const [highway, themes, sync, fingering] = await Promise.all(['highway.js', 'themes.js', 'sync.js', 'fingering.js'].map((f) => import(url(f))));
   const look = { ...themes.theme(themes.DEFAULT_STYLE), guides: true, noteLines: 0.5, notes3d: true, frames: 'gradient', repeatMarks: 'frame', markings: 'black', tabLayout: 'scroll', stringOrder: 'low', headstock: 'inline', viewAngle: 30, sideAngle: 5, noteSpeed: 1, drawDistance: 1, fretWidth: 1, boardHeight: 1, fretNumbers: true };
-  const frames = (draw) => { // ms a frame, and draw calls a frame, over the whole song
-    const cam = {}, arrangement = { ...song, links: undefined };
-    counting = { n: 0 };
+  const frames = (draw) => { // ms a frame, and what the whole song asked the canvas for, over FRAMES frames of a frozen clock
+    const cam = { clock: 0 }, arrangement = { ...song, links: undefined };
+    counting = zeroes();
     const start = performance.now();
-    for (let f = 0; f < FRAMES; f++) draw(canvas, arrangement, (f / FRAMES) * SONG, look, cam);
-    const ms = (performance.now() - start) / FRAMES, draws = counting.n / FRAMES;
+    for (let f = 0; f < FRAMES; f++) {
+      cam.clock = f * FRAME_MS;
+      draw(canvas, arrangement, (f / FRAMES) * SONG, look, cam);
+    }
+    const ms = (performance.now() - start) / FRAMES, counts = counting;
     counting = null;
-    return { ms, draws };
+    return { ms, counts };
   };
   const timed = (run, times = 1) => { const start = performance.now(); for (let i = 0; i < times; i++) run(); return (performance.now() - start) / times; };
   parentPort.on('message', () => {
-    const h = frames(highway.drawHighway), t = frames(highway.drawTab), n = highway.drawSheet ? frames(highway.drawSheet) : { ms: 0, draws: 0 }; // a build before the notation page has nothing to measure
+    const drawn = { highway: frames(highway.drawHighway), tab: frames(highway.drawTab), notation: highway.drawSheet ? frames(highway.drawSheet) : null }; // a build before the notation page has nothing to measure
     parentPort.postMessage({
-      'highway ms/frame': h.ms, 'tab ms/frame': t.ms, 'notation ms/frame': n.ms,
-      'sync ms': timed(() => sync.align(sync.onsetEnvelope(audio, RATE), onsets)),
-      'fingering ms': timed(() => fingering.suggestPositions(notes), 100),
-      'highway draws/frame': h.draws, 'tab draws/frame': t.draws, 'notation draws/frame': n.draws,
+      times: {
+        ...Object.fromEntries(SURFACES.filter((s) => drawn[s]).map((s) => [`${s} ms/frame`, drawn[s].ms])),
+        'sync ms': timed(() => sync.align(sync.onsetEnvelope(audio, RATE), onsets)),
+        'fingering ms': timed(() => fingering.suggestPositions(notes), 100),
+      },
+      counts: Object.fromEntries(SURFACES.filter((s) => drawn[s]).flatMap((s) => KEYS.map((k) => [`${s} ${LABELS[k]}`, drawn[s].counts[k]]))),
     });
   });
 } else {
@@ -98,27 +152,50 @@ if (!isMainThread) {
   for (let r = 0; r < ROUNDS; r++) for (const i of r % 2 ? dirs.keys().toArray().reverse() : dirs.keys()) samples[i].push(await round(workers[i]));
   await Promise.all(workers.map((w) => w.terminate()));
 
+  // A count that moves between rounds of the same build is the freeze leaking, not a regression: nothing below it means
+  // anything until that is fixed, so it is its own failure
+  const drifted = [];
+  for (const [i, rounds] of samples.entries()) {
+    for (const [key, first] of Object.entries(rounds[0].counts)) {
+      const off = rounds.find((s) => s.counts[key] !== first);
+      if (off) drifted.push(`${dirs[i]}: ${key} ${first} in the first round, ${off.counts[key]} in another`);
+    }
+  }
+
   const median = (list) => list.toSorted((a, b) => a - b)[list.length >> 1];
   const gzipped = async (dir) => (await Promise.all((await readdir(dir)).filter((f) => /\.(js|html)$/.test(f) && !f.startsWith('mount.')).map((f) => readFile(join(dir, f))))).reduce((sum, b) => sum + gzipSync(b, { level: 9 }).length, 0);
   const mount = await readFile(join(dirs.at(-1), 'mount.js')).then((b) => `mount.js: ${gzipSync(b, { level: 9 }).length.toLocaleString('en')} bytes gzipped, not in the sum above (the player's own page never downloads it).\n\n`, () => '');
-  const results = await Promise.all(dirs.map(async (dir, i) => ({ ...Object.fromEntries(Object.keys(samples[i][0]).map((key) => [key, median(samples[i].map((s) => s[key]))])), 'gzip bytes': await gzipped(dir) })));
+  const results = await Promise.all(dirs.map(async (dir, i) => ({
+    times: Object.fromEntries(Object.keys(samples[i][0].times).map((key) => [key, median(samples[i].map((s) => s.times[key]))])),
+    counts: { ...samples[i][0].counts, 'gzip bytes': await gzipped(dir) },
+  })));
 
-  const show = (key, v) => (key.includes('draws') || key.includes('bytes') ? Math.round(v).toLocaleString('en') : v.toFixed(3));
-  const limit = (key) => (key.includes('draws') ? LIMITS.draws : key.includes('bytes') ? LIMITS.gzip : LIMITS.time);
+  // Counts and bytes are exact and hard: any rise fails, so a hard row shows the operations it moved by as well as the share
+  // (a single call on a hundred thousand is a real failure that rounds to +0.0%). Times are noisy and advisory: printed only
+  const rows = (r) => [...Object.entries(r.times).map(([key, v]) => ({ key, v, hard: false })), ...Object.entries(r.counts).map(([key, v]) => ({ key, v, hard: true }))];
+  const show = (row) => (row.hard ? row.v.toLocaleString('en') : row.v.toFixed(3));
+  const share = (v, was) => (was ? `${v >= was ? '+' : ''}${((v / was - 1) * 100).toFixed(1)}%` : v ? 'new' : '+0.0%');
+  const moved = (v, was) => `${v >= was ? '+' : ''}${(v - was).toLocaleString('en')} · ${share(v, was)}`;
   const [base, head] = results.length === 2 ? results : [null, results[0]], failed = [];
   const table = base
-    ? ['| | base | this change | |', '|:--|--:|--:|--:|', ...Object.keys(head).map((key) => {
-      const change = base[key] ? head[key] / base[key] - 1 : 0, worse = change > limit(key);
-      if (worse) failed.push(key);
-      return `| ${key} | ${show(key, base[key])} | ${show(key, head[key])} | ${change >= 0 ? '+' : ''}${(change * 100).toFixed(1)}%${worse ? ' ❌' : ''} |`;
+    ? ['| | base | this change | |', '|:--|--:|--:|--:|', ...rows(head).map((row) => {
+      const was = base.times[row.key] ?? base.counts[row.key];
+      if (was === undefined) return `| ${row.key} | — | ${show(row)} | new |`; // the base build has no such surface (no notation page yet)
+      const worse = row.hard && row.v > was;
+      if (worse) failed.push(`${row.key} ${moved(row.v, was)}: ${was.toLocaleString('en')} → ${row.v.toLocaleString('en')}`);
+      const delta = row.hard ? `${moved(row.v, was)}${worse ? ' ❌' : ''}` : `${share(row.v, was)} · advisory`;
+      return `| ${row.key} | ${show({ ...row, v: was })} | ${show(row)} | ${delta} |`;
     })]
-    : ['| | this change |', '|:--|--:|', ...Object.entries(head).map(([key, v]) => `| ${key} | ${show(key, v)} |`)];
+    : ['| | this change |', '|:--|--:|', ...rows(head).map((row) => `| ${row.key} | ${show(row)}${row.hard ? '' : ' · advisory'} |`)];
   const ok = process.env.PERF_OK === 'true';
-  const verdict = !base ? '' : failed.length
-    ? `**Performance regression** in ${failed.join(', ')} (limits: time +${LIMITS.time * 100}%, draw calls +${LIMITS.draws * 100}%, gzip +${LIMITS.gzip * 100}%).${ok ? ' Accepted with the `perf-ok` label.' : ' Make it faster, or add the `perf-ok` label to accept it.'}`
-    : 'No performance regression.';
-  const report = `### Performance\n\n${table.join('\n')}\n\n${mount}${verdict}\n`;
+  const legend = `Counts are operations over ${FRAMES} frames of the whole song at a frozen 60 Hz, so they are exact: any rise fails. Frame times are advisory — the noise floor is wider than the gate would be.\n\n`;
+  const verdict = drifted.length
+    ? `**The frame is not frozen**: a count moved between rounds of the same build, so no comparison below it holds.\n${drifted.map((d) => `- ${d}`).join('\n')}`
+    : !base ? '' : failed.length
+      ? `**Performance regression**: ${failed.join('; ')}.${ok ? ' Accepted with the `perf-ok` label.' : ' Bring it back down, or add the `perf-ok` label to accept it.'}`
+      : 'No performance regression: no surface asks the canvas for more than the base does, and the download is no heavier.';
+  const report = `### Performance\n\n${table.join('\n')}\n\n${legend}${mount}${verdict}\n`;
   console.log(report);
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, report);
-  if (failed.length && !ok) process.exitCode = 1;
+  if (drifted.length || (failed.length && !ok)) process.exitCode = 1;
 }
