@@ -29,7 +29,7 @@ const context = new Proxy({}, {
 });
 globalThis.devicePixelRatio = 2;
 globalThis.OffscreenCanvas = class { getContext() { return context; } };
-globalThis.Path2D = class { moveTo() {} lineTo() {} };
+globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} rect() {} };
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
 
 // A busy four minutes: eighths across the strings with slides, bends and mutes, a chord on every bar, a new hand position
@@ -51,6 +51,8 @@ const song = {
   name: 'Lead', tuning: [0, 0, 0, 0, 0, 0], centOffset: 0, capo: 0, strings: 6, open: [40, 45, 50, 55, 59, 64], notes, chords, anchors, handShapes: [],
   sections: Array.from({ length: SONG / 20 }, (_, i) => ({ time: i * 20, name: i % 2 ? 'Chorus' : 'Verse' })),
   beats: Array.from({ length: SONG / beat }, (_, i) => ({ time: i * beat, measure: i % 4 ? -1 : i / 4 + 1 })),
+  rhythm: Array.from({ length: (SONG / beat) * 2 }, (_, i) => ({ time: (i * beat) / 2, value: 8, dots: i % 12 === 11 ? 1 : 0, rest: i % 16 === 15, tuplet: 0 })), // eighths, a rest every other bar
+  meters: [{ time: 0, text: '4/4' }],
   phrases: Array.from({ length: SONG / 10 }, (_, i) => ({ time: i * 10, endTime: (i + 1) * 10, name: '', maxDifficulty: 0 })),
 };
 // A recording: an attack on every beat, over noise

@@ -67,7 +67,8 @@ const context = new Proxy({
 }, { get: (target, key) => (key in target ? target[key] : () => {}) });
 globalThis.devicePixelRatio = 2;
 globalThis.OffscreenCanvas = class { getContext() { return context; } }; // the floor's strip of colour bands
-globalThis.Path2D = class { moveTo() {} lineTo() {} }; // the tab's beat lines, gathered into one path
+const rects = []; // the tab's rhythm: its beams and the rests written as a bar, both filled from one path
+globalThis.Path2D = class { moveTo() {} lineTo() {} arc() {} rect(x, y, w) { rects.push([Math.round(x), Math.round(w)]); } }; // the tab's beat lines and its rhythm, each gathered into one path
 const canvas = { clientWidth: 1728, clientHeight: 944, width: 0, height: 0, getContext: () => context };
 const arrangement = chart({ length: 20, notes: Array.from({ length: 24 }, (_, i) => ({ time: 1 + i * 0.25, string: i % 6, fret: i % 3 ? 1 + ((i * 5) % 22) : 0 })), anchors: [{ time: 0, fret: 1 }, { time: 4, fret: 12 }] });
 for (const look of Object.keys(LOOKS))
@@ -151,7 +152,7 @@ for (const out of [3, 1.5, 0]) { // seconds before it is played: the back of the
   assert.ok(numbers.includes('(3)'), `the note is numbered ${out} s out`); // a ghost note's brackets tell it from the board's own 3
 }
 
-// The 2D tab view draws the fret numbers of the notes coming up, and none from long ago
+// The tablature draws the fret numbers of the notes coming up, and none from long ago
 const texts = [];
 const writer = new Proxy({ fillText: (str) => texts.push(str) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
 for (const stringOrder of ['low', 'high'])
@@ -183,6 +184,23 @@ const numbersAt = (now, tabLayout) => {
 };
 assert.equal(numbersAt(2, 'pages'), numbersAt(2.2, 'pages'), 'a page holds still');
 assert.notEqual(numbersAt(2, 'scroll'), numbersAt(2.2, 'scroll'), 'scrolling moves');
+
+// The rhythm over the staff: eighths beam with the ones they share a beat with and break at the next beat, a quarter
+// carries no beam at all, and a rest is written rather than left as a gap
+const timed = {
+  ...arrangement, open: [40, 45, 50, 55, 59, 64], notes: [], chords: [],
+  beats: [0, 1, 2, 3].map((time) => ({ time, measure: time ? -1 : 1 })),
+  rhythm: [[0, 8], [0.5, 8], [1, 8], [1.5, 8], [2, 4]].map(([time, value]) => ({ time, value, dots: 0, rest: false, tuplet: 0 })),
+};
+const lanes = (arr) => {
+  rects.length = 0;
+  drawTab({ ...canvas, getContext: () => context }, arr, 0, { ...theme(DEFAULT_STYLE), tabLayout: 'scroll' });
+  return rects.map(([, w]) => w);
+};
+assert.deepEqual(lanes(timed), [120, 120], 'a beam over each beat’s pair of eighths, half a second apart at 240 px a second, and none over the quarter');
+const [alone, second] = lanes({ ...timed, rhythm: timed.rhythm.map((r, i) => (i === 1 ? { ...r, rest: true } : r)) });
+assert.ok(alone < 30 && second === 120, `a rest breaks the beam: the eighth before it is flagged and the second beat still beams, not ${alone} and ${second}`);
+assert.ok(lanes({ ...timed, rhythm: [{ time: 0.5, value: 16, dots: 0, rest: false, tuplet: 0 }] }).every((w) => w < 30), 'a sixteenth on its own is flagged, not beamed across the bar');
 
 // Every notation the highway shows draws in the tab view too, in both layouts
 const marks = [

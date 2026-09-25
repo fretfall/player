@@ -632,7 +632,7 @@
                 ) {
                 display: none;
             }
-            /* The 2D tab view: the settings only the 3D highway uses make way */
+            /* Tablature: the settings only the 3D highway uses make way */
             :root.tab2d .only-3d,
             :root:not(.tab2d) .only-2d {
                 display: none;
@@ -1877,7 +1877,7 @@
                 class="icon"
                 id="tabView"
                 aria-pressed="false"
-                aria-label="2D tab view"
+                aria-label="Tablature"
                 aria-describedby="tabViewTip"
             >
                 <svg
@@ -1893,10 +1893,10 @@
                     <path d="M7 3v14" stroke-width="2.2" />
                 </svg>
                 <span class="tip" role="tooltip" id="tabViewTip"
-                    ><b>2D tab view <kbd>D</kbd></b
-                    >The notes as tab: fret numbers on flat strings, coming in
-                    from the right to the play line. Press again for the 3D
-                    highway</span
+                    ><b>Tablature <kbd>D</kbd></b
+                    >The notes as tab: fret numbers on flat strings with the
+                    rhythm over them, coming in from the right to the play
+                    line. Press again for the 3D highway</span
                 >
             </button>
             <button
@@ -2146,7 +2146,7 @@
                     title="Notes scrolling in to the play line, or a page of bars that holds still while the play line moves across it"
                 >
                     <div class="setting-head">
-                        <span id="tabLayoutLabel">Tab</span>
+                        <span id="tabLayoutLabel">Tablature</span>
                     </div>
                     <div
                         class="seg"
@@ -2235,7 +2235,7 @@
                 </div>
                 <div
                     class="setting"
-                    title="The mute crosses and finger numbers on the notes"
+                    title="The finger numbers on a note, and the fret numbers in the tab. The mutes' crosses are white either way"
                 >
                     <div class="setting-head">
                         <span id="markingsLabel">Markings on notes</span>

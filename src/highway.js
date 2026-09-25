@@ -538,19 +538,18 @@ export function drawHighway(canvas, arr, now, t, cam) {
     line3([x - w, y - h, z], [x + w, y + h, z]);
     line3([x - w, y + h, z], [x + w, y - h, z]);
   };
-  // Mutes: a palm mute is a big dark X across the note, a fret-hand mute a small white X in its middle. hw
-  // and hh: the gem's half size; color: the X's own colour instead (greyed out on a repeat)
-  // Marks on a gem (its mute's X, its finger number) are black, or white with a dark edge (the markings setting)
+  // Mutes: a palm mute is a big white X across the note, a fret-hand mute a small white X in its middle, each over a
+  // dark edge so it reads on any string's colour. hw and hh: the gem's half size; color: the X's own colour instead
+  // (greyed out on a repeat, and an open string's bar keeps its colour)
+  // The numbers on a gem — the finger to press with — are black, or white with a dark edge (the markings setting)
   const white = t.markings === 'white', marks = white ? '#ffffff' : t.ink;
   const muteMark = (x, y, z, k, hw, hh, palm, color = null) => {
     const [w, h] = palm ? [hw * 0.85, hh * 0.8] : [Math.min(hw, 0.34) * 0.72, hh * 0.82]; // the fret hand's is big now, and faint
-    const dark = palm && !white && !color; // a black palm mute's X; a fret-hand mute's is white on its dark edge either way
     if (!color) { // the dark edge
-      g.strokeStyle = alpha(t.ink, dark ? 0.85 : palm ? 0.7 : 0.35);
-      g.lineWidth = dark ? Math.max(2, 0.06 * k) : palm ? Math.max(3.5, 0.1 * k) : Math.max(2.5, 0.06 * k);
+      g.strokeStyle = alpha(t.ink, palm ? 0.7 : 0.35);
+      g.lineWidth = palm ? Math.max(3.5, 0.1 * k) : Math.max(2.5, 0.06 * k);
       xMark(x, y, z, w, h);
     }
-    if (dark) return;
     g.strokeStyle = color ?? (palm ? '#ffffff' : alpha('#ffffff', 0.42));
     g.lineWidth = Math.max(color ? 2 : palm ? 1.8 : 1.2, (palm ? 0.05 : 0.035) * k);
     xMark(x, y, z, w, h);
@@ -1740,7 +1739,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
   lap('labels');
 }
 
-// The 2D view, as tab: a card with the strings running across it and each note a bar along its string as long as it's held,
+// The tablature: a card with the strings running across it and each note a bar along its string as long as it's held,
 // its fret number at the start and its marks over it as tab writes them. Scrolling, notes come in from the right to a play line
 // near the left and fade out well before the string names; in pages, a page of whole bars holds still while the play line
 // moves across it. Note speed spaces the notes out, fretboard height the strings
@@ -1767,7 +1766,8 @@ export function drawTab(canvas, arr, now, t) {
   const { g, W } = clearCanvas(canvas);
   if (!arr) return;
   const n = arr.strings, gap = Math.min(TAB_GAP, 320 / Math.max(1, n - 1)) * (t.boardHeight ?? 1);
-  const top = VH * 0.62 - (gap * (n - 1)) / 2, bottom = top + gap * (n - 1), cardTop = top - gap * 1.65, cardBottom = bottom + gap * 1.45;
+  const top = VH * 0.645 - (gap * (n - 1)) / 2, bottom = top + gap * (n - 1), cardTop = top - gap * 2.2, cardBottom = bottom + gap * 1.45;
+  const beamY = top - gap * 1.55, stem = Math.min(20, gap * 0.32); // the rhythm's beam line, and how far its stems hang to the note heads
   const row = (s) => top + (t.stringOrder === 'high' ? n - 1 - s : s) * gap; // as the highway: low E on top, or high e as in tab
   const speed = TAB_SPEED * (t.noteSpeed ?? 1), paged = t.tabLayout === 'pages';
   const left = TAB_LABELS + 30, right = W - TAB_EDGE - 30;
@@ -1830,7 +1830,7 @@ export function drawTab(canvas, arr, now, t) {
       lines.moveTo(x, top - gap * 0.35);
       lines.lineTo(x, bottom + gap * 0.35);
       if (!bar) continue;
-      g.fillText(String(beat.measure), x + 6, cardTop + gap * 0.36);
+      g.fillText(String(beat.measure), x + 6, cardTop + gap * 0.3);
       barAt.set(Math.round(beat.time * 50), measure(g, small, String(beat.measure)).width + 16);
     }
     g.lineWidth = 1;
@@ -1842,7 +1842,7 @@ export function drawTab(canvas, arr, now, t) {
     g.fillStyle = t.accent;
     const markings = new Map();
     for (const m of arr.markers ?? []) if (m.time >= from && m.time <= to) markings.set(Math.round(m.time * 50), [...(markings.get(Math.round(m.time * 50)) ?? []), m.text]);
-    for (const [key, texts] of markings) g.fillText([...new Set(texts)].join('  ·  '), X(key / 50) + 6 + (barAt.get(key) ?? 0), cardTop + gap * 0.36);
+    for (const [key, texts] of markings) g.fillText([...new Set(texts)].join('  ·  '), X(key / 50) + 6 + (barAt.get(key) ?? 0), cardTop + gap * 0.3);
     g.strokeStyle = alpha(t.text, 0.14);
     g.beginPath();
     for (let s = 0; s < n; s++) {
@@ -1887,6 +1887,87 @@ export function drawTab(canvas, arr, now, t) {
     const size = fontSize(Math.min(26, gap * 0.42)), h = size * 1.3, pad = size * 0.32, round = t.gem === 'pill' ? h / 2 : 5;
     const fonts = { note: `700 ${size}px ${t.num}`, grace: `700 ${fontSize(size * 0.72)}px ${t.num}`, finger: `700 ${fontSize(size * 0.5)}px ${t.num}` };
     const white = t.markings === 'white';
+
+    // Over the strings, the rhythm as tab writes it: a stem down to each beat's head, beamed with the beats it shares a
+    // beat with, flagged where it stands alone, dotted, and a rest where nothing is played. It all goes into two paths,
+    // one filled and one stroked, so a lane of any length costs two draws. Quiet, like the bar lines: the notes carry
+    // the colour
+    const rhythm = arr.rhythm, at = (r) => X(r.time) + h / 2; // over the middle of the note's bar, where its fret number is
+    if (rhythm?.length) {
+      const fills = new Path2D(), strokes = new Path2D(), headR = Math.max(2.5, gap * 0.055);
+      const beamH = Math.max(2, gap * 0.045), stub = Math.max(5, gap * 0.13), u = stem / 20; // the rests are drawn 20 px tall and scaled
+      const beams = (r) => (r.value >= 8 ? Math.round(Math.log2(r.value)) - 2 : 0); // an eighth carries one beam, a sixteenth two
+      const dot = (x, y, d) => {
+        fills.moveTo(x + d, y);
+        fills.arc(x, y, d, 0, Math.PI * 2);
+      };
+      const rest = (x, r) => { // a bar for a whole or a half, the zigzag for a quarter, a slanted stem with a blob a beam below that
+        if (r.value <= 2) return fills.rect(x - 7 * u, beamY + stem * (r.value === 1 ? 0.3 : 0.62), 14 * u, 5 * u);
+        strokes.moveTo(x + (r.value === 4 ? -3 : 4) * u, beamY + (r.value === 4 ? 2 : 3) * u);
+        if (r.value > 4) strokes.lineTo(x - 3 * u, beamY + 19 * u);
+        else for (const [dx, dy] of [[3, 9], [-3, 15], [4, 21]]) strokes.lineTo(x + dx * u, beamY + dy * u);
+        for (let i = 0; i < beams(r); i++) dot(x + (2 - i * 1.6) * u, beamY + (5 + i * 5) * u, 2 * u);
+      };
+      const head = (x, r) => {
+        const y = beamY + stem;
+        if (r.value >= 4) dot(x, y, headR);
+        else {
+          strokes.moveTo(x + headR, y);
+          strokes.arc(x, y, headR, 0, Math.PI * 2); // a half or longer is written hollow
+        }
+        if (r.value > 1) {
+          strokes.moveTo(x, beamY);
+          strokes.lineTo(x, y - headR * 0.7); // a whole note carries no stem
+        }
+      };
+      const run = [], tuplets = [];
+      let levels = 0, tuplet = 0;
+      const flush = () => {
+        for (let l = 0; l < levels; l++) { // a beam over the beats that share its level, a stub where one stands alone
+          let start = -1;
+          for (let i = 0; i <= run.length; i++) {
+            const has = i < run.length && beams(run[i]) > l;
+            if (has && start < 0) start = i;
+            if (has || start < 0) continue;
+            const x0 = at(run[start]);
+            fills.rect(start === i - 1 && start ? x0 - stub : x0, beamY + l * beamH * 2, Math.max(at(run[i - 1]) - x0, stub), beamH); // one alone after others: its stub points back
+            start = -1;
+          }
+        }
+        if (tuplet && run.length > 1) tuplets.push([(at(run[0]) + at(run.at(-1))) / 2, String(tuplet)]);
+        run.length = levels = tuplet = 0;
+      };
+      let unit = -1, b = Math.max(0, firstAt(arr.beats, from) - 1); // the beat a run is in: walked along, as the rhythm is in time too
+      for (let i = Math.max(0, firstAt(rhythm, from) - 1); i < rhythm.length; i++) {
+        const r = rhythm[i], x = at(r);
+        if (r.time > to) break;
+        while (arr.beats[b + 1]?.time <= r.time + 1e-4) b++; // beamed no further than the beat they are in
+        if (b !== unit || r.rest) flush();
+        unit = b;
+        if (r.rest) rest(x, r);
+        else {
+          head(x, r);
+          if (!beams(r)) flush();
+          else {
+            run.push(r);
+            levels = Math.max(levels, beams(r));
+            tuplet ||= r.tuplet;
+          }
+        }
+        for (let d = 0; d < r.dots; d++) dot(x + headR * (2.2 + d * 1.5), beamY + stem + headR * 0.8, Math.max(1.3, headR * 0.45));
+      }
+      flush();
+      g.fillStyle = g.strokeStyle = t.muted;
+      g.lineWidth = Math.max(1.2, gap * 0.022);
+      g.stroke(strokes);
+      g.fill(fills);
+      if (tuplets.length) { // three in the time of two: the number over the beam
+        g.font = words;
+        g.textAlign = 'center';
+        for (const [x, count] of tuplets) g.fillText(count, x, beamY - beamH * 2);
+        g.textAlign = 'left';
+      }
+    }
 
     // An arpeggio's shape, held while its notes are played one at a time: a dashed outline round the strings it holds, named
     for (const shape of arr.handShapes ?? []) {
@@ -2220,16 +2301,29 @@ export function drawTab(canvas, arr, now, t) {
   g.lineWidth = 1;
   g.stroke();
 
-  const labelFont = `700 ${fontSize(Math.min(14, gap * 0.24))}px ${t.num}`, r = Math.min(13, gap * 0.22);
-  g.font = labelFont;
+  if (!arr.open) return; // a chart without its tuning gets no head: nothing to name the strings after
+  // The staff's head: what it is, the meter in force, and each string named after its open note in a chip of its own
+  // colour, which fills while that string is sounding
+  const labelFont = `700 ${fontSize(Math.min(14, gap * 0.24))}px ${t.num}`, r = Math.min(13, gap * 0.22), x = (TAB_EDGE + TAB_LABELS) / 2;
   g.textAlign = 'center';
-  for (let s = 0; s < n && arr.open; s++) { // each string named after its open note, in a ring of its colour
-    const x = (TAB_EDGE + TAB_LABELS) / 2, y = row(s);
-    g.strokeStyle = g.fillStyle = color(s);
-    g.lineWidth = 1.8;
+  g.fillStyle = t.muted;
+  g.font = `700 ${fontSize(Math.min(12, gap * 0.2))}px ${t.ui}`;
+  g.fillText('TAB', x, beamY + stem * 0.7);
+  const meter = arr.meters?.findLast((m) => m.time <= now)?.text.split('/');
+  if (meter) { // the time in force, stacked on the staff where a tab's head carries it
+    const middle = (top + bottom) / 2, numerals = `700 ${fontSize(Math.min(30, gap * 0.52))}px ${t.num}`;
+    g.font = numerals;
+    g.fillText(meter[0], TAB_LABELS + 20, middle - gap * 0.04);
+    g.fillText(meter[1], TAB_LABELS + 20, middle + gap * 0.56);
+  }
+  g.font = labelFont;
+  for (let s = 0; s < n; s++) {
+    const y = row(s), c = color(s), on = glowing.some((spark) => spark.y === y); // its chip fills while the string sounds
+    g.fillStyle = on ? c : alpha(c, 0.16);
     g.beginPath();
-    g.arc(x, y, r, 0, Math.PI * 2);
-    g.stroke();
+    g.roundRect(x - r * 1.2, y - r * 0.95, r * 2.4, r * 1.9, r * 0.55);
+    g.fill();
+    g.fillStyle = on ? t.ink : c;
     g.fillText(noteName(arr.open[s]), x, y + measure(g, labelFont, 'E').middle);
   }
 }

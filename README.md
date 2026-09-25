@@ -15,7 +15,7 @@ Open a tab and play along: the notes fall down a 3D fretboard, with hand positio
 band's recording and the player lines the tab up with it on its own.
 
 - **Formats**: `.gp`, `.gp3`–`.gp5`, `.gpx`, `.musicxml`, `.mxl`, plus `.mp3`, `.m4a`, `.ogg`, `.wav`, `.flac` recordings
-- **Practice**: phrase loops, speed control with a speed trainer, metronome, 3D highway or 2D tab
+- **Practice**: phrase loops, speed control with a speed trainer, metronome, 3D highway or tablature
 - **Band**: every part in a window of its own, all in time
 - **Lean**: plain HTML and ES modules, no framework, no runtime dependencies, about 58 kB gzipped
 
@@ -120,7 +120,7 @@ play.onclick = () => (fretfall.playing = !fretfall.playing);
 
 Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 
-Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> 2D tab · <kbd>K</kbd> metronome ·
+Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>K</kbd> metronome ·
 <kbd>F</kbd> full screen · <kbd>S</kbd> settings · <kbd>?</kbd> everything else. Add `?perf` to the URL for a frame profiler.
 
 ## Develop

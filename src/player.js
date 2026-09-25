@@ -90,7 +90,7 @@ const REPEAT_MARKS = {
 const TAB_LAYOUTS = {
     scroll: { label: "Scroll" },
     pages: { label: "Pages" },
-}; // the 2D tab view: notes scrolling to the play line, or a page of bars at a time
+}; // the tablature: notes scrolling to the play line, or a page of bars at a time
 const MARKINGS = {
     black: { label: "Black" },
     white: { label: "White" },
@@ -562,7 +562,7 @@ addEventListener("pointerdown", (e) => {
     if (!e.target.closest("#menu, #menuButton")) toggleMenu(false);
 });
 
-// --- Notation legend: what each mark on the highway, or on the 2D tab, means, drawn in the current theme's colours
+// --- Notation legend: what each mark on the highway, or on the tablature, means, drawn in the current theme's colours
 const svg = (inner) =>
     `<svg viewBox="0 0 56 32" aria-hidden="true">${inner}</svg>`;
 const gem = (x, y, w = 24, h = 12, c = 1, label = "") =>
@@ -671,9 +671,9 @@ const LEGEND = [
         [
             [
                 "Palm mute",
-                "Rest the side of your picking hand on the strings near the bridge: a big dark X across the note.",
+                "Rest the side of your picking hand on the strings near the bridge: a big white X across the note, in the string's own colour on an open string's bar.",
                 svg(
-                    `${gem(16, 10, 24, 12, 0)}<path d="M18 11l20 10M18 21l20-10" class="li" stroke-width="2" opacity=".85"/>`,
+                    `${gem(16, 10, 24, 12, 0)}<path d="M18 11l20 10M18 21l20-10" class="li" stroke-width="4" opacity=".7"/><path d="M18 11l20 10M18 21l20-10" class="lw" stroke-width="2"/>`,
                 ),
             ],
             [
@@ -747,21 +747,21 @@ const LEGEND = [
                 "Hammer-on",
                 "Sound the note by hammering a finger down, without picking: a white triangle on the note, pointing down.",
                 svg(
-                    `${gem(16, 14, 24, 12)}<path d="M22 7h12l-6 10z" class="fw li" stroke-width="1.2"/>`,
+                    `${gem(16, 14, 24, 12)}<path d="M22 15h12l-6 9z" class="fw li" stroke-width="1.2"/>`,
                 ),
             ],
             [
                 "Pull-off",
                 "Pull your finger off the string to sound the lower note: a white triangle on the note, pointing up.",
                 svg(
-                    `${gem(16, 14, 24, 12)}<path d="M22 17h12l-6-10z" class="fw li" stroke-width="1.2"/>`,
+                    `${gem(16, 14, 24, 12)}<path d="M22 25h12l-6-9z" class="fw li" stroke-width="1.2"/>`,
                 ),
             ],
             [
                 "Tie",
-                "Hold the note on into the next one without playing it again.",
+                "Hold the note on into the next one without playing it again: its trail runs on, and no note comes down on the beat it ties to.",
                 svg(
-                    `${gem(4, 19, 16, 8)}${gem(36, 19, 16, 8)}<path d="M12 18Q28 4 44 18" class="lt" stroke-width="1.4" stroke-dasharray="3 3"/>`,
+                    `<path d="M24 20L26 2h4l2 18z" class="f1" opacity=".5"/><path d="M14 9h28" class="lw" stroke-width="2" opacity=".6"/>${gem(16, 18, 24, 10)}`,
                 ),
             ],
             [
@@ -775,7 +775,7 @@ const LEGEND = [
                 "Slide in and out",
                 "Slide into the note from below or above, or off it at the end.",
                 svg(
-                    `<path d="M6 27L22 17" class="l1" stroke-width="2" stroke-dasharray="3 3"/>${gem(22, 10, 22, 12)}`,
+                    `<path d="M4 27L18 18" class="l1" stroke-width="2" stroke-dasharray="3 3"/><path d="M40 18L53 10" class="l1" stroke-width="2" stroke-dasharray="3 3"/>${gem(18, 10, 22, 12)}`,
                 ),
             ],
             [
@@ -823,9 +823,9 @@ const LEGEND = [
             ],
             [
                 "Vibrato",
-                "Shake the note. A taller wave means a wider vibrato.",
+                "Shake the note: its trail waves the whole way. A taller wave means a wider vibrato.",
                 svg(
-                    `${gem(16, 19, 24, 9)}<path d="M13 9q2.5-4 5 0t5 0 5 0 5 0 5 0 5 0" class="lt" stroke-width="1.6"/>`,
+                    `<path d="M28 19q-5-3 0-5t0-5t0-5t0-4" class="l1" stroke-width="4.5" opacity=".5" fill="none"/>${gem(16, 19, 24, 9)}`,
                 ),
             ],
             [
@@ -970,7 +970,7 @@ const LEGEND = [
         ],
     ],
 ];
-// The same marks as they show in the 2D tab view: bars along faint strings, a fret number at their start
+// The same marks as they show in the tablature: bars along faint strings, a fret number at their start
 const lane = (...ys) =>
     ys.map((y) => `<path d="M2 ${y}h52" class="lt" stroke-width=".8" opacity=".3"/>`).join("");
 const tx = (x, y, text, size = 8, cls = "fi", extra = "") =>
@@ -994,7 +994,7 @@ const TAB_LEGEND = [
             ],
             [
                 "Play line",
-                "Play each note as it reaches the line. Scrolling, played notes dim and fade out to the left; in pages (Settings), the page holds still and the line moves across it.",
+                "Play each note as it reaches the line: they come in from the right, and played ones dim and fade out to the left. Set the tablature to pages (Settings) and a page of bars holds still while the line moves across it instead, the next page starting past the dashed line on the right, faded, to read ahead.",
                 svg(`${lane(16)}${bar(4, 16, 12, 1, "3", 'opacity=".4"')}<path d="M21 3v26" class="la" stroke-width="2.5"/>${bar(26, 16, 24, 1, "5")}`),
             ],
             [
@@ -1041,6 +1041,13 @@ const TAB_LEGEND = [
                 "String number",
                 "Play it on this string (1 is the high e).",
                 svg(`${lane(16)}<circle cx="15" cy="16" r="6.5" class="l2" stroke-width="1.2"/>${tx(15, 16, "3", 7, "f2")}${bar(26, 16, 16, 2, "5")}`),
+            ],
+            [
+                "String names",
+                "Down the left, each string named after the note it plays open, in its own colour. Its chip fills while that string is sounding.",
+                svg(
+                    `<path d="M24 9h30M24 23h30" class="lt" stroke-width=".8" opacity=".3"/><rect x="4" y="3" width="15" height="12" rx="3.5" class="f0"/>${tx(11.5, 9, "E", 7, "fi")}<rect x="4" y="17" width="15" height="12" rx="3.5" class="f1" fill-opacity=".16"/>${tx(11.5, 23, "A", 7, "f1")}${bar(30, 9, 18, 0, "5")}`,
+                ),
             ],
             [
                 "Bar number",
@@ -1192,6 +1199,13 @@ const TAB_LEGEND = [
     [
         "Along the top",
         [
+            [
+                "Rhythm",
+                "How long each beat lasts, over the staff as a tab writes it: a stem down to its note head, beamed with the beats it shares a beat with, flagged on its own, and a rest where nothing is played. The time signature stands at the head of the staff.",
+                svg(
+                    `<path d="M4 10h30" class="lt" stroke-width="2.5" opacity=".5"/>${[4, 14, 24, 34].map((x) => `<path d="M${x} 10v10" class="lt" stroke-width="1" opacity=".5"/><circle cx="${x}" cy="21" r="2" class="fm" opacity=".5"/>`).join("")}<path d="M44 11l4 5l-4 5l5 5" class="lt" stroke-width="1" opacity=".5" fill="none"/>`,
+                ),
+            ],
             ["Tempo, time and key", "From this bar on, a new tempo, time signature, key or swing feel, beside the bar's number.", svg(barMark("♩ = 120"))],
             ["Repeats and endings", "Where a repeat starts, how many times, and which ending you are on.", svg(barMark("repeat ×2", 7))],
             ["Jumps", "Road signs to follow: segno, coda, D.C. (from the start), D.S. (from the segno), fine.", svg(barMark("D.S. al coda", 6))],
@@ -1556,6 +1570,8 @@ function songFromScore(score, cache) {
                 lastOnString = {};
             const markers = [],
                 hairpins = [],
+                rhythm = [],
+                meters = [],
                 capos = staff.capo ? [{ time: 0, fret: staff.capo }] : [], // the file's own capo is simply one from the start
                 passes = {};
             let meter = "4/4",
@@ -1594,6 +1610,8 @@ function songFromScore(score, cache) {
                     (passes[master.index] ?? 0) + 1);
                 const barMeter = `${master.timeSignatureNumerator}/${master.timeSignatureDenominator}`;
                 if (barMeter !== meter) mark((meter = barMeter));
+                if (meters.at(-1)?.text !== barMeter)
+                    meters.push({ time: start, text: barMeter }); // the tab staff's own head, the first bar's included
                 const barKey = `${bar.keySignature}:${bar.keySignatureType}`,
                     mode = bar.keySignatureType ? "minor" : "major";
                 if (barKey !== key) {
@@ -1653,7 +1671,22 @@ function songFromScore(score, cache) {
                                     beat.playbackDuration,
                             );
                         if (!v) {
-                            // beat-wide marks from the first voice only: free text, ottava, crescendo hairpins
+                            // beat-wide marks from the first voice only: free text, ottava, crescendo hairpins, and the
+                            // rhythm the tab view writes over the staff: the beat's written value, its dots, whether it
+                            // is a rest. ponytail: the first voice's rhythm alone, as one lane can only carry one
+                            if (
+                                beat.graceType ===
+                                GP.GraceType.None
+                            )
+                                rhythm.push({
+                                    time: t0,
+                                    value: beat.duration, // 1 whole, 2 half, 4 quarter, 8 eighth, and on down
+                                    dots: beat.dots,
+                                    rest: beat.isRest,
+                                    tuplet: beat.hasTuplet
+                                        ? beat.tupletNumerator
+                                        : 0,
+                                });
                             if (beat.text) {
                                 mark(beat.text, t0);
                                 const capo =
@@ -1992,6 +2025,8 @@ function songFromScore(score, cache) {
                 handShapes,
                 markers,
                 hairpins,
+                rhythm,
+                meters,
                 capos,
                 track,
             };
@@ -2827,10 +2862,10 @@ const SHORTCUTS = [
                 ["h"],
                 "H",
                 "Minimal view",
-                "Just the highway and the lyrics",
+                "Just the notes and the lyrics",
                 toggleMinimal,
             ],
-            [["d"], "D", "2D tab view", "Or back to the 3D highway", toggleTabView],
+            [["d"], "D", "Tablature", "Or back to the 3D highway", toggleTabView],
             [["f"], "F", "Full screen", "", toggleFullscreen],
             [["o"], "O", "Open a song", "", () => $("open").click()],
             [["s"], "S", "Settings", "", () => toggleSheet("settings")],
@@ -2847,7 +2882,7 @@ const SHORTCUTS = [
                 "Close what is open",
                 "Settings, this sheet, the volume or the menu",
                 () => {
-                    toggleSheet("settings", false);
+                    toggleSheet(null, false); // Settings and this sheet alike
                     toggleVolume(false);
                     toggleMenu(false);
                 },
