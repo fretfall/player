@@ -1,6 +1,6 @@
 # Fretfall Player
 
-An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser.
+An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser — with a tablature and a notation page beside it.
 
 [![CI](https://github.com/fretfall/player/actions/workflows/ci.yml/badge.svg)](https://github.com/fretfall/player/actions/workflows/ci.yml)
 [![Performance](https://github.com/fretfall/player/actions/workflows/perf.yml/badge.svg)](https://github.com/fretfall/player/actions/workflows/perf.yml)
@@ -15,7 +15,8 @@ Open a tab and play along: the notes fall down a 3D fretboard, with hand positio
 band's recording and the player lines the tab up with it on its own.
 
 - **Formats**: `.gp`, `.gp3`–`.gp5`, `.gpx`, `.musicxml`, `.mxl`, plus `.mp3`, `.m4a`, `.ogg`, `.wav`, `.flac` recordings
-- **Practice**: phrase loops, speed control with a speed trainer, metronome, 3D highway, tablature, or notation over the tablature
+- **Views**: the 3D highway; a tablature, scrolling or a page at a time, with the rhythm written over it; and a notation page — the tab as systems of whole bars with the rhythm, the technique marks, chord names and lyrics, on the theme's card or on paper, with a staff over each system if you like
+- **Practice**: phrase loops, speed control with a speed trainer, metronome
 - **Band**: every part in a window of its own, all in time
 - **Lean**: plain HTML and ES modules, no framework, no runtime dependencies, about 58 kB gzipped
 
@@ -26,7 +27,7 @@ npm install @fretfall/player
 npx serve node_modules/@fretfall/player
 ```
 
-Any static file server works. Tabs are read and played by [alphaTab](https://www.alphatab.net), loaded from jsDelivr.
+Any static file server works. Tabs are read and played by [alphaTab](https://www.alphatab.net), loaded from jsDelivr; the fonts, the notation's music face among them, come from Google Fonts.
 
 ## Build on it
 
@@ -121,7 +122,7 @@ play.onclick = () => (fretfall.playing = !fretfall.playing);
 
 Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 
-Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>N</kbd> notation · <kbd>K</kbd> metronome ·
+Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>N</kbd> notation · <kbd>H</kbd> minimal · <kbd>K</kbd> metronome ·
 <kbd>F</kbd> full screen · <kbd>S</kbd> settings · <kbd>?</kbd> everything else. Add `?perf` to the URL for a frame profiler.
 
 ## Develop
@@ -132,7 +133,7 @@ npm start         # the demo on http://localhost:4410, rebuilt from src/ on ever
 npm test          # node --test
 npm run lint      # oxlint: correctness and performance rules
 npm run build     # dist/, the published package (DEMO=1: with the demo's front door, as github.io serves it)
-npm run bench     # frame time, draw calls, sync and size of dist/
+npm run bench     # frame time and draw calls of the highway, the tablature and the notation page, sync, fingering and size of dist/
 ```
 
 `src/` is the player's modules, `demo/` the page they ship with, and the demo's front door and tab. The build flattens both

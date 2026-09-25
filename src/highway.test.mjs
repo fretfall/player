@@ -245,7 +245,11 @@ const page = { ...timed, notes: [{ ...NOTE, time: 1, string: 2, fret: 2 }, { ...
 drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, theme(DEFAULT_STYLE), {});
 assert.ok(['2', '3', 'E', 'A'].every((str) => texts.includes(str)), `numbers and string names written: ${[...new Set(texts)]}`);
 assert.ok(rects.length >= 1, 'the whole rest is written as its bar');
-assert.equal(beatBoxes.length, 1, 'one beat boxed');
+assert.equal(beatBoxes.filter(([, w]) => w > 20).length, 1, 'one beat boxed');
+assert.equal(beatBoxes.filter(([, w]) => w <= 20).length, 1, 'the moment marked once, a rounded marker');
+beatBoxes.length = 0;
+drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, { ...theme(DEFAULT_STYLE), beatBox: false }, {});
+assert.deepEqual(beatBoxes.map(([, w]) => w > 20), [false], 'with the highlight off, the marker alone');
 assert.doesNotThrow(() => drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, { ...theme(DEFAULT_STYLE), sheetNotes: true }, {}), 'the staff over each system draws, its glyphs waiting on the face');
 // What tab writes around a note, on the page: the note held into in brackets, a palm mute and a let ring as labelled runs,
 // the chord's name, the words under the rhythm; and none of the marks with the Marks setting at just the notes

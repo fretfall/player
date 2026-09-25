@@ -1775,7 +1775,7 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
   const { g, W } = clearCanvas(canvas);
   if (!arr) return;
   const n = arr.strings, sg = SHEET_GAP * (t.boardHeight ?? 1), staffH = sg * (n - 1), marked = (t.tabMarks ?? 'all') === 'all';
-  const light = t.paper === 'light', ink = light ? '#15181f' : t.text, faint = light ? '#7a8190' : t.muted; // on paper, the writing is ink and the card white
+  const light = t.paper === 'light', ink = light ? '#15181f' : t.text, faint = light ? '#5c6472' : t.muted; // on paper, the writing is ink and the card white; the grey holds 4.5:1 on it
   const left = TAB_EDGE + 46, right = W - TAB_EDGE - 16, usable = right - left;
   // Notes: a staff over each system, the notes written as music an octave above where a guitar sounds. Room over the
   // staff for the ledger lines a high note needs, and under it for a low one's, down to the tab; the rhythm then goes on
@@ -1888,7 +1888,7 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     for (const sec of arr.sections ?? []) if (sec.time >= page.start && sec.time < page.end) {
       const x = X(sec.time) + 1;
       texts.push([words, sec.name, x, sysTop - 34, ink, 'left']); // on the chord row, clear of the palm mutes and let rings
-      chordFree = x + measure(g, words, sec.name).width + 10;
+      chordFree = x + measure(g, words, sec.name).width + 16;
     }
     for (const m of arr.markers ?? []) if (m.time >= page.start && m.time < page.end && !m.text.startsWith('repeat') && !/^\d+\/\d+$/.test(m.text)) {
       const x = Math.max(X(m.time) + 1, free);
@@ -1970,7 +1970,14 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
         thin.lineTo(span.x1, sysTop - 21);
       }
     }
-    if (arr.lyrics?.length) for (let k = firstAt(arr.lyrics, page.start - 1e-3); k < arr.lyrics.length && arr.lyrics[k].time < page.end - 1e-3; k++) texts.push([small, arr.lyrics[k].text, X(arr.lyrics[k].time), staffBottom + (notes ? sg : stemLen) + sg * 1.55, faint, 'left']); // the words under the rhythm, a syllable at its note
+    if (arr.lyrics?.length) { // the words under the rhythm, a syllable at its note, never on top of the one before
+      let wordFree = -Infinity;
+      for (let k = firstAt(arr.lyrics, page.start - 1e-3); k < arr.lyrics.length && arr.lyrics[k].time < page.end - 1e-3; k++) {
+        const x = Math.max(X(arr.lyrics[k].time), wordFree);
+        texts.push([small, arr.lyrics[k].text, x, staffBottom + (notes ? sg : stemLen) + sg * 1.55, faint, 'left']);
+        wordFree = x + measure(g, small, arr.lyrics[k].text).width + 5;
+      }
+    }
     // with Notes on, every note's head at its written pitch on the staff over the tab, an accidental where it leaves the
     // key (holding to the bar's end, per letter — ponytail: engravers keep it per letter and octave), ledger lines past
     // the staff, a sounding head in its string's colour; the stems, beams, flags, dots and rests then sit on the staff
@@ -2111,7 +2118,7 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
       if (r && r.time >= page.start - 1e-3 && r.time < page.end) {
         const next = values[k + 1] && values[k + 1].time < page.end ? values[k + 1].time : page.end, x0 = X(r.time) - sg * (notes ? 1 : 0.75), x1 = X(next) - sg * (notes ? 0.3 : 0.35);
         const top = notes ? sysTop - sg * 0.5 : staffTop - sg * 0.7;
-        current.box = [x0, top, Math.max(x1 - x0, sg * 1.5), staffBottom + sg * 0.5 - top + (notes ? 0 : stemLen * 0.45 + sg * 0.2)];
+        if (t.beatBox !== false) current.box = [x0, top, Math.max(x1 - x0, sg * 1.5), staffBottom + sg * 0.5 - top + (notes ? 0 : stemLen * 0.45 + sg * 0.2)]; // the beat, filled (Settings)
       }
       current.x = [X(Math.min(now, page.end)), (notes ? sysTop : staffTop) - sg * 0.5, staffBottom + sg * 0.5];
     }
@@ -2205,12 +2212,12 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     g.fill();
     g.stroke();
   }
-  if (current.x) {
-    g.strokeStyle = alpha(t.accent, 0.5);
+  if (current.x) { // the moment itself: a rounded marker down the system, as Songsterr draws it
+    const [x, y0, y1] = current.x, w = sg * 0.9;
+    g.strokeStyle = t.accent;
     g.lineWidth = 1.5;
     g.beginPath();
-    g.moveTo(current.x[0], current.x[1]);
-    g.lineTo(current.x[0], current.x[2]);
+    g.roundRect(x - w / 2, y0, w, y1 - y0, w / 2);
     g.stroke();
   }
   g.restore();

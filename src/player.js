@@ -142,6 +142,7 @@ const settings = {
     paper: "dark",
     sheetScroll: "follow",
     sheetNotes: false, // the notation page: the notes on a staff over each system
+    beatBox: true, // the notation page: the beat being played, filled
     guides: true,
     fretNumbers: 0.5,
     songIntro: true,
@@ -213,6 +214,7 @@ function applyTheme() {
         paper: settings.paper,
         sheetScroll: settings.sheetScroll,
         sheetNotes: settings.sheetNotes,
+        beatBox: settings.beatBox,
         stringOrder: settings.stringOrder,
         headstock: settings.headstock,
         viewAngle: settings.viewAngle,
@@ -400,7 +402,7 @@ showView();
 $("resetSettings").onclick = () => {
     const { volume, volumeMuted, metronome, minimal, view, panel } = settings;
     Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, view, panel });
-    for (const key of ["guides", "notes3d", "songIntro", "sheetNotes", "mute", "autoplay"])
+    for (const key of ["guides", "notes3d", "songIntro", "sheetNotes", "beatBox", "mute", "autoplay"])
         $(key).checked = settings[key];
     if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
     setOffset(settings.offset);
@@ -464,7 +466,7 @@ $("volume").oninput = (e) => setVolume(+e.target.value, false);
 $("volumeButton").onclick = () => toggleVolume();
 $("volumeMute").onclick = () =>
     setVolume(settings.volume || 0.8, !settings.volumeMuted);
-for (const key of ["guides", "notes3d", "songIntro", "sheetNotes"]) {
+for (const key of ["guides", "notes3d", "songIntro", "sheetNotes", "beatBox"]) {
     $(key).checked = settings[key];
     $(key).onchange = (e) => {
         settings[key] = e.target.checked;
@@ -1235,16 +1237,6 @@ const TAB_LEGEND = [
         ],
     ],
     [
-        "Notation",
-        [
-            [
-                "Page",
-                "With Notation on (N), the tab as a page: a row of whole bars a system, the fret numbers cut into their strings, the rhythm on stems under each system and rests on it, ties as arcs, the bar numbers with a dot a beat along the top, and the tempo, sections and text over the bars. The beat being played is boxed; the page keeps that system second from the top.",
-                svg(`${[5, 11, 17, 23].map((y) => `<path d="M2 ${y}h52" class="lt" stroke-width=".6" opacity=".4"/>`).join("")}<rect x="12" y="7" width="8" height="8" class="fi"/>${tx(16, 11, "5", 7, "ft")}<rect x="30" y="13" width="8" height="8" class="fi"/>${tx(34, 17, "3", 7, "ft")}<path d="M16 24v5M34 24v5M16 29h18" class="lt" stroke-width="1.2"/><rect x="9" y="3" width="15" height="28" rx="3" class="la" stroke-width="1" fill="none" opacity=".9"/>`),
-            ],
-        ],
-    ],
-    [
         "Along the top",
         [
             [
@@ -1259,6 +1251,43 @@ const TAB_LEGEND = [
             ["Jumps", "Road signs to follow: segno, coda, D.C. (from the start), D.S. (from the segno), fine.", svg(barMark("D.S. al coda", 6))],
             ["8va and loco", "Play an octave higher, until loco.", svg(barMark("8va", 9))],
             ["Text", "Instructions written in the file, like pizz. or bass stop.", svg(barMark("pizz.", 9))],
+        ],
+    ],
+];
+// The marks as the notation page writes them: numbers cut into the strings, the rhythm under each system, the
+// technique marks as tab prints them, and a staff over each system if asked for
+const cut = (x, y, text, cls = "ft", size = 8) =>
+    `<rect x="${x - 6}" y="${y - 5}" width="12" height="10" class="fi"/>${tx(x, y, text, size, cls)}`;
+const SHEET_LEGEND = [
+    [
+        "Notes",
+        [
+            ["Number", "Play this string at this fret as the beat reaches it: the number cut into its string. A sounding note is in its string's colour.", svg(`${lane(11, 21)}${cut(14, 11, "5")}${cut(30, 21, "7")}${cut(44, 11, "3", "f1")}`)],
+            ["Beat and moment", "The beat being played is filled across the system (Beat highlight in Settings), and the moment itself is the rounded marker down it.", svg(`${lane(11, 21)}<rect x="14" y="3" width="20" height="26" rx="3" class="fa" opacity=".15"/><rect x="21" y="2" width="7" height="28" rx="3.5" class="la" stroke-width="1.2" fill="none"/>${cut(18, 11, "5")}${cut(40, 21, "7")}`)],
+            ["Rhythm", "Under each system: a stem a beat, beamed with the beats of its own beat, a foot to the right for a lone eighth, a dot beside it for a dotted value, and a rest on the strings where nothing is played.", svg(`${lane(8)}<path d="M8 10v10M18 10v10M8 20h10M30 10v10M30 20h6M44 10v10" class="lt" stroke-width="1.6"/><circle cx="48" cy="18" r="1.4" class="ft"/>`)],
+            ["Fingering", "The small number beside the fret is the finger to press with (T = thumb); the Marks setting drops it, or every mark.", svg(`${lane(16)}${cut(24, 16, "7")}${tx(32, 18, "3", 5.5, "fi", 'opacity=".7"')}`)],
+            ["Dead, harmonic, ghost", "× is a dead note, <5> a harmonic, (5) a ghost note, barely heard.", svg(`${lane(16)}${cut(10, 16, "×")}${cut(28, 16, "<5>")}${cut(46, 16, "(5)")}`)],
+        ],
+    ],
+    [
+        "Techniques",
+        [
+            ["Tie", "Hold the note on into the next without playing it again: an arc under them, and the note held into in brackets.", svg(`${lane(14)}${cut(14, 14, "5")}${cut(40, 14, "(5)")}<path d="M19 19Q27 27 35 19" class="lt" stroke-width="1.1" fill="none"/>`)],
+            ["Slide", "A slash after the number, rising or falling the way the slide goes; before the number for a slide in.", svg(`${lane(16)}${cut(14, 16, "5")}<path d="M21 20l6-8" class="lt" stroke-width="1.2"/>${cut(36, 16, "7")}<path d="M43 12l6 8" class="lt" stroke-width="1.2"/>`)],
+            ["Hammer-on and pull-off", "An arc from the note before, with H or P over it.", svg(`${lane(18)}${cut(14, 18, "5")}${cut(40, 18, "7")}<path d="M14 12Q27 2 40 12" class="lt" stroke-width="1.1" fill="none"/>${tx(27, 5, "H", 6, "fm")}`)],
+            ["Bend", "Bend the string up by the amount over the arrow: ½ is one fret, full is two.", svg(`${lane(18)}${cut(18, 18, "7")}<path d="M24 16q6-4 6-12" class="lt" stroke-width="1.1" fill="none"/><path d="M27 7l3-4 3 4" class="lt" stroke-width="1.1" fill="none"/>${tx(40, 5, "full", 6, "ft")}`)],
+            ["Vibrato", "Shake the note for as long as the wave over it.", svg(`${lane(18)}${cut(28, 18, "7")}<path d="M20 9q2-3 4 0t4 0 4 0 4 0" class="lt" stroke-width="1.1" fill="none"/>`)],
+            ["Palm mute and let ring", "Written over the bars as runs: the label, a dashed line to the last note it holds for, and a tick.", svg(`${lane(20)}${tx(10, 7, "P.M.", 6, "fm", 'text-anchor="start"')}<path d="M24 6h22" class="lm" stroke-width="1" stroke-dasharray="3 2"/><path d="M46 3v6" class="lm" stroke-width="1"/>${cut(12, 20, "0")}${cut(28, 20, "0")}${cut(44, 20, "0")}`)],
+        ],
+    ],
+    [
+        "Along the top and under",
+        [
+            ["Chord names", "The chord you are playing, over the bar where it changes.", svg(`${lane(20)}${tx(12, 6, "E5", 8, "ft", 'text-anchor="start"')}${cut(12, 20, "0")}${cut(26, 20, "2")}`)],
+            ["Bars, sections and text", "Each bar's number with a dot a beat along the top; the section's name, the tempo, repeats and text the file writes over the bars.", svg(`<path d="M8 12v18" class="lt" stroke-width="1" opacity=".5"/>${tx(11, 8, "5", 6, "fm", 'text-anchor="start"')}<circle cx="22" cy="8" r="1.2" class="fm"/><circle cx="34" cy="8" r="1.2" class="fm"/>${tx(11, 2, "Riff", 6, "ft", 'text-anchor="start" font-style="italic"')}`)],
+            ["Meter and repeats", "The time signature in the staff at the first bar and where it changes; a repeat's bar heavy, with its two dots.", svg(`${lane(9, 15, 21, 27)}${tx(14, 13, "4", 9, "ft")}${tx(14, 25, "4", 9, "ft")}<path d="M36 6v24" class="lt" stroke-width="2.5"/><circle cx="41" cy="15" r="1.3" class="fm"/><circle cx="41" cy="21" r="1.3" class="fm"/>`)],
+            ["Words", "The song's lyrics under the rhythm, a syllable at its note.", svg(`${lane(8)}<path d="M10 10v8M26 10v8M42 10v8" class="lt" stroke-width="1.4"/>${tx(10, 26, "Plug", 6, "fm", 'text-anchor="start"')}${tx(26, 26, "it", 6, "fm", 'text-anchor="start"')}${tx(42, 26, "in", 6, "fm", 'text-anchor="start"')}`)],
+            ["Notes on a staff", "With Notes on (Settings), a staff over each system writes the notes as music, an octave above where a guitar sounds: the key's sharps and flats at its head, an accidental where a note leaves them, and the rhythm on its stems.", svg(`${[5, 10, 15, 20, 25].map((y) => `<path d="M2 ${y}h52" class="lt" stroke-width=".6" opacity=".4"/>`).join("")}<ellipse cx="20" cy="15" rx="3" ry="2.2" class="ft" transform="rotate(-20 20 15)"/><path d="M22.6 14v-11" class="lt" stroke-width="1.1"/>${tx(31, 9, "♯", 8, "ft")}<ellipse cx="38" cy="10" rx="3" ry="2.2" class="ft" transform="rotate(-20 38 10)"/><path d="M40.6 9v-8" class="lt" stroke-width="1.1"/>`)],
         ],
     ],
 ];
@@ -1313,7 +1342,7 @@ $("legendFind").oninput = (e) => {
 let shortcutRows = () => [];
 const showLegend = () => {
     $("legendList").replaceChildren(
-        ...legendRows(settings.view === "highway" ? LEGEND : TAB_LEGEND),
+        ...legendRows({ highway: LEGEND, tablature: TAB_LEGEND, notation: SHEET_LEGEND }[settings.view]),
         ...shortcutRows(),
         Object.assign(document.createElement("p"), {
             className: "legend-empty",

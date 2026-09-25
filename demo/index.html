@@ -1710,6 +1710,7 @@
                     <button
                         class="icon"
                         id="metronome"
+                        data-label="Metronome"
                         aria-pressed="false"
                         aria-label="Metronome"
                         aria-describedby="metronomeTip"
@@ -1736,6 +1737,7 @@
                     <button
                         class="icon"
                         id="band"
+                        data-label="Play as a band"
                         aria-label="Play as a band"
                         aria-describedby="bandTip"
                         disabled
@@ -1765,6 +1767,7 @@
                     <button
                         class="icon"
                         id="minimal"
+                        data-label="Minimal view"
                         aria-pressed="false"
                         aria-label="Minimal view"
                         aria-describedby="minimalTip"
@@ -2170,6 +2173,13 @@
                         aria-labelledby="paperLabel"
                     ></div>
                 </div>
+                <label class="toggle only-notation"
+                    ><span
+                        >Beat highlight<small
+                            >The beat being played, filled across the system</small
+                        ></span
+                    ><input id="beatBox" type="checkbox" role="switch"
+                /></label>
                 <label class="toggle only-notation"
                     ><span
                         >Notes<small
