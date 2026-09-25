@@ -2109,6 +2109,7 @@ function songFromScore(score, cache) {
         if (lyrics.length) break;
     }
     lyrics.sort((a, b) => a.time - b.time); // sung in more voices than one: in the order they're heard
+    for (const a of arrangements) a.lyrics = lyrics; // the notation page writes them under its systems
     return {
         title: score.title,
         artist: score.artist,

@@ -247,5 +247,18 @@ assert.ok(['2', '3', 'E', 'A'].every((str) => texts.includes(str)), `numbers and
 assert.ok(rects.length >= 1, 'the whole rest is written as its bar');
 assert.equal(beatBoxes.length, 1, 'one beat boxed');
 assert.doesNotThrow(() => drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, { ...theme(DEFAULT_STYLE), sheetNotes: true }, {}), 'the staff over each system draws, its glyphs waiting on the face');
+// What tab writes around a note, on the page: the note held into in brackets, a palm mute and a let ring as labelled runs,
+// the chord's name, the words under the rhythm; and none of the marks with the Marks setting at just the notes
+const marked = {
+  ...page, chords: [{ time: 1, name: 'E5', notes: [0, 1], fingers: [], frets: [], accent: false, palmMute: false, fretHandMute: false, highDensity: false }],
+  notes: [{ ...NOTE, time: 1, string: 2, fret: 2, chord: 0, tieTo: 2, palmMute: true, vibrato: true }, { ...NOTE, time: 1, string: 0, fret: 3, chord: 0, palmMute: true, slideTo: 5, sustain: 0.4 }, { ...NOTE, time: 1.5, string: 2, fret: 2, hammerOn: true, letRing: true }, { ...NOTE, time: 2, string: 2, fret: 4, letRing: true, bendCurve: [[0, 0], [1, 1]], sustain: 0.5 }],
+  lyrics: [{ time: 1, length: 0.5, text: 'Smoke' }, { time: 1.5, length: 0.5, text: 'on' }],
+};
+texts.length = 0;
+drawSheet({ ...canvas, getContext: () => boxer }, marked, 0.5, theme(DEFAULT_STYLE), {});
+assert.ok(['(2)', 'P.M.', 'let ring', 'E5', 'Smoke', 'H', 'full'].every((str) => texts.includes(str)), `the marks are written: ${[...new Set(texts)]}`);
+texts.length = 0;
+drawSheet({ ...canvas, getContext: () => boxer }, marked, 0.5, { ...theme(DEFAULT_STYLE), tabMarks: 'notes' }, {});
+assert.ok(!['P.M.', 'let ring', 'E5', 'H', 'full'].some((str) => texts.includes(str)) && texts.includes('(2)') && texts.includes('Smoke'), 'just the notes: the tie and the words stay, the marks go');
 
 console.log('ok');
