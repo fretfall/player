@@ -246,5 +246,6 @@ drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, theme(DEFAULT_STYLE
 assert.ok(['2', '3', 'E', 'A'].every((str) => texts.includes(str)), `numbers and string names written: ${[...new Set(texts)]}`);
 assert.ok(rects.length >= 1, 'the whole rest is written as its bar');
 assert.equal(beatBoxes.length, 1, 'one beat boxed');
+assert.doesNotThrow(() => drawSheet({ ...canvas, getContext: () => boxer }, page, 1.2, { ...theme(DEFAULT_STYLE), sheetNotes: true }, {}), 'the staff over each system draws, its glyphs waiting on the face');
 
 console.log('ok');

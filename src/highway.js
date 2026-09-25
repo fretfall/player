@@ -1777,14 +1777,44 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
   const n = arr.strings, sg = SHEET_GAP * (t.boardHeight ?? 1), staffH = sg * (n - 1), marked = (t.tabMarks ?? 'all') === 'all';
   const light = t.paper === 'light', ink = light ? '#15181f' : t.text, faint = light ? '#7a8190' : t.muted; // on paper, the writing is ink and the card white
   const left = TAB_EDGE + 46, right = W - TAB_EDGE - 16, usable = right - left;
-  const rowTop = 30, stemLen = sg * 1.3, beamH = Math.max(2, sg * 0.16), pitch = rowTop + staffH + stemLen + sg * 2.8; // a system: the bar numbers over it, the rhythm under it, room to the next
-  const pages = tabPages(arr, usable / SHEET_SPEED), at = Math.max(0, pages.findLastIndex((p) => p.start <= now));
+  // Notes: a staff over each system, the notes written as music an octave above where a guitar sounds. Room over the
+  // staff for the ledger lines a high note needs, and under it for a low one's, down to the tab; the rhythm then goes on
+  // the staff's stems rather than under the tab
+  // The staff space is six tenths of the tab's string spacing, a shade under engravers' two thirds; the room over the staff
+  // is what the song's highest note needs in ledger lines, the room under it what the lowest open string needs, both worked
+  // out once a song. The glyphs — clef, accidentals, rests, flags — are Noto Music's, drawn once the face is in and not
+  // before (nothing, rather than a text face's likeness); heads, stems, beams and ledger lines are drawn
+  const notes = !!t.sheetNotes, sp = sg * 0.6, glyphs = notes && typeof document !== 'undefined' && !!document.fonts?.check(`${4 * sp}px "Noto Music"`, '\u{1D120}');
+  const stepOf = (m) => (Math.floor(m / 12) - 1) * 7 + [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][m % 12]; // a written midi note's line or space: E4, the lowest line, is 30
+  if (notes && !arr.sheetRange) { // ledger lines over the staff for the highest note, under it for the lowest string
+    let hi = 38;
+    for (const note of arr.notes) hi = Math.max(hi, stepOf((arr.open?.[note.string] ?? 40) + note.fret + 12));
+    arr.sheetRange = { over: Math.max(2, Math.ceil((hi - 38) / 2) + 1), under: Math.max(6, Math.floor((30 - stepOf((arr.open?.[0] ?? 40) + 12)) / 2) + 2.5) };
+  }
+  const over = notes ? arr.sheetRange.over : 0, under = notes ? arr.sheetRange.under : 0, noteRoom = notes ? sp * (over + 4 + under) : 0;
+  const rowTop = 30 + noteRoom, stemLen = sg * 1.3, beamH = Math.max(2, sg * 0.16), pitch = rowTop + staffH + (notes ? sg : stemLen) + sg * 2.8; // a system: the bar numbers over it, the rhythm under it, room to the next
+  const fifths = notes ? (arr.keys?.findLast((k) => k.time <= now)?.fifths ?? 0) : 0, flats = fifths < 0;
+  const music = `${4 * sp}px "Noto Music"`, ACC = { 1: ['\u266f', 0.9], '-1': ['\u266d', 0.8], 0: ['\u266e', 0.7] }; // the face's accidentals and their ink widths in spaces
+  const prefix = notes ? sp * (0.6 + 2.84 + 0.5 + Math.abs(fifths) * 1.15 + 1) : 0; // the clef and the key signature, before the first beat
+  const letters = flats ? [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6] : [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6], accs = flats ? [0, -1, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0] : [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]; // a pitch class's letter and accidental, spelt the key's way
+  const keyAcc = [0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < Math.abs(fifths); i++) keyAcc[(flats ? [6, 2, 5, 1, 4, 0, 3] : [3, 0, 4, 1, 5, 2, 6])[i]] = flats ? -1 : 1; // B E A D G C F, or F C G D A E B
+  const ledgers = new Path2D(), engraved = []; // the ledger lines, thicker than a stem; the glyphs, set in the music face at the end
+  if (notes && !arr.sheetShortest) { // the shortest gap between beats, so heads never crowd closer than 1.75 spaces
+    let shortest = Infinity;
+    const values = arr.rhythm ?? [];
+    for (let k = 1; k < values.length; k++) if (values[k].time - values[k - 1].time > 1e-3) shortest = Math.min(shortest, values[k].time - values[k - 1].time);
+    arr.sheetShortest = shortest;
+  }
+  const pxPerSec = notes && arr.sheetShortest < Infinity ? Math.max(SHEET_SPEED, (1.75 * sp) / arr.sheetShortest) : SHEET_SPEED;
+  const pages = tabPages(arr, (usable - prefix) / pxPerSec), at = Math.max(0, pages.findLastIndex((p) => p.start <= now));
   // Following, the page turns a system at a time as the beat crosses into the next, the current one second from the top
   // (paused, no frame comes to finish a glide, so it doesn't glide); the wheel scrolls it meanwhile, and alone when it is
   // left to the hand (the scroll setting). Either way it stays on the page
-  if (cam.sheetY === undefined || (t.sheetScroll !== 'manual' && cam.sheetAt !== at)) cam.sheetY = Math.max(0, at - 1) * pitch;
-  cam.sheetAt = at;
   const cardTop = CARD_TOP, cardBottom = VH - 66; // as the tablature's; over the song's facts
+  const lead = cardBottom - cardTop - 22 >= 2 * pitch ? 1 : 0; // a system before the current one, when two fit the card; with the staff on, the one alone
+  if (cam.sheetY === undefined || (t.sheetScroll !== 'manual' && cam.sheetAt !== at)) cam.sheetY = Math.max(0, at - lead) * pitch;
+  cam.sheetAt = at;
   cam.sheetY = Math.min(Math.max(0, cam.sheetY), Math.max(0, pages.length * pitch + 22 - (cardBottom - cardTop)));
   const pageTop = cardTop + 22 - cam.sheetY, values = arr.rhythm ?? [], middleRow = (n - 1) / 2;
   g.save();
@@ -1803,29 +1833,47 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     const y0 = pageTop + i * pitch;
     if (y0 + pitch < cardTop) continue;
     if (y0 > cardBottom) break;
-    const page = pages[i], scale = usable / (page.end - page.start), X = (time) => left + (time - page.start) * scale;
+    const page = pages[i], scale = (usable - prefix) / (page.end - page.start), X = (time) => left + prefix + (time - page.start) * scale;
     const staffTop = y0 + rowTop, staffBottom = staffTop + staffH, beamY = staffBottom + 5 + stemLen;
+    const nBot = staffTop - sp * under, nTop = nBot - 4 * sp, yOf = (step) => nBot - ((step - 30) * sp) / 2; // the staff over the tab: E4, its lowest line, is step 30
+    const sysTop = notes ? nTop - sp * over : staffTop; // where the system begins: the bar numbers and what is written over the bars go above it
     for (let s = 0; s < n; s++) {
       lines.moveTo(left, row(staffTop, s));
       lines.lineTo(right, row(staffTop, s));
+    }
+    if (notes) {
+      for (let l = 0; l < 5; l++) {
+        lines.moveTo(left, nTop + l * sp);
+        lines.lineTo(right, nTop + l * sp);
+      }
+      bars.moveTo(left, nTop); // one line down the system's left, staff to tab
+      bars.lineTo(left, staffBottom);
+      const clefX = left + sp * 0.6; // the G clef with its 8, its baseline on the lowest line, then the key's sharps or flats at their steps
+      engraved.push(['\u{1D120}', clefX, nBot]);
+      const order = flats ? [34, 37, 33, 36, 32, 35, 31] : [38, 35, 39, 36, 33, 37, 34]; // the flats' steps, B E A D G C F, and the sharps', F C G D A E B
+      for (let k = 0; k < Math.abs(fifths); k++) engraved.push([ACC[flats ? -1 : 1][0], clefX + sp * (2.84 + 0.5 + k * (flats ? 1.05 : 1.15)), yOf(order[k]) + sp * 0.52]);
     }
     if (i === 0 && arr.open) for (let s = 0; s < n; s++) labels.push([noteName(arr.open[s]), left - 16, row(staffTop, s) + sg * 0.32, color(t, s)]); // the strings, named on the first system alone
     // bars and beats along the top: the bar's number, a dot a beat; a repeat's bar heavy with its two dots; the meter at the first bar and where it changes
     for (let b = firstAt(arr.beats, page.start - 1e-3); b < arr.beats.length && arr.beats[b].time < page.end - 1e-3; b++) {
       const beat = arr.beats[b], x = X(beat.time), key = Math.round(beat.time * 50);
       if (beat.measure < 0) {
-        dots.moveTo(x + 1.6, staffTop - 11);
-        dots.arc(x, staffTop - 11, 1.6, 0, Math.PI * 2);
+        dots.moveTo(x + 1.6, sysTop - 11);
+        dots.arc(x, sysTop - 11, 1.6, 0, Math.PI * 2);
         continue;
       }
       const path = repeatAt.has(key) ? heavy : bars;
       path.moveTo(x, staffTop);
       path.lineTo(x, staffBottom);
+      if (notes) {
+        path.moveTo(x, nTop);
+        path.lineTo(x, nBot);
+      }
       if (repeatAt.has(key)) for (const s of [middleRow - 0.5, middleRow + 0.5]) {
         dots.moveTo(x + 8.6, row(staffTop, 0) + s * sg);
         dots.arc(x + 7, row(staffTop, 0) + s * sg, 1.6, 0, Math.PI * 2);
       }
-      texts.push([small, String(beat.measure), x + 1, staffTop - 8, faint, 'left']);
+      texts.push([small, String(beat.measure), x + 1, sysTop - 8, faint, 'left']);
       const meter = meterAt.get(key) ?? (b === 0 ? arr.meters?.[0]?.text : null);
       if (meter) {
         const [top, bottom] = meter.split('/'), mx = x + 12 + (repeatAt.has(key) ? 6 : 0), big = `600 ${fontSize(staffH * 0.38)}px ${t.num}`;
@@ -1836,12 +1884,12 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     let free = -Infinity;
     for (const sec of arr.sections ?? []) if (sec.time >= page.start && sec.time < page.end) {
       const x = X(sec.time) + 1;
-      texts.push([words, sec.name, x, staffTop - 21, ink, 'left']);
+      texts.push([words, sec.name, x, sysTop - 21, ink, 'left']);
       free = x + measure(g, words, sec.name).width + 10;
     }
     for (const m of arr.markers ?? []) if (m.time >= page.start && m.time < page.end && !m.text.startsWith('repeat') && !/^\d+\/\d+$/.test(m.text)) {
       const x = Math.max(X(m.time) + 1, free);
-      texts.push([small, m.text, x, staffTop - 21, m.text.startsWith('♩') ? t.accent : ink, 'left']);
+      texts.push([small, m.text, x, sysTop - 21, m.text.startsWith('♩') ? t.accent : ink, 'left']);
       free = x + measure(g, small, m.text).width + 10;
     }
     // the notes: a number cut into its string, × for a mute, the harmonic's and ghost's brackets, the finger small beside it
@@ -1864,28 +1912,78 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
         stems.quadraticCurveTo((x + tx) / 2, y + sg * 1.2, tx - w / 2, y + sg * 0.45);
       }
     }
-    // the rhythm under the system: a stem down from the staff for each beat, beamed with its beat's, flagged alone,
-    // dotted, and a rest on the staff where nothing is played. ponytail: the beat runs are grouped as the tab's lane
-    // groups them; one helper would serve both
+    // with Notes on, every note's head at its written pitch on the staff over the tab, an accidental where it leaves the
+    // key (holding to the bar's end, per letter — ponytail: engravers keep it per letter and octave), ledger lines past
+    // the staff, a sounding head in its string's colour; the stems, beams, flags, dots and rests then sit on the staff
+    const heads = new Map();
+    if (notes) {
+      const state = [...keyAcc];
+      let bb0 = Math.max(0, firstAt(arr.beats, page.start) - 1);
+      for (let k = firstAt(arr.notes, page.start - 1e-3); k < arr.notes.length && arr.notes[k].time < page.end - 1e-3; k++) {
+        const note = arr.notes[k], x = X(note.time), m = (arr.open?.[note.string] ?? 40) + note.fret + 12, pc = m % 12;
+        const step = (Math.floor(m / 12) - 1) * 7 + letters[pc], y = yOf(step), r = sp * (note.grace ? 0.42 : 0.6); // a head 1.18 by 1 space, as Bravura's
+        while (arr.beats[bb0 + 1]?.time <= note.time + 1e-4) if (arr.beats[++bb0].measure >= 0) state.splice(0, 7, ...keyAcc); // a new bar: the key's own again
+        const sounding = note.time <= now && now < note.time + Math.max(note.sustain, 0.15);
+        heads.set(k, { x, y, r, step });
+        if (sounding) lit.push(['head', x, y, r, color(t, note.string)]);
+        else {
+          fills.moveTo(x + r, y);
+          fills.ellipse(x, y, r, r * 0.81, -0.35, 0, Math.PI * 2);
+        }
+        for (let ledger = 28; ledger >= step; ledger -= 2) { ledgers.moveTo(x - sp * 0.99, yOf(ledger)); ledgers.lineTo(x + sp * 0.99, yOf(ledger)); }
+        for (let ledger = 40; ledger <= step; ledger += 2) { ledgers.moveTo(x - sp * 0.99, yOf(ledger)); ledgers.lineTo(x + sp * 0.99, yOf(ledger)); }
+        if (state[letters[pc]] !== accs[pc]) { // a quarter space clear of the head's edge
+          state[letters[pc]] = accs[pc];
+          const [glyph, w] = ACC[accs[pc]];
+          engraved.push([glyph, x - sp * (0.59 + 0.25 + w + 0.2), y + sp * 0.52]);
+        }
+      }
+    }
+    // the rhythm: under the system, a stem down from the tab for each beat; with Notes on, a stem from the beat's heads
+    // on the staff, up from below its middle line and down from above it. Beamed with its beat's, flagged alone, dotted,
+    // and a rest where nothing is played. ponytail: the beat runs are grouped as the tab's lane groups them; one helper
+    // would serve both
     const run = [];
     let levels = 0, unit = -1, bb = Math.max(0, firstAt(arr.beats, page.start) - 1);
+    const midY = nTop + 2 * sp;
     const flush = () => {
-      for (let l = 0; l < levels; l++) { // beams stack up from the stems' feet toward the staff
-        const y = beamY - l * beamH * 1.6 - beamH;
+      if (!run.length) return;
+      // Under the tab the beams stack up from the stems' feet. On the staff a run's direction is its heads' majority, its
+      // stems go from the outermost head's centre to a flat beam half a space thick — three and a half spaces from the
+      // heads' mean, two and a half at least from the nearest — and the levels stack inward a quarter space apart; a
+      // lone stem takes its flags from the face, hung from its end
+      const up = notes ? run.filter((e) => e.up).length * 2 >= run.length : false, dir = notes ? (up ? 1 : -1) : -1;
+      const thick = notes ? sp * 0.5 : beamH, gap = notes ? sp * 0.25 : beamH * 0.6;
+      let tip = beamY;
+      if (notes) {
+        for (const e of run) {
+          e.sx = e.x + (up ? sp * 0.53 : -sp * 0.53);
+          e.sy = up ? e.lo : e.hi;
+          e.tip = up ? Math.min(e.hi - sp * 3.5, midY) : Math.max(e.lo + sp * 3.5, midY);
+        }
+        const ys = run.map((e) => e.sy), mean = ys.reduce((a, b) => a + b, 0) / ys.length;
+        tip = run.length === 1 ? run[0].tip + (beams(run[0].r) > 2 ? dir * -sp * 0.58 : 0) : up ? Math.min(mean - sp * 3.5, Math.min(...run.map((e) => e.hi)) - sp * 2.5) : Math.max(mean + sp * 3.5, Math.max(...run.map((e) => e.lo)) + sp * 2.5);
+        for (const e of run) { stems.moveTo(e.sx, e.sy); stems.lineTo(e.sx, tip); }
+      }
+      for (let l = 0; run.length > 1 && l < levels; l++) {
+        const y = tip + dir * l * (thick + gap) - (dir < 0 ? thick : 0);
         let start = -1;
         for (let k = 0; k <= run.length; k++) {
           const has = k < run.length && beams(run[k].r) > l;
           if (has && start < 0) start = k;
           if (has || start < 0) continue;
-          const x0 = run[start].x, x1 = run[k - 1].x, alone = start === k - 1;
-          fills.rect(alone && start ? x0 - sg * 0.8 : x0, y, alone ? sg * 0.8 : x1 - x0, beamH);
+          const x0 = run[start].sx - (notes ? sp * 0.06 : 0), x1 = run[k - 1].sx + (notes ? sp * 0.06 : 0), alone = start === k - 1, let_ = notes ? sp * 1.1 : sg * 0.8;
+          fills.rect(alone && start ? x1 - let_ : x0, y, alone ? let_ : x1 - x0, thick);
           start = -1;
         }
       }
-      if (run.length === 1) for (let l = 0; l < beams(run[0].r); l++) { // a flag a level, hooked from the foot
-        const { x } = run[0], y = beamY - l * beamH * 1.6;
-        stems.moveTo(x, y);
-        stems.quadraticCurveTo(x + sg * 0.15, y - sg * 0.5, x + sg * 0.75, y - sg * 0.9);
+      if (run.length === 1 && beams(run[0].r)) {
+        const e = run[0];
+        if (!notes) for (let l = 0; l < beams(e.r); l++) { // a flag a level, hooked from the stem's foot
+          const y = tip + dir * l * (thick + gap);
+          stems.moveTo(e.x, y);
+          stems.quadraticCurveTo(e.x + sg * 0.15, y - dir * sg * 0.5, e.x + sg * 0.75, y - dir * sg * 0.9);
+        } else engraved.push(['\u{1D165}' + ['\u{1D16E}', '\u{1D16F}', '\u{1D170}'][Math.min(3, beams(e.r)) - 1], e.sx - sp * 0.06, e.sy + sp * 0.54, up ? 1 : -1, e.sy]); // the face's stem and flag, on the drawn stem; a down stem is the pair turned over
       }
       run.length = levels = 0;
     };
@@ -1897,7 +1995,15 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
       while (arr.beats[bb + 1]?.time <= r.time + 1e-4) bb++;
       if (bb !== unit || r.rest) flush();
       unit = bb;
-      if (r.rest) { // on the staff's middle
+      if (r.rest && notes) { // a whole rest hangs under the fourth line and a half sits on the middle line, drawn; the rest from the face, centred on the staff
+        if (r.value <= 2) fills.rect(x - sp * 0.6, r.value === 1 ? nTop + sp : nTop + sp * 1.5, sp * 1.2, sp * 0.5);
+        else {
+          const which = Math.min(3, Math.round(Math.log2(r.value)) - 2), w = [1.03, 1.05, 1.32, 1.6][which];
+          engraved.push([['\u{1D13D}', '\u{1D13E}', '\u{1D13F}', '\u{1D140}'][which], x - sp * 0.2 - (w * sp) / 2, nBot]);
+        }
+        continue;
+      }
+      if (r.rest) { // on the tab's middle
         const my = staffTop + middleRow * sg;
         if (r.value <= 2) fills.rect(x - 6 * u, my - (r.value === 1 ? 5 : 0) * u, 12 * u, 5 * u);
         else {
@@ -1911,17 +2017,32 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
         }
         continue;
       }
-      if (r.value > 1) { // a whole note has no stem
-        stems.moveTo(x, staffBottom + 5);
-        stems.lineTo(x, beamY);
+      let entry = { r, x, stems, up: false, lo: staffBottom + 5, hi: staffBottom + 5, sx: x, sy: staffBottom + 5, tip: beamY };
+      if (notes) { // the beat's heads: the stem from the outermost, up from below the middle line, hollow for a half or longer
+        const struck = [];
+        for (let q = firstAt(arr.notes, r.time - 1e-3); q < arr.notes.length && arr.notes[q].time <= r.time + 1e-3; q++) if (heads.has(q) && !arr.notes[q].grace) struck.push(heads.get(q));
+        if (!struck.length) continue;
+        const ys = struck.map((q) => q.y), lo = Math.max(...ys), hi = Math.min(...ys), up = Math.abs(lo - midY) >= Math.abs(hi - midY); // the head farthest from the middle line decides
+        entry = { r, x, stems, up, lo, hi, sx: x + (up ? sp * 0.53 : -sp * 0.53), sy: up ? lo : hi, tip: up ? Math.min(hi - sp * 3.5, midY) : Math.max(lo + sp * 3.5, midY) };
+        if (r.value <= 2) for (const q of struck) { cuts.moveTo(q.x + sp * 0.38, q.y); cuts.ellipse(q.x, q.y, sp * 0.38, sp * 0.2, -0.6, 0, Math.PI * 2); } // hollow: cut back out
+        for (const q of struck) for (let d = 0; d < r.dots; d++) { // beside each head, in its space or the one over its line
+          const dy = q.step % 2 === 0 ? -sp * 0.5 : 0;
+          fills.moveTo(q.x + sp * (1.2 + d * 0.5) + sp * 0.2, q.y + dy);
+          fills.arc(q.x + sp * (1.2 + d * 0.5), q.y + dy, sp * 0.2, 0, Math.PI * 2);
+        }
+      } else {
+        for (let d = 0; d < r.dots; d++) {
+          fills.moveTo(x + sg * 0.6 + d * sg * 0.45 + sg * 0.14, staffBottom + 9);
+          fills.arc(x + sg * 0.6 + d * sg * 0.45, staffBottom + 9, sg * 0.14, 0, Math.PI * 2);
+        }
       }
-      for (let d = 0; d < r.dots; d++) {
-        fills.moveTo(x + sg * 0.6 + d * sg * 0.45 + sg * 0.14, staffBottom + 9);
-        fills.arc(x + sg * 0.6 + d * sg * 0.45, staffBottom + 9, sg * 0.14, 0, Math.PI * 2);
-      }
-      if (!beams(r)) flush();
-      else {
-        run.push({ r, x });
+      if (r.value === 1) { flush(); continue; } // a whole note has no stem
+      if (!beams(r)) {
+        flush();
+        stems.moveTo(entry.sx, entry.sy);
+        stems.lineTo(entry.sx, entry.tip);
+      } else {
+        run.push(entry);
         levels = Math.max(levels, beams(r));
       }
     }
@@ -1929,28 +2050,46 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     if (i === at) { // the beat being played, boxed across the staff and its stem, and the moment itself
       const k = Math.max(0, firstAt(values, now + 1e-4) - 1), r = values[k];
       if (r && r.time >= page.start - 1e-3 && r.time < page.end) {
-        const next = values[k + 1] && values[k + 1].time < page.end ? values[k + 1].time : page.end, x0 = X(r.time) - sg * 0.75, x1 = X(next) - sg * 0.35;
-        current.box = [x0, staffTop - sg * 0.7, Math.max(x1 - x0, sg * 1.5), staffH + sg * 1.4 + stemLen * 0.45];
+        const next = values[k + 1] && values[k + 1].time < page.end ? values[k + 1].time : page.end, x0 = X(r.time) - sg * (notes ? 1 : 0.75), x1 = X(next) - sg * (notes ? 0.3 : 0.35);
+        const top = notes ? sysTop - sg * 0.5 : staffTop - sg * 0.7;
+        current.box = [x0, top, Math.max(x1 - x0, sg * 1.5), staffBottom + sg * 0.5 - top + (notes ? 0 : stemLen * 0.45 + sg * 0.2)];
       }
-      current.x = [X(Math.min(now, page.end)), staffTop - sg * 0.5, staffBottom + sg * 0.5];
+      current.x = [X(Math.min(now, page.end)), (notes ? sysTop : staffTop) - sg * 0.5, staffBottom + sg * 0.5];
     }
   }
   // the lines and bars, then the rhythm; the numbers cut into the lines, and the numbers themselves; the box; the card under it all
-  g.lineCap = 'round';
+  g.lineCap = 'butt';
   g.strokeStyle = alpha(ink, 0.42);
-  g.lineWidth = 1;
+  g.lineWidth = notes ? Math.max(1, sp * 0.13) : 1;
   g.stroke(lines);
   g.strokeStyle = alpha(ink, 0.7);
-  g.lineWidth = 1.2;
+  g.lineWidth = notes ? Math.max(1.2, sp * 0.16) : 1.2;
   g.stroke(bars);
-  g.lineWidth = 3;
+  g.lineWidth = notes ? sp * 0.5 : 3;
   g.stroke(heavy);
   g.fillStyle = faint;
   g.fill(dots);
   g.strokeStyle = g.fillStyle = ink;
-  g.lineWidth = Math.max(1.2, sg * 0.09);
+  g.lineWidth = notes ? Math.max(1, sp * 0.12) : Math.max(1.2, sg * 0.09);
   g.stroke(stems);
+  g.lineWidth = Math.max(1, sp * 0.16);
+  g.stroke(ledgers);
+  g.lineCap = 'round';
   g.fill(fills);
+  if (glyphs) { // the face's glyphs, each at its baseline; a down stem's flag is the pair turned over on its head
+    g.font = music;
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
+    for (const [glyph, x, y, dir, at] of engraved) {
+      if (dir === -1) {
+        g.save();
+        g.translate(x, at);
+        g.scale(1, -1);
+        g.fillText(glyph, 0, sp * 0.54);
+        g.restore();
+      } else g.fillText(glyph, x, y);
+    }
+  }
   g.globalCompositeOperation = 'destination-out';
   g.fill(cuts);
   g.globalCompositeOperation = 'source-over';
@@ -1974,11 +2113,17 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
   for (const [str, x, y] of fingers) g.fillText(str, x, y);
   g.globalAlpha = 1;
   g.textAlign = 'center';
-  for (const [font, str, x, y, c] of lit) { // sounding: its string's colour, lit
-    g.font = font;
+  for (const [font, str, x, y, c] of lit) { // sounding: its string's colour, lit — a number, or a head on the staff
     g.fillStyle = g.shadowColor = c;
     g.shadowBlur = 12;
-    g.fillText(str, x, y);
+    if (font === 'head') {
+      g.beginPath();
+      g.ellipse(str, x, y, y * 0.81, -0.35, 0, Math.PI * 2);
+      g.fill();
+    } else {
+      g.font = font;
+      g.fillText(str, x, y);
+    }
   }
   g.shadowBlur = 0;
   g.font = small;
@@ -1986,12 +2131,12 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     g.fillStyle = c;
     g.fillText(str, x, y);
   }
-  if (current.box) {
-    g.strokeStyle = t.accent;
-    g.fillStyle = alpha(t.accent, 0.09);
-    g.lineWidth = 1.5;
+  if (current.box) { // the beat column: a fill, edged faintly, so it never cuts through the ink
+    g.strokeStyle = alpha(t.accent, 0.35);
+    g.fillStyle = alpha(t.accent, 0.1);
+    g.lineWidth = 1;
     g.beginPath();
-    g.roundRect(...current.box, 6);
+    g.roundRect(...current.box, 4);
     g.fill();
     g.stroke();
   }

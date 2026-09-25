@@ -45,15 +45,15 @@ export const COLORS = {
 
 export const FONTS = {
   stage: {
-    label: 'Chakra Petch', href: 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap',
+    label: 'Chakra Petch', href: 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&family=Noto+Music&display=swap',
     ui: "'Barlow', 'Helvetica Neue', sans-serif", num: "'Chakra Petch', 'Barlow', sans-serif", lyric: "'Barlow', 'Helvetica Neue', sans-serif", lyricStyle: 'normal',
   },
   chart: {
-    label: 'IBM Plex', href: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap',
+    label: 'IBM Plex', href: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Noto+Music&display=swap',
     ui: "'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif", num: "'IBM Plex Mono', ui-monospace, monospace", lyric: "'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif", lyricStyle: 'normal',
   },
   workbench: {
-    label: 'Bricolage', href: 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Serif:ital@0;1&display=swap',
+    label: 'Bricolage', href: 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Serif:ital@0;1&family=Noto+Music&display=swap',
     ui: "'Bricolage Grotesque', 'Avenir Next', sans-serif", num: "'Bricolage Grotesque', 'Avenir Next', sans-serif", lyric: "'Instrument Serif', Georgia, serif", lyricStyle: 'italic',
   },
 };

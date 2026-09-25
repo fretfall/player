@@ -141,6 +141,7 @@ const settings = {
     tabMarks: "all",
     paper: "dark",
     sheetScroll: "follow",
+    sheetNotes: false, // the notation page: the notes on a staff over each system
     guides: true,
     fretNumbers: 0.5,
     songIntro: true,
@@ -211,6 +212,7 @@ function applyTheme() {
         tabMarks: settings.tabMarks,
         paper: settings.paper,
         sheetScroll: settings.sheetScroll,
+        sheetNotes: settings.sheetNotes,
         stringOrder: settings.stringOrder,
         headstock: settings.headstock,
         viewAngle: settings.viewAngle,
@@ -226,6 +228,7 @@ function applyTheme() {
     root.classList.toggle("notation", settings.view === "notation");
     for (const b of $("view").children) b.setAttribute("aria-pressed", String(b.value === settings.view));
     $("fonts").href = theme.href;
+    document.fonts?.load('40px "Noto Music"', "\u{1D120}"); // the notation's clef, rests, flags and accidentals: the page draws them once it is in
     const vars = {
         bg: theme.bg,
         ink: theme.ink,
@@ -397,7 +400,7 @@ showView();
 $("resetSettings").onclick = () => {
     const { volume, volumeMuted, metronome, minimal, view, panel } = settings;
     Object.assign(settings, DEFAULTS, { volume, volumeMuted, metronome, minimal, view, panel });
-    for (const key of ["guides", "notes3d", "songIntro", "mute", "autoplay"])
+    for (const key of ["guides", "notes3d", "songIntro", "sheetNotes", "mute", "autoplay"])
         $(key).checked = settings[key];
     if (arr?.track) api.changeTrackMute([arr.track], settings.mute);
     setOffset(settings.offset);
@@ -461,7 +464,7 @@ $("volume").oninput = (e) => setVolume(+e.target.value, false);
 $("volumeButton").onclick = () => toggleVolume();
 $("volumeMute").onclick = () =>
     setVolume(settings.volume || 0.8, !settings.volumeMuted);
-for (const key of ["guides", "notes3d", "songIntro"]) {
+for (const key of ["guides", "notes3d", "songIntro", "sheetNotes"]) {
     $(key).checked = settings[key];
     $(key).onchange = (e) => {
         settings[key] = e.target.checked;
