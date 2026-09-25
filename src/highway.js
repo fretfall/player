@@ -534,9 +534,12 @@ export function drawHighway(canvas, arr, now, t, cam) {
     const a = anchorAt(anchors, time), fretted = frets.filter((f) => f > 0);
     return [Math.min(a.fret - 1, ...fretted.map((f) => f - 1)) + 0.05, Math.max(a.fret - 1 + Math.max(4, a.width), ...fretted) - 0.05];
   };
-  const xMark = (x, y, z, w, h) => {
-    line3([x - w, y - h, z], [x + w, y + h, z]);
-    line3([x - w, y + h, z], [x + w, y - h, z]);
+  const xMark = (x, y, z, w, h) => { // both bars in one stroke, so a translucent X is no brighter where they cross
+    path([[x - w, y - h, z], [x + w, y + h, z]], false);
+    const [ax, ay] = P(x - w, y + h, z), [bx, by] = P(x + w, y - h, z);
+    g.moveTo(ax, ay);
+    g.lineTo(bx, by);
+    stroke();
   };
   // Mutes: a palm mute is a big white X across the note, a fret-hand mute a small white X in its middle, each over a
   // dark edge so it reads on any string's colour. hw and hh: the gem's half size; color: the X's own colour instead
@@ -830,15 +833,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
   // Shown by the frame alone: a repeated chord, and one the hand has damped — there is no pitch in it to draw, so its
   // strings would only be colour saying "play this" over a mark saying the opposite
   const frameOnly = (note) => chordOf(note)?.fretHandMute || (t.repeatMarks === 'frame' && (note.repeat || chordOf(note)?.highDensity));
-  if (!arr.palmRuns) { // a palm mute held over a run of notes: the first on a string is marked full, the ones that follow it at half height, worked out once a song
-    const last = {};
-    for (const note of arr.notes) {
-      const palm = note.palmMute || chordOf(note)?.palmMute;
-      note.palmAgain = !!palm && note.time - (last[note.string] ?? -Infinity) < 0.8;
-      if (palm) last[note.string] = note.time;
-    }
-    arr.palmRuns = true;
-  }
   const spot = (note) => { // x along the neck (an open string spans the hand position), y at its string's height
     const a = anchorAt(anchors, note.time), open = note.fret === 0;
     return { a, open, x: open ? a.fret - 1 + a.width / 2 : note.fret - 0.5, y: ys(note.string) };
@@ -1339,8 +1333,8 @@ export function drawHighway(canvas, arr, now, t, cam) {
       boxed.add(note.chord);
       // Repeats of the chord before get the same frame, empty and faint until it comes close: then strum again
       const [l, r] = frameAt(chord.notes.map((j) => arr.notes[j].fret), note.time), shown = g.globalAlpha;
-      const near = z < NEAR;
-      const weight = near ? 0.65 : chord.highDensity && t.repeatMarks !== 'frame' ? 0.18 : 0.5; // a frame on its own keeps its full weight
+      const near = z < NEAR, veiled = (chord.fretHandMute || chord.palmMute) && t.repeatMarks !== 'hide'; // a muted chord: its whole frame, X and all, at half
+      const weight = (near ? 0.65 : chord.highDensity && t.repeatMarks !== 'frame' ? 0.18 : 0.5) * (veiled ? 0.5 : 1); // a frame on its own keeps its full weight
       path([[l, floor, z], [r, floor, z], [r, boardHi, z], [l, boardHi, z]]);
       if (t.frames === 'gradient') { // a panel glowing up from the floor, fading out above the top string
         const [, bottom] = P(l, floor, z), [, top] = P(l, boardHi, z), lit = near ? t.anchorLane : t.anchorFill;
@@ -1361,20 +1355,22 @@ export function drawHighway(canvas, arr, now, t, cam) {
       g.strokeStyle = noteLine;
       g.lineWidth = 2;
       if (noteLine) line3([l, floor, z], [r, floor, z]);
-      // A whole hand laid across the strings damps them all at once, so it is one X over the chord rather than one on
-      // every string: big enough to read as the hand it is, and faint enough not to shout over the notes around it.
-      // A palm mute is the picking hand on the strings while they are struck: that one is marked on every note
-      if (chord.fretHandMute && t.repeatMarks !== 'hide') {
+      // A whole hand laid across the strings mutes them all at once, so it is one X over the chord rather than one on
+      // every string: big enough to read as the hand it is. The frame and the X are one thing drawn at half, so the
+      // chord reads as veiled rather than wearing a faint mark. A palm-muted chord's first strike has gems to carry
+      // its mark; its repeats are the frame alone, so the frame wears the X for them, squished to half its height
+      if (veiled && (chord.fretHandMute || chord.highDensity)) {
         // Inset from the frame, so it reads as a mark laid on the chord rather than part of its box; drawn in strokes
-        // about as broad as a note's rail, and translucent, so it sits among the colours instead of over them. One
-        // pass and no glow: a note is lit, a chord damped by the hand is veiled
+        // about as broad as a note's rail. One pass and no glow: a note is lit, a chord damped by the hand is veiled
         const [, , kk] = P((l + r) / 2, floor, z);
-        const mx = (l + r) / 2, my = (floor + boardHi) / 2, mw = ((r - l) / 2) * 0.78, mh = ((boardHi - floor) / 2) * 0.72;
-        g.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        const mx = (l + r) / 2, mw = ((r - l) / 2) * 0.78, mh = ((boardHi - floor) / 2) * (chord.fretHandMute ? 0.72 : 0.3), my = chord.fretHandMute ? (floor + boardHi) / 2 : floor + mh * 1.4; // the damp's X fills the frame; a palm mute's sits low, just off the floor
+        g.globalAlpha = shown * 0.5;
+        g.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // half again within the veiled frame
         g.lineWidth = Math.max(3, 0.28 * kk);
         g.lineCap = 'round';
         xMark(mx, my, z, mw, mh);
         g.lineCap = 'butt';
+        g.globalAlpha = shown;
       }
       if (chord.accent) { // played harder: the frame's top corners shine white
         const arm = Math.min(0.6, (r - l) * 0.22), drop = (boardHi - floor) * 0.35;
@@ -1416,8 +1412,6 @@ export function drawHighway(canvas, arr, now, t, cam) {
 
     const [cx, cy, k] = P(x, y, z);
     if (cx < -200 || cx > W + 200 || frameOnly(note)) {
-      // a chord shown by its frame alone still says it is palm-muted: the X where its note would be, at half height where the mute carries on
-      if (palm && cx >= -200 && cx <= W + 200 && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? (a.width - 0.2) / 2 : 0.34, (open ? 0.12 : 0.42) * gap * (note.palmAgain ? 0.5 : 1), true, t.muted);
       g.globalAlpha = 1;
       continue;
     }
@@ -1433,7 +1427,7 @@ export function drawHighway(canvas, arr, now, t, cam) {
       gem(x, y, z, hw, hh);
       stroke();
       glow(false);
-      if ((palm || (note.mute && !chord?.fretHandMute)) && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? 0.34 : hw, (open ? gap * 0.3 : hh) * (note.palmAgain ? 0.5 : 1), palm, t.muted); // its mute, greyed out, a palm mute carried on at half height; a whole hand's damp is the chord's own X
+      if (((note.palmMute && !chord?.palmMute) || (note.mute && !chord?.fretHandMute)) && t.repeatMarks !== 'hide') muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, t.muted); // its mute, greyed out; a whole hand's is the chord's own X
       g.globalAlpha = faded;
     } else if (!note.tied) {
       if (!open && numberInk) {
@@ -1482,10 +1476,10 @@ export function drawHighway(canvas, arr, now, t, cam) {
         g.lineWidth = 1;
         stroke();
       }
-      // A whole hand's damp is the chord's one X, so its notes say nothing; a palm mute is marked on every note, a
-      // chord's or a string's own, and so is a string muted on its own
+      // A whole hand's damp is the chord's one X, so its notes say nothing. A palm mute is on the chord's frame and on
+      // every note of its first strike, so the gems say it too; a string muted on its own still carries its own
       if (palm || (note.mute && !chord?.fretHandMute))
-        muteMark(x, y, z, k, open ? 0.34 : hw, (open ? gap * 0.3 : hh) * (note.palmAgain ? 0.5 : 1), palm, open && palm ? c : null); // on an open string's thin bar, the palm mute's X keeps its colour; carried on from the note before, it is half the height
+        muteMark(x, y, z, k, open ? 0.34 : hw, open ? gap * 0.3 : hh, palm, open && palm ? c : null); // on an open string's thin bar, the palm mute's X keeps its colour
 
       if (!open && !muted && !palm) { // a mute's X takes the middle of the gem
         const finger = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
