@@ -1,6 +1,6 @@
 {
   "name": "@fretfall/player",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "An arcade-style 3D note highway for Guitar Pro and MusicXML tabs, in the browser. Plays along with the synth or the band's recording.",
   "keywords": ["guitar", "bass", "tab", "guitar-pro", "musicxml", "note-highway", "alphatab", "practice"],
   "license": "MIT",

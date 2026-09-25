@@ -18,7 +18,7 @@ band's recording and the player lines the tab up with it on its own.
 - **Views**: the 3D highway; a tablature, scrolling or a page at a time, with the rhythm written over it; and a notation page — the tab as systems of whole bars with the rhythm, the technique marks, chord names and lyrics, on the theme's card or on paper, with a staff over each system if you like
 - **Practice**: phrase loops, speed control with a speed trainer, metronome
 - **Band**: every part in a window of its own, all in time
-- **Lean**: plain HTML and ES modules, no framework, no runtime dependencies, about 58 kB gzipped
+- **Lean**: plain HTML and ES modules, no framework, no runtime dependencies, about 70 kB gzipped
 
 ## Quick start
 
