@@ -91,6 +91,11 @@ const TAB_LAYOUTS = {
     scroll: { label: "Scroll" },
     pages: { label: "Pages" },
 }; // the tablature: notes scrolling to the play line, or a page of bars at a time
+const TAB_MARKS = {
+    all: { label: "Everything" },
+    plain: { label: "No fingering" },
+    notes: { label: "Just the notes" },
+}; // what is written around a note in the tablature
 const MARKINGS = {
     black: { label: "Black" },
     white: { label: "White" },
@@ -124,6 +129,7 @@ const settings = {
     minimal: false,
     tabView: false,
     tabLayout: "scroll",
+    tabMarks: "all",
     guides: true,
     fretNumbers: 0.5,
     songIntro: true,
@@ -158,6 +164,7 @@ for (const [key, options, fallback] of [
     ["repeatMarks", REPEAT_MARKS, "frame"],
     ["markings", MARKINGS, "black"],
     ["tabLayout", TAB_LAYOUTS, "scroll"],
+    ["tabMarks", TAB_MARKS, "all"],
     ["stringOrder", STRING_ORDERS, "low"],
     ["headstock", HEADSTOCKS, "inline"],
 ])
@@ -182,6 +189,7 @@ function applyTheme() {
         repeatMarks: settings.repeatMarks,
         markings: settings.markings,
         tabLayout: settings.tabLayout,
+        tabMarks: settings.tabMarks,
         stringOrder: settings.stringOrder,
         headstock: settings.headstock,
         viewAngle: settings.viewAngle,
@@ -288,6 +296,7 @@ for (const seg of root.querySelectorAll("[data-setting]")) {
             repeatMarks: REPEAT_MARKS,
             markings: MARKINGS,
             tabLayout: TAB_LAYOUTS,
+            tabMarks: TAB_MARKS,
             stringOrder: STRING_ORDERS,
             headstock: HEADSTOCKS,
         }[setting];
@@ -989,7 +998,7 @@ const TAB_LEGEND = [
         [
             [
                 "Note",
-                "Play this string at this fret when the start of its bar reaches the play line. The small number beside the fret is the finger to use (T = thumb).",
+                "Play this string at this fret when the start of its bar reaches the play line. The small number beside the fret is the finger to use (T = thumb); Marks in Settings drops it, and everything else written around a note.",
                 svg(`${lane(16)}${bar(10, 16, 36, 1, "7")}${tx(22, 16.5, "1", 5.5, "fi", 'opacity=".7"')}`),
             ],
             [

@@ -1770,6 +1770,7 @@ export function drawTab(canvas, arr, now, t) {
   const beamY = top - gap * 1.55, stem = Math.min(20, gap * 0.32); // the rhythm's beam line, and how far its stems hang to the note heads
   const row = (s) => top + (t.stringOrder === 'high' ? n - 1 - s : s) * gap; // as the highway: low E on top, or high e as in tab
   const speed = TAB_SPEED * (t.noteSpeed ?? 1), paged = t.tabLayout === 'pages';
+  const marked = (t.tabMarks ?? 'all') === 'all', bare = t.tabMarks === 'notes'; // fingering, and then everything written around a note: the marks setting
   const left = TAB_LABELS + 30, right = W - TAB_EDGE - 30;
   // In pages, a strip on the right shows how the next page starts, faded and at the page's own spacing, so the notes after
   // the turn are there to read before it
@@ -1853,7 +1854,7 @@ export function drawTab(canvas, arr, now, t) {
 
     // Under the strings: where the hand moves to (unless the guides are off), dynamics, and crescendo and diminuendo wedges
     const handY = bottom + gap * 0.92, dynamicsY = bottom + gap * 1.24; // clear of the bottom string's notes and their ties
-    if (t.guides !== false) {
+    if (t.guides !== false && !bare) {
       g.font = small;
       g.fillStyle = g.strokeStyle = t.anchorLane;
       g.lineWidth = 2;
@@ -1872,7 +1873,7 @@ export function drawTab(canvas, arr, now, t) {
     }
     g.strokeStyle = t.text;
     g.lineWidth = 1.5;
-    for (const pin of arr.hairpins ?? []) {
+    for (const pin of bare ? [] : arr.hairpins ?? []) {
       if (pin.endTime < from || pin.time > to) continue;
       const x0 = X(pin.time), x1 = Math.max(x0 + 30, X(pin.endTime)), [tip, mouth] = pin.kind === 'cresc' ? [x0, x1] : [x1, x0];
       g.globalAlpha = past(x1);
@@ -1970,7 +1971,7 @@ export function drawTab(canvas, arr, now, t) {
     }
 
     // An arpeggio's shape, held while its notes are played one at a time: a dashed outline round the strings it holds, named
-    for (const shape of arr.handShapes ?? []) {
+    for (const shape of bare ? [] : arr.handShapes ?? []) {
       if (!shape.arpeggio || shape.endTime < from || shape.startTime > to) continue;
       const rows = shape.frets.flatMap((f, s) => (f >= 0 && s < n ? [row(s)] : []));
       if (!rows.length) continue;
@@ -1994,7 +1995,7 @@ export function drawTab(canvas, arr, now, t) {
     // Room kept between a bar and the next note on its string: for its slide's slash, and the next one's bracket, slide in or string number
     const slides = (note) => (note.slideTo ?? note.slideUnpitchTo ?? null) !== null || !!note.slideOut;
     const bracketed = (note) => { const chord = chordOf(note); return !!chord && !note.repeat && !chord.highDensity && chord.notes.length > 1; };
-    const room = (note, next) => 4 + (slides(note) ? 16 : 0) + (bracketed(next) ? 10 : 0) + (next.slideIn ? 18 : 0) + (next.showString ? 20 : 0);
+    const room = (note, next) => (bare ? 4 : 4 + (slides(note) ? 16 : 0) + (bracketed(next) ? 10 : 0) + (next.slideIn ? 18 : 0) + (next.showString ? 20 : 0)); // nothing between them to keep room for, once the marks are off
     // Marks stack up over a note: markX is its middle, markY the top of the stack so far
     let markX = 0, markY = 0;
     const stack = (height, draw) => {
@@ -2016,7 +2017,7 @@ export function drawTab(canvas, arr, now, t) {
       const muted = note.mute || chord?.fretHandMute, palm = note.palmMute || chord?.palmMute, repeated = note.repeat || chord?.highDensity;
       const text = muted ? '×' : note.harmonic || note.harmonicPinch ? `<${note.fret}>` : note.ghost ? `(${note.fret})` : String(note.fret);
       const fingerOf = note.finger ?? (chord?.fingers?.[note.string] >= 0 ? chord.fingers[note.string] : null);
-      const finger = muted || note.fret === 0 || fingerOf === null ? '' : fingerOf === 0 ? 'T' : String(fingerOf);
+      const finger = !marked || muted || note.fret === 0 || fingerOf === null ? '' : fingerOf === 0 ? 'T' : String(fingerOf);
       const font = note.grace ? fonts.grace : fonts.note;
       const textWidth = measure(g, font, text).width, fingerWidth = finger ? measure(g, fonts.finger, finger).width + 3 : 0;
       const next = arr.notes[nexts[i]], until = next ? X(next.time) - room(note, next) : Infinity; // bars end short of the next note on the string
@@ -2030,7 +2031,7 @@ export function drawTab(canvas, arr, now, t) {
       const shown = (sounding || x0 >= playX - 1 ? 1 : 0.4) * (note.ghost ? 0.55 : 1);
       g.globalAlpha = shown;
 
-      if (chord && !framed.has(chord)) { // a chord's frame: a bracket down the side of its notes, white on an accented one
+      if (chord && !framed.has(chord) && !bare) { // a chord's frame: a bracket down the side of its notes, white on an accented one
         framed.add(chord);
         const rows = chord.notes.map((j) => row(arr.notes[j].string)), y0 = Math.min(...rows) - h / 2, y1 = Math.max(...rows) + h / 2, bx = x0 - 7;
         if (rows.length > 1 && !repeated) {
@@ -2099,7 +2100,7 @@ export function drawTab(canvas, arr, now, t) {
       numbers.push({ text, font, finger, fill, shown, squeeze, x: cx, y: y + measure(g, font, text).middle, left: -(textWidth + fingerWidth) / 2, textWidth });
 
       // Around the note: slides in and out, a tie on to the note it's held into, the string's number when it's asked for
-      marks.push(() => {
+      if (!bare) marks.push(() => {
         g.globalAlpha = shown;
         const ink = repeated ? t.muted : t.text;
         g.strokeStyle = g.fillStyle = ink;

@@ -224,4 +224,17 @@ for (const tabLayout of ['scroll', 'pages'])
   for (const now of [0, 1.5, 3, 6])
     assert.doesNotThrow(() => drawTab(canvas, notated, now, { ...theme(DEFAULT_STYLE), tabLayout, markings: 'white' }), `${tabLayout} at ${now} s`);
 
+// Marks: the fingering goes first, then everything written around a note, and the fret numbers are left alone
+const written = (tabMarks) => {
+  texts.length = 0;
+  drawTab({ ...canvas, getContext: () => writer }, notated, 1.5, { ...theme(DEFAULT_STYLE), tabMarks });
+  return [...texts];
+};
+const AROUND = ['E5', 'Am', 'pp', 'fret 12', '\u00bdB1', 'AH', 'PH', 'm.g.', 'full'];
+const everything = written('all'), plain = written('plain'), bare = written('notes');
+assert.ok(AROUND.every((mark) => everything.includes(mark)), `the lot is written: ${[...new Set(everything)]}`);
+assert.ok(AROUND.every((mark) => plain.includes(mark)) && plain.length < everything.length, 'no fingering, the rest as it was');
+assert.ok(!AROUND.some((mark) => bare.includes(mark)), `nothing written around a note: ${[...new Set(bare)]}`);
+assert.ok(notated.notes.filter((note) => note.time >= 1.5 && note.time < 3.5).map((note) => String(note.fret)).some((fret) => bare.includes(fret)), 'the fret numbers stay');
+
 console.log('ok');
