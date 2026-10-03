@@ -26,6 +26,10 @@
                 --num: system-ui, sans-serif;
                 --lyric: system-ui, sans-serif;
                 --lyric-style: normal;
+                --display: system-ui, sans-serif;
+                --headline: #e8eaef;
+                --plate: transparent;
+                --glass: blur(18px);
             }
             * {
                 box-sizing: border-box;
@@ -670,6 +674,9 @@
                 backdrop-filter: blur(10px);
                 text-align: center;
             }
+            :root.flat #status {
+                backdrop-filter: none;
+            }
             /* Playing as a band: every part plays in its own window, and this one only keeps time and sounds: nothing to draw */
             :root.banding
                 :is(
@@ -779,8 +786,9 @@
                 visibility: visible;
             }
             #introTitle {
-                font: 700 clamp(22px, 3vw, 38px) / 1.15 var(--num);
-                color: var(--text);
+                font: 700 clamp(22px, 3vw, 38px) / 1.15 var(--display);
+                color: var(--headline);
+                text-shadow: 0.05em 0.05em 0 var(--plate);
             }
             #introFacts {
                 font-size: 14px;
@@ -808,7 +816,7 @@
                 border-radius: 14px;
                 overflow: hidden;
                 background: color-mix(in srgb, var(--ink) 94%, transparent);
-                backdrop-filter: blur(18px);
+                backdrop-filter: var(--glass);
                 border: 1px solid var(--chip-border);
                 box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
             }

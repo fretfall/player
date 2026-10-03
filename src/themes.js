@@ -12,7 +12,7 @@ export const COLORS = {
     ink: '#070b16', text: '#e9eef7', muted: '#7f8ba3', accent: '#ffb547',
     floor0: '#0f2442', floor1: '#070b16', lane: '#5eb4ff', anchorLane: '#a8d8ff', anchorFill: '#3fa2ff', anchorOpacity: 0.22,
     measure: 'rgba(140, 205, 255, 0.55)', beat: 'rgba(140, 205, 255, 0.16)',
-    str: ['#ff4d4d', '#ffd23f', '#3fa2ff', '#ff9a3c', '#45e08a', '#c16cff', '#26c6da', '#ec407a'],
+    str: ['#ff4d4d', '#ffe44d', '#3fa2ff', '#ff9a3c', '#45e08a', '#c16cff', '#26c6da', '#ec407a'],
     post: 'rgba(201, 214, 232, 0.28)', anchorPost: '#ffffff', nut: '#e8e2d0', board: 'rgba(8, 14, 28, 0.6)', inlayDot: 'rgba(200, 220, 255, 0.35)', inlay: '#5eb4ff',
     chordBox: 'rgba(233, 238, 247, 0.8)', chordFill: 'rgba(233, 238, 247, 0.05)', flash: '#ffe2a8',
     numOn: '#ffffff', numOff: '#46526b', phraseDone: '#3fa2ff', phraseTodo: 'rgba(233, 238, 247, 0.10)',
@@ -69,3 +69,14 @@ export const STRINGS = {
 export const DEFAULT_STYLE = { look: 'stage', colors: 'stage', fonts: 'workbench', strings: 'default' };
 
 export const theme = (style) => ({ ...LOOKS[style.look], ...COLORS[style.colors], ...FONTS[style.fonts], ...(STRINGS[style.strings]?.str && { str: STRINGS[style.strings].str }) });
+
+// The CSS variables the player's chrome draws with (its sheets, readouts and the intro card), from a theme. A colour or
+// font set may also give `display` (the intro's title face, else `num`), `headline` and `plate` (its two inks: the
+// title's colour, else `text`, and a print offset under it, else none) and `glass: false` (sheets and the status flat,
+// with no blur behind them: for a page that never blurs over a moving canvas)
+export const chromeVars = (t) => ({
+  bg: t.bg, ink: t.ink, text: t.text, muted: t.muted, accent: t.accent, chip: t.chip, 'chip-border': t.chipBorder,
+  done: t.phraseDone, todo: t.phraseTodo, ui: t.ui, num: t.num, lyric: t.lyric, 'lyric-style': t.lyricStyle,
+  display: t.display ?? t.num, headline: t.headline ?? t.text, plate: t.plate ?? 'transparent',
+  glass: t.glass === false ? 'none' : 'blur(18px)',
+});

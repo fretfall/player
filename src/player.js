@@ -22,6 +22,7 @@ import {
     STRINGS,
     DEFAULT_STYLE,
     theme as makeTheme,
+    chromeVars,
 } from "./themes.js";
 import {
     drawHighway,
@@ -226,26 +227,13 @@ function applyTheme() {
         fill: settings.minimal, // nothing over the highway: it grows into the room
     };
     root.classList.toggle("minimal", settings.minimal);
+    root.classList.toggle("flat", theme.glass === false); // no blur behind the sheets and the status
     root.classList.toggle("tab2d", settings.view !== "highway");
     root.classList.toggle("notation", settings.view === "notation");
     for (const b of $("view").children) b.setAttribute("aria-pressed", String(b.value === settings.view));
     $("fonts").href = theme.href;
     document.fonts?.load('40px "Noto Music"', "\u{1D120}"); // the notation's clef, rests, flags and accidentals: the page draws them once it is in
-    const vars = {
-        bg: theme.bg,
-        ink: theme.ink,
-        text: theme.text,
-        muted: theme.muted,
-        accent: theme.accent,
-        chip: theme.chip,
-        "chip-border": theme.chipBorder,
-        done: theme.phraseDone,
-        todo: theme.phraseTodo,
-        ui: theme.ui,
-        num: theme.num,
-        lyric: theme.lyric,
-        "lyric-style": theme.lyricStyle,
-    };
+    const vars = chromeVars(theme);
     Object.assign(
         vars,
         { lane: theme.anchorLane },
