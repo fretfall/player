@@ -1,19 +1,37 @@
 {
   "name": "@fretfall/player",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "An arcade-style 3D note highway for Guitar Pro and MusicXML tabs, in the browser. Plays along with the synth or the band's recording.",
-  "keywords": ["guitar", "bass", "tab", "guitar-pro", "musicxml", "note-highway", "alphatab", "practice"],
+  "keywords": [
+    "guitar",
+    "bass",
+    "tab",
+    "guitar-pro",
+    "musicxml",
+    "note-highway",
+    "alphatab",
+    "practice"
+  ],
   "license": "MIT",
   "author": "Angelo Dini",
   "homepage": "https://github.com/fretfall/player#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/fretfall/player.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fretfall/player.git"
+  },
   "bugs": "https://github.com/fretfall/player/issues",
   "type": "module",
   "main": "./mount.js",
   "types": "./mount.d.ts",
   "exports": {
-    ".": { "types": "./mount.d.ts", "default": "./mount.js" },
-    "./mount.js": { "types": "./mount.d.ts", "default": "./mount.js" },
+    ".": {
+      "types": "./mount.d.ts",
+      "default": "./mount.js"
+    },
+    "./mount.js": {
+      "types": "./mount.d.ts",
+      "default": "./mount.js"
+    },
     "./*": "./*"
   },
   "private": true,
