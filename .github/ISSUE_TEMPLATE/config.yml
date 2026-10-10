@@ -1,6 +1,9 @@
-# Blank issues stay open for questions and anything the two templates do not fit — Discussions is off
+# Blank issues stay open for anything the two templates do not fit; questions go to Discussions
 blank_issues_enabled: true
 contact_links:
+  - name: A question, or something you made with it
+    url: https://github.com/fretfall/player/discussions
+    about: Ask, share a tab or a page built on the player, or float an idea before it becomes an issue
   - name: A tab that opens nowhere
     url: https://www.alphatab.net
     about: Reading .gp and .musicxml files is alphaTab's job. If the file fails in their playground too, report it there
