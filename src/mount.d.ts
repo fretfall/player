@@ -56,6 +56,26 @@ export interface Fretfall {
   volume: number;
   /** The mute, which a volume of 0 also turns on. Settable. */
   muted: boolean;
+  /**
+   * The speed trainer: on a loop played at 90% or slower, 10% faster each time the loop comes round, off by itself at
+   * 100%. Settable; without such a loop it stays (or turns) off.
+   */
+  trainer: boolean;
+  /**
+   * The count-in: beats clicked, on the metronome's sound, before playback starts from a pause; twice as many once the
+   * tempo heard (bpm × speed) is 120 or more. 0, the default, is none. Settable. Pausing during it calls it off.
+   */
+  countIn: number;
+  /**
+   * The part's sections where the file names them, each up to the next, else its phrases (named or `""`), in seconds;
+   * empty without a song. A copy, made on each read: read it once a song, not each frame (`fretfall:song` carries it).
+   */
+  readonly phrases: FretfallPhrase[];
+  /**
+   * The part's beats in seconds, `measure` being the bar's number (from 1) on its first beat and -1 on the others;
+   * empty without a song. A copy, made on each read: read it once a song, not each frame.
+   */
+  readonly beats: { time: number; measure: number }[];
   /** What is looping, in seconds, or null. Settable: kept inside the song, and anything else clears it. */
   loop: { start: number; end: number } | null;
   /** The click on the chart's beats. Settable. */
@@ -94,12 +114,19 @@ export interface FretfallControls {
   muted: boolean;
   loop: { start: number; end: number } | null;
   metronome: boolean;
+  trainer: boolean;
   parts: string[];
   part: number;
   sheet: 'settings' | 'legend' | null;
   fullscreen: boolean;
   view: 'highway' | 'tablature' | 'notation';
   minimal: boolean;
+}
+
+export interface FretfallPhrase {
+  name: string;
+  start: number;
+  end: number;
 }
 
 export interface FretfallSong {
@@ -109,14 +136,21 @@ export interface FretfallSong {
   artist?: string;
   parts: string[];
   part: number;
+  /** As `fretfall.phrases` reads them. */
+  phrases: FretfallPhrase[];
+}
+
+export interface FretfallOptions {
+  /** `dist`: the URL of the page's own copy of alphaTab's `dist/` folder (its version: 1.8.4), loaded instead of jsDelivr. */
+  alphaTab?: { dist: string };
 }
 
 /**
  * Mounts the player in `element`, which has to be in the page and have a size. Once a page: there is no unmount, and a
  * second call returns the first one's promise, so keep the element and hide it rather than removing it.
- * Resolves to `window.fretfall` once `fretfall:ready` has fired.
+ * Resolves to `window.fretfall` once `fretfall:ready` has fired. `options` count on the first call only.
  */
-export function mount(element: HTMLElement): Promise<Fretfall>;
+export function mount(element: HTMLElement, options?: FretfallOptions): Promise<Fretfall>;
 
 declare global {
   var fretfall: Fretfall | undefined; // window.fretfall too

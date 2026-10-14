@@ -169,3 +169,20 @@ export function lyricsShown(lines, t) {
   if (!soon(top)) top = top > 0 && t < lines[top - 1].end + 1.5 ? top - 1 : -1;
   return { top, bottom: top >= 0 && soon(top + 1) ? top + 1 : -1 };
 }
+
+// What a page loops by name (fretfall.phrases): the part's sections where the file names them, each up to the next, else
+// its phrases. Seconds
+export const phrasesOf = (arr, length) =>
+  arr.sections?.length
+    ? arr.sections.map((s, i) => ({ name: s.name, start: s.time, end: arr.sections[i + 1]?.time ?? length }))
+    : arr.phrases.map((p) => ({ name: p.name ?? '', start: p.time, end: p.endTime }));
+
+// The count-in before a start from a pause (fretfall.countIn): `n` clicks a beat apart, twice as many once the tempo
+// heard (the beats' at `t`, times speed) is 120 bpm or more, a fast bar being too short to get the hands ready.
+// → { count, gap }, gap in seconds of the clock rather than the song's
+export function countIn(beats, t, n, speed) {
+  const next = beats.findIndex((b) => b.time >= t - 0.01),
+    i = Math.max(0, Math.min(next < 0 ? Infinity : next, beats.length - 2)), // past the last beat: the last two's
+    gap = (beats.length > 1 ? beats[i + 1].time - beats[i].time : 0.5) / speed; // no beats to go by: 120 bpm
+  return { count: 60 / gap >= 120 ? n * 2 : n, gap };
+}
