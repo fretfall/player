@@ -1391,8 +1391,12 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
             return !el.paused;
         },
         play: () => el.play(),
-        pause: () => el.pause(),
+        pause: () => {
+            stopCountIn();
+            el.pause();
+        },
         seek: (t) => {
+            stopCountIn();
             el.currentTime = Math.max(0, offset + ratio * (t + songOffset / 1000));
         },
         setSpeed: (v) => {
@@ -1498,6 +1502,7 @@ const synthPlayer = {
         return api.play();
     },
     pause: () => {
+        stopCountIn();
         synth.tick = synth.paused = msToTick(
             synth.tempo,
             (synthPlayer.time + songOffset / 1000) * 1000,
@@ -1506,6 +1511,7 @@ const synthPlayer = {
         api.pause();
     },
     seek: (t) => {
+        stopCountIn();
         synth.tick = msToTick(synth.tempo, Math.max(0, t + songOffset / 1000) * 1000);
         synth.at = performance.now();
         synth.heard = false; // the synth refills its buffers from here
@@ -2696,13 +2702,16 @@ function metronome(t) {
     clickedTo = until;
 }
 // The count-in (fretfall.countIn, off unless a page asks): clicks a beat apart before a start from a pause, then the song.
-// Pausing meanwhile calls it off, clicks and all
+// Its clicks can outlast the wait, the song starting at once when its lead-in is longer than the count-in, so they are
+// kept until the next count-in: a pause, a seek or another song (each player's pause and seek, usePlayer) calls off both
 let countInBeats = 0,
-    countingIn = null; // { timer, tones } while it counts
+    countingIn = null, // the timer that starts the song, while it counts
+    countClicks = []; // the clicks scheduled on the audio clock
 const stopCountIn = () => {
+    for (const tone of countClicks) tone?.stop(); // stopping one that has sounded, or before it has, is fine
+    countClicks = [];
     if (!countingIn) return;
-    clearTimeout(countingIn.timer);
-    for (const tone of countingIn.tones) tone?.stop();
+    clearTimeout(countingIn);
     countingIn = null;
     tellControls();
 };
@@ -2710,16 +2719,13 @@ const play = () => {
     const clock = audioClock(),
         { count, at, start } = countIn(arr?.beats ?? [], songTime(), following ? 0 : countInBeats, speed);
     if (!count) return Promise.resolve(player.play());
-    const now = clock.currentTime,
-        tones = at.map((t, i) => click(now + t, i % countInBeats === 0)); // each bar's first click accented
+    const now = clock.currentTime;
+    countClicks = at.map((t, i) => click(now + t, i % countInBeats === 0)); // each bar's first click accented
     return new Promise((started) => {
-        countingIn = {
-            tones,
-            timer: setTimeout(() => {
-                countingIn = null;
-                started(Promise.resolve(player.play()).finally(tellControls)); // by then it plays, or failed to
-            }, start * 1000),
-        };
+        countingIn = setTimeout(() => {
+            countingIn = null; // the clicks stay, for a lead-in longer than the count-in
+            started(Promise.resolve(player.play()).finally(tellControls)); // by then it plays, or failed to
+        }, start * 1000);
         tellControls();
     });
 };
