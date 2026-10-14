@@ -63,12 +63,14 @@ export interface Fretfall {
   trainer: boolean;
   /**
    * The count-in: beats clicked, on the metronome's sound, before playback starts from a pause; twice as many once the
-   * tempo heard (bpm × speed) is 120 or more. 0, the default, is none. Settable. Pausing during it calls it off.
+   * tempo heard (bpm × speed) is 120 or more, each bar's first accented. The song carries on from where it was, timed so
+   * its next beat falls one beat after the last click. 0, the default, is none. Settable. Meanwhile `controls.countingIn`
+   * is true and `playing` false; pausing calls it off.
    */
   countIn: number;
   /**
    * The part's sections where the file names them, each up to the next, else its phrases (named or `""`), in seconds;
-   * empty without a song. A copy, made on each read: read it once a song, not each frame (`fretfall:song` carries it).
+   * what comes before the first section is one more, unnamed. Empty without a song. A copy, made on each read: read it once a song, not each frame (`fretfall:song` carries it).
    */
   readonly phrases: FretfallPhrase[];
   /**
@@ -109,6 +111,8 @@ export interface Fretfall {
 
 export interface FretfallControls {
   playing: boolean;
+  /** Counting in (see `countIn`): `playing` is still false. Setting `playing` to false calls it off. */
+  countingIn: boolean;
   speed: number;
   volume: number;
   muted: boolean;

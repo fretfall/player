@@ -2704,20 +2704,23 @@ const stopCountIn = () => {
     clearTimeout(countingIn.timer);
     for (const tone of countingIn.tones) tone?.stop();
     countingIn = null;
+    tellControls();
 };
 const play = () => {
     const clock = audioClock(),
-        { count, gap } = countIn(arr?.beats ?? [], songTime(), following ? 0 : countInBeats, speed);
+        { count, at, start } = countIn(arr?.beats ?? [], songTime(), following ? 0 : countInBeats, speed);
     if (!count) return Promise.resolve(player.play());
-    const tones = Array.from({ length: count }, (_, i) => click(clock.currentTime + i * gap, !i));
+    const now = clock.currentTime,
+        tones = at.map((t, i) => click(now + t, i % countInBeats === 0)); // each bar's first click accented
     return new Promise((started) => {
         countingIn = {
             tones,
             timer: setTimeout(() => {
                 countingIn = null;
-                started(player.play());
-            }, count * gap * 1000),
+                started(Promise.resolve(player.play()).finally(tellControls)); // by then it plays, or failed to
+            }, start * 1000),
         };
+        tellControls();
     });
 };
 // Autoplay (Settings): a song that has just opened starts playing. Not before anyone has used the page (browsers keep
@@ -3365,6 +3368,7 @@ function announce(name, detail) {
 function controlState() {
     return {
         playing: !!player?.playing,
+        countingIn: !!countingIn,
         speed,
         volume: settings.volume,
         muted: settings.volumeMuted,

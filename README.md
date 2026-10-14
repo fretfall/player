@@ -56,8 +56,8 @@ fretfall.part = 1;
 | `loop` | `{ start, end }` in seconds, or `null`. Settable: kept inside the song, and anything else clears it |
 | `metronome` | The click, on the chart's beats. Settable |
 | `trainer` | The speed trainer: on a loop at 90% or slower, 10% faster each time round, off by itself at 100%. Settable; without such a loop it stays off |
-| `countIn` | Beats clicked before playback starts from a pause, twice as many once the tempo heard (bpm × speed) is 120 or more. Settable; 0, the default, is none |
-| `phrases` | The part's sections where the file names them, else its phrases: `{ name, start, end }` in seconds, `[]` without a song. A copy each read, and in `fretfall:song` |
+| `countIn` | Beats clicked before playback starts from a pause, twice as many once the tempo heard (bpm × speed) is 120 or more; the song carries on from where it was, its next beat one beat after the last click. Settable; 0, the default, is none. Meanwhile `controls.countingIn` is true and `playing` false, and `playing = false` calls it off |
+| `phrases` | The part's sections where the file names them (a lead-in before the first, unnamed), else its phrases: `{ name, start, end }` in seconds, `[]` without a song. A copy each read, and in `fretfall:song` |
 | `beats` | The part's beats: `{ time, measure }`, `measure` the bar's number on its first beat and -1 on the rest. A copy each read |
 | `view`, `minimal`, `band()` | What the notes are drawn as — `'highway'`, `'tablature'` or `'notation'` — and the view alone with the lyrics; both settable. `band()` opens every other part in a window of its own |
 | `sheet` | Which sheet is open: `'settings'`, `'legend'` or `null`. Settable |
