@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { tempoMap, tickToMs, msToTick, tuningName, tuningReference, markRepeats, annotate, lyricsShown, markArpeggios } from './music.js';
+import { tempoMap, tickToMs, msToTick, tuningName, tuningReference, markRepeats, annotate, lyricsShown, markArpeggios, phrasesOf, countIn } from './music.js';
 
 // 120 bpm for 4 quarters, then 60 bpm
 const map = tempoMap([{ tick: 3840, tempo: 60 }], 120);
@@ -105,5 +105,44 @@ assert.equal(rows(16.5), '-1,-1');
 assert.equal(rows(23), '2,-1');
 assert.equal(rows(33), '2,-1');
 assert.equal(rows(34), '-1,-1');
+
+// fretfall.phrases: the file's named sections, each up to the next and the last to the end; without any, its phrases
+const bars = [{ time: 0, endTime: 2, name: '' }, { time: 2, endTime: 4, name: '' }, { time: 4, endTime: 6, name: '' }];
+assert.deepEqual(phrasesOf({ sections: [{ time: 0, name: 'Intro' }, { time: 4, name: 'Chorus' }], phrases: bars }, 10),
+  [{ name: 'Intro', start: 0, end: 4 }, { name: 'Chorus', start: 4, end: 10 }]);
+assert.deepEqual(phrasesOf({ sections: [{ time: 4.8, name: 'Intro' }], phrases: bars }, 10), // a recording's lead-in first
+  [{ name: '', start: 0, end: 4.8 }, { name: 'Intro', start: 4.8, end: 10 }]);
+assert.deepEqual(phrasesOf({ sections: [], phrases: bars }, 6).map((p) => [p.name, p.start, p.end]), [['', 0, 2], ['', 2, 4], ['', 4, 6]]);
+assert.deepEqual(phrasesOf({ phrases: [] }, 6), []); // a page's format may say no sections at all
+
+// fretfall.countIn: one bar's worth below 120 bpm heard, two from there; the tempo heard is the song's times the speed
+const beatsAt = (bpm) => Array.from({ length: 16 }, (_, i) => ({ time: (i * 60) / bpm, measure: i % 4 ? -1 : i / 4 + 1 }));
+const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≠ ${b}`);
+const on = countIn(beatsAt(90), 0, 4, 1); // on a beat: four clicks, the song's beat where the fifth would be
+assert.equal(on.count, 4);
+near(on.gap, 60 / 90);
+on.at.forEach((at, k) => near(at, (k * 60) / 90));
+near(on.start, (4 * 60) / 90);
+// Resumed between beats (4.8 and 5.4 at 100 bpm, paused at 5.1): the clicks keep their beat apart, and the song starts
+// 0.3 s early so its next beat (5.4) sounds one beat after the last click
+const mid = countIn(beatsAt(100), 5.1, 4, 1);
+mid.at.forEach((at, k) => near(at, k * 0.6));
+near(mid.start, 2.1);
+near(mid.start + (5.4 - 5.1), mid.at.at(-1) + mid.gap);
+const slow = countIn(beatsAt(100), 5.1, 4, 0.5); // at half speed the song's 0.3 s take 0.6
+near(slow.start + 0.6, slow.at.at(-1) + slow.gap);
+const leadIn = countIn([{ time: 10, measure: 1 }, { time: 10.6, measure: -1 }], 0, 4, 1); // 10 s before the first beat
+assert.equal(leadIn.start, 0); // the song starts now, the clicks counting into its first beat
+leadIn.at.forEach((at, k) => near(at, 10 - (4 - k) * 0.6));
+assert.equal(countIn(beatsAt(140), 3, 4, 1).count, 8);
+assert.equal(countIn(beatsAt(100), 0, 4, 1).count, 4);
+assert.equal(countIn(beatsAt(150), 0, 4, 1).count, 8);
+assert.equal(countIn(beatsAt(140), 0, 4, 0.8).count, 4); // 112 bpm heard
+assert.ok(Math.abs(countIn(beatsAt(140), 0, 4, 0.8).gap - 60 / 112) < 1e-9); // the clicks slow down with it
+assert.equal(countIn(beatsAt(100), 0, 0, 1).count, 0); // off
+assert.equal(countIn(beatsAt(100), 100, 4, 1).count, 4); // past the last beat: the last two's tempo
+assert.equal(countIn([{ time: 0, measure: 1 }, { time: 1, measure: -1 }, { time: 1.25, measure: -1 }], 1.2, 4, 1).count, 8); // the tempo where it starts
+const none = countIn([], 0, 4, 1); // no beats to go by: 120 bpm, the song after the last click
+assert.deepEqual([none.count, none.gap, none.start], [8, 0.5, 4]);
 
 console.log('ok');

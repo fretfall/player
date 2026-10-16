@@ -55,6 +55,10 @@ fretfall.part = 1;
 | `volume`, `muted` | 0 to 1, and the mute. Settable; a volume of 0 is muted, and setting one asks for sound again |
 | `loop` | `{ start, end }` in seconds, or `null`. Settable: kept inside the song, and anything else clears it |
 | `metronome` | The click, on the chart's beats. Settable |
+| `trainer` | The speed trainer: on a loop at 90% or slower, 10% faster each time round, off by itself at 100%. Settable; without such a loop it stays off |
+| `countIn` | Beats clicked before playback starts from a pause, twice as many once the tempo heard (bpm × speed) is 120 or more; the song carries on from where it was, its next beat one beat after the last click. Settable; 0, the default, is none. Meanwhile `controls.countingIn` is true and `playing` false, and `playing = false` calls it off |
+| `phrases` | The part's sections where the file names them (a lead-in before the first, unnamed), else its phrases: `{ name, start, end }` in seconds, `[]` without a song. A copy each read, and in `fretfall:song` |
+| `beats` | The part's beats: `{ time, measure }`, `measure` the bar's number on its first beat and -1 on the rest. A copy each read |
 | `view`, `minimal`, `band()` | What the notes are drawn as — `'highway'`, `'tablature'` or `'notation'` — and the view alone with the lyrics; both settable. `band()` opens every other part in a window of its own |
 | `sheet` | Which sheet is open: `'settings'`, `'legend'` or `null`. Settable |
 | `fullscreen` | Settable — set it from your own button's click, as browsers want a gesture behind it |
@@ -77,6 +81,8 @@ import { mount } from '@fretfall/player/mount.js';
 const fretfall = await mount(element); // window.fretfall, once fretfall:ready has fired
 ```
 
+- **alphaTab from the page's own server**: `mount(element, { alphaTab: { dist: '/alphatab/1.8.4/' } })` loads alphaTab, its
+  fonts and its sound font from a copy of its `dist/` folder there instead of jsDelivr.
 - **Once a page.** The player's modules run once and there is no unmount: a second call returns the first one's promise. Keep
   the element and hide it (`hidden`, `display: none`) rather than removing it; hidden, the player draws nothing and leaves
   the keys alone. It plays on, so pause it first: `fretfall.playing = false`.
@@ -109,7 +115,7 @@ it (`demo/mount.html` shows a dock).
 #### Controls of your own
 
 `dock()` moves the player's controls into your bar. To build your own instead, everything they do is on the hook —
-`playing`, `time`, `speed`, `volume`, `muted`, `loop`, `metronome`, `part`, `sheet`, `fullscreen`, `view`, `minimal`, `band()`, `pick()` — so your
+`playing`, `time`, `speed`, `volume`, `muted`, `loop`, `metronome`, `trainer`, `part`, `sheet`, `fullscreen`, `view`, `minimal`, `band()`, `pick()` — so your
 buttons drive the player without reaching into its markup. `fretfall.controls` is the lot in one object, and
 `fretfall:controls` fires whenever any of them changes, whoever changed it: one listener, one re-render, rather than an
 event per knob. The player's own controls stay in step, so you can dock some and build others.

@@ -9,6 +9,8 @@ import {
     annotate,
     lyricsShown,
     markArpeggios,
+    phrasesOf,
+    countIn,
 } from "./music.js";
 import { suggestPositions, fingerFor } from "./fingering.js";
 
@@ -51,6 +53,7 @@ const root =
         document.documentElement,
     mounted = root !== document.documentElement;
 const CDN =
+    root.dataset.alphatab ?? // mount(element, { alphaTab: { dist } }): a copy of the page's own
     "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/";
 const OPEN_STRINGS = {
     4: [28, 33, 38, 43],
@@ -1388,8 +1391,12 @@ function audioPlayer(src, { offset = 0, ratio = 1 } = {}) {
             return !el.paused;
         },
         play: () => el.play(),
-        pause: () => el.pause(),
+        pause: () => {
+            stopCountIn();
+            el.pause();
+        },
         seek: (t) => {
+            stopCountIn();
             el.currentTime = Math.max(0, offset + ratio * (t + songOffset / 1000));
         },
         setSpeed: (v) => {
@@ -1495,6 +1502,7 @@ const synthPlayer = {
         return api.play();
     },
     pause: () => {
+        stopCountIn();
         synth.tick = synth.paused = msToTick(
             synth.tempo,
             (synthPlayer.time + songOffset / 1000) * 1000,
@@ -1503,6 +1511,7 @@ const synthPlayer = {
         api.pause();
     },
     seek: (t) => {
+        stopCountIn();
         synth.tick = msToTick(synth.tempo, Math.max(0, t + songOffset / 1000) * 1000);
         synth.at = performance.now();
         synth.heard = false; // the synth refills its buffers from here
@@ -1522,6 +1531,7 @@ const synthPlayer = {
 };
 
 function usePlayer(next) {
+    stopCountIn();
     if (player && player !== next) player.stop();
     player = next;
     player.setSpeed(speed);
@@ -2236,6 +2246,7 @@ function setSong(next) {
         artist: song.artist,
         parts: parts.map((a) => a.name),
         part: arr ? parts.indexOf(arr) : -1,
+        phrases: arr ? phrasesOf(arr, song.length) : [],
     });
     opening = null;
 }
@@ -2666,6 +2677,7 @@ function click(at, accent) {
     tone.connect(gain).connect(clicks.destination);
     tone.start(at);
     tone.stop(at + 0.05);
+    return tone;
 }
 function metronome(t) {
     // from the frame loop: clicks for the beats in the next tenth of a second
@@ -2689,13 +2701,41 @@ function metronome(t) {
     }
     clickedTo = until;
 }
+// The count-in (fretfall.countIn, off unless a page asks): clicks a beat apart before a start from a pause, then the song.
+// Its clicks can outlast the wait, the song starting at once when its lead-in is longer than the count-in, so they are
+// kept until the next count-in: a pause, a seek or another song (each player's pause and seek, usePlayer) calls off both
+let countInBeats = 0,
+    countingIn = null, // the timer that starts the song, while it counts
+    countClicks = []; // the clicks scheduled on the audio clock
+const stopCountIn = () => {
+    for (const tone of countClicks) tone?.stop(); // stopping one that has sounded, or before it has, is fine
+    countClicks = [];
+    if (!countingIn) return;
+    clearTimeout(countingIn);
+    countingIn = null;
+    tellControls();
+};
+const play = () => {
+    const clock = audioClock(),
+        { count, at, start } = countIn(arr?.beats ?? [], songTime(), following ? 0 : countInBeats, speed);
+    if (!count) return Promise.resolve(player.play());
+    const now = clock.currentTime;
+    countClicks = at.map((t, i) => click(now + t, i % countInBeats === 0)); // each bar's first click accented
+    return new Promise((started) => {
+        countingIn = setTimeout(() => {
+            countingIn = null; // the clicks stay, for a lead-in longer than the count-in
+            started(Promise.resolve(player.play()).finally(tellControls)); // by then it plays, or failed to
+        }, start * 1000);
+        tellControls();
+    });
+};
 // Autoplay (Settings): a song that has just opened starts playing. Not before anyone has used the page (browsers keep
 // it silent until then, so the demo on a first visit waits), and not in the band's windows, which follow this one
 let autoplayWaits = false; // for the synth's instruments to load
 // Start playing as soon as there is something to play: what Autoplay uses, and what a page around the player asks
 // for by setting fretfall.playing
 const playWhenReady = () => {
-    if (!player || player.playing) return;
+    if (!player || player.playing || countingIn) return;
     if (player === synthPlayer && !api.isReadyForPlayback) { // a Guitar Pro file opened before its instruments have loaded
         if (autoplayWaits) return;
         autoplayWaits = true;
@@ -2706,8 +2746,7 @@ const playWhenReady = () => {
         };
         return api.playerReady.on(ready);
     }
-    audioClock();
-    Promise.resolve(player.play()).catch(
+    play().catch(
         (e) => e.name !== "AbortError" && e.name !== "NotAllowedError" && status(e.message),
     );
 };
@@ -2719,8 +2758,9 @@ const autoplay = () => {
 const togglePlay = () => {
     if (!player) return;
     audioClock();
+    if (countingIn) return stopCountIn();
     if (player.playing) return player.pause();
-    Promise.resolve(player.play()).catch(
+    play().catch(
         (e) => e.name !== "AbortError" && status(e.message),
     ); // AbortError: a newer song took over
 };
@@ -2785,10 +2825,13 @@ function syncLoopTools() {
         x < 140 ? "0%" : x > room.width - 140 ? "100%" : "50%",
     ); // half a tooltip from the side: it opens from that side
 }
-$("trainer").onclick = () => {
-    training = !training;
-    syncLoopTools();
+const setTraining = (on) => {
+    const was = training;
+    training = on;
+    syncLoopTools(); // which says no without a loop at 90% or slower
+    if (training !== was) tellControls();
 };
+$("trainer").onclick = () => setTraining(!training);
 $("clearLoop").onclick = () => {
     loop = null;
     markLoop();
@@ -3331,11 +3374,13 @@ function announce(name, detail) {
 function controlState() {
     return {
         playing: !!player?.playing,
+        countingIn: !!countingIn,
         speed,
         volume: settings.volume,
         muted: settings.volumeMuted,
         loop: loop ? { start: loop.start, end: loop.end } : null,
         metronome: settings.metronome,
+        trainer: training,
         parts: song?.arrangements.map((a) => a.name) ?? [],
         part: song ? song.arrangements.indexOf(arr) : -1,
         sheet: Object.keys(SHEETS).find((name) => !$(name).hidden) ?? null,
@@ -3364,7 +3409,10 @@ window.fretfall = {
         return !!player?.playing;
     },
     set playing(on) {
-        if (!on) player?.pause();
+        if (!on) {
+            stopCountIn();
+            player?.pause();
+        }
         else if (!following) playWhenReady(); // waits for the synth's instruments if the song has just opened
     },
     get time() {
@@ -3424,6 +3472,18 @@ window.fretfall = {
     set metronome(on) {
         if (!!on !== settings.metronome) toggleTool("metronome");
     },
+    get trainer() {
+        return training; // the speed trainer: on a loop at 90% or slower, 10% faster each time round up to 100%
+    },
+    set trainer(on) {
+        setTraining(!!on);
+    },
+    get countIn() {
+        return countInBeats;
+    },
+    set countIn(n) {
+        countInBeats = Math.max(0, Math.round(+n || 0)); // beats before a start from a pause, twice as many from 120 bpm heard
+    },
     get loop() {
         return loop ? { start: loop.start, end: loop.end } : null; // a copy: a loop is set whole, never edited in place
     },
@@ -3482,6 +3542,14 @@ window.fretfall = {
                 midi: (open[n.string] ?? 0) + n.fret,
             })),
         };
+    },
+    // The part's sections where the file names them, else its phrases, and its beats (measure: the bar's number on its
+    // first beat, -1 on the rest). Copies: read them once a song, not each frame
+    get phrases() {
+        return song && arr ? phrasesOf(arr, song.length) : [];
+    },
+    get beats() {
+        return arr?.beats.map((b) => ({ time: b.time, measure: b.measure })) ?? [];
     },
     get offset() {
         return songOffset; // ms, the open song's own, on top of Audio delay
