@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { moveCamera, bendAt, drawHighway, drawTab, drawSheet, HEADSTOCKS, headstockParts } from './highway.js';
+import { moveCamera, bendAt, drawHighway, drawTab, drawSheet, drawPiano, pianoKeys, HEADSTOCKS, headstockParts } from './highway.js';
 import { LOOKS, DEFAULT_STYLE, theme } from './themes.js';
 
 const run = (anchors, until, snapshotsAt) => {
@@ -266,3 +266,15 @@ drawSheet({ ...canvas, getContext: () => boxer }, marked, 0.5, { ...theme(DEFAUL
 assert.ok(!['P.M.', 'let ring', 'E5', 'H', 'full'].some((str) => texts.includes(str)) && texts.includes('(2)') && texts.includes('Smoke'), 'just the notes: the tie and the words stay, the marks go');
 
 console.log('ok');
+
+// The piano: whole octaves round the part, a black key over the join of its neighbours, and a sounding note's key lit
+const board = pianoKeys(40, 76, 700); // a guitar's open low E to the high E at its 12th fret: C2 to B5, 28 white keys
+assert.deepEqual([board.from, board.to, board.white], [36, 83, 25]);
+assert.deepEqual([board.x(36), board.x(38), board.x(40), board.x(48)], [0, 25, 50, 175]);
+assert.equal(board.x(37) + board.black / 2, 25, 'C# sits over the join of C and D');
+const pressed = [];
+const pianist = new Proxy({ fillRect: (x, y, w) => w > 1 && pressed.push(Math.round(x / w)) }, { get: (target, key) => (key in target ? target[key] : context[key]) });
+Path2D.prototype.roundRect = () => {};
+const tune = { ...chart({ length: 10, notes: [{ time: 1, string: 1, fret: 0, sustain: 1 }, { time: 5, string: 0, fret: 3 }], anchors: [{ time: 0, fret: 1 }] }), open: [40, 45, 50, 55, 59, 64], capos: [{ time: 0, fret: 2 }] };
+drawPiano({ ...canvas, getContext: () => pianist }, tune, 1.5, theme(DEFAULT_STYLE));
+assert.deepEqual(pressed, [0, 6], 'the keyboard, then the open A string at a capo on 2: B2, the seventh white key');

@@ -1,6 +1,6 @@
 # Fretfall Player
 
-An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser — with a tablature and a notation page beside it.
+An arcade-style note highway for Guitar Pro and MusicXML tabs, in the browser — with a tablature, a notation page and a piano beside it.
 
 [![CI](https://github.com/fretfall/player/actions/workflows/ci.yml/badge.svg)](https://github.com/fretfall/player/actions/workflows/ci.yml)
 [![Performance](https://github.com/fretfall/player/actions/workflows/perf.yml/badge.svg)](https://github.com/fretfall/player/actions/workflows/perf.yml)
@@ -15,7 +15,7 @@ Open a tab and play along: the notes fall down a 3D fretboard, with hand positio
 band's recording and the player lines the tab up with it on its own.
 
 - **Formats**: `.gp`, `.gp3`–`.gp5`, `.gpx`, `.musicxml`, `.mxl`, plus `.mp3`, `.m4a`, `.ogg`, `.wav`, `.flac` recordings
-- **Views**: the 3D highway; a tablature, scrolling or a page at a time, with the rhythm written over it; and a notation page — the tab as systems of whole bars with the rhythm, the technique marks, chord names and lyrics, on the theme's card or on paper, with a staff over each system if you like
+- **Views**: the 3D highway; a tablature, scrolling or a page at a time, with the rhythm written over it; a piano, the notes falling onto a keyboard; and a notation page — the tab as systems of whole bars with the rhythm, the technique marks, chord names and lyrics, on the theme's card or on paper, with a staff over each system if you like
 - **Practice**: phrase loops, speed control with a speed trainer, metronome
 - **Band**: every part in a window of its own, all in time
 - **Lean**: plain HTML and ES modules, no framework, no runtime dependencies, about 70 kB gzipped
@@ -59,7 +59,7 @@ fretfall.part = 1;
 | `countIn` | Beats clicked before playback starts from a pause, twice as many once the tempo heard (bpm × speed) is 120 or more; the song carries on from where it was, its next beat one beat after the last click. Settable; 0, the default, is none. Meanwhile `controls.countingIn` is true and `playing` false, and `playing = false` calls it off |
 | `phrases` | The part's sections where the file names them (a lead-in before the first, unnamed), else its phrases: `{ name, start, end }` in seconds, `[]` without a song. A copy each read, and in `fretfall:song` |
 | `beats` | The part's beats: `{ time, measure }`, `measure` the bar's number on its first beat and -1 on the rest. A copy each read |
-| `view`, `minimal`, `band()` | What the notes are drawn as — `'highway'`, `'tablature'` or `'notation'` — and the view alone with the lyrics; both settable. `band()` opens every other part in a window of its own |
+| `view`, `minimal`, `band()` | What the notes are drawn as — `'highway'`, `'tablature'`, `'notation'` or `'piano'` — and the view alone with the lyrics; both settable. `band()` opens every other part in a window of its own |
 | `sheet` | Which sheet is open: `'settings'`, `'legend'` or `null`. Settable |
 | `fullscreen` | Settable — set it from your own button's click, as browsers want a gesture behind it |
 | `controls` | Everything above that a control toggles, in one object, for a bar of your own to draw itself from |
@@ -128,7 +128,7 @@ play.onclick = () => (fretfall.playing = !fretfall.playing);
 
 Types come with it (`mount.d.ts`): `mount()`, the `fretfall` hook and its events.
 
-Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>N</kbd> notation · <kbd>H</kbd> minimal · <kbd>K</kbd> metronome ·
+Keys: <kbd>Space</kbd> play · <kbd>L</kbd> loop · <kbd>O</kbd> open · <kbd>D</kbd> tablature · <kbd>N</kbd> notation · <kbd>P</kbd> piano · <kbd>H</kbd> minimal · <kbd>K</kbd> metronome ·
 <kbd>F</kbd> full screen · <kbd>S</kbd> settings · <kbd>?</kbd> everything else. Add `?perf` to the URL for a frame profiler.
 
 ## Develop
@@ -139,7 +139,7 @@ npm start         # the demo on http://localhost:4410, rebuilt from src/ on ever
 npm test          # node --test
 npm run lint      # oxlint: correctness and performance rules
 npm run build     # dist/, the published package (DEMO=1: with the demo's front door, as github.io serves it)
-npm run bench     # frame time and draw calls of the highway, the tablature and the notation page, sync, fingering and size of dist/
+npm run bench     # frame time and draw calls of the highway, the tablature, the notation page and the piano, sync, fingering and size of dist/
 ```
 
 `src/` is the player's modules, `demo/` the page they ship with, and the demo's front door and tab. The build flattens both

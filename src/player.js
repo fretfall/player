@@ -28,6 +28,7 @@ import {
 } from "./themes.js";
 import {
     drawHighway,
+    drawPiano,
     drawTab,
     drawSheet,
     lookAhead,
@@ -118,6 +119,7 @@ const STRING_ORDERS = {
     high: { label: "High e on top" },
 }; // looking down at the guitar, or as in tab
 const VIEW_DEFAULTS = 8; // bumped whenever a default changes: 4 changed the view sliders (defaults and scale), 5 repeated chords, 6 the side angle, 7 fret numbers, 8 their opacity
+const VIEWS = new Set(["highway", "tablature", "notation", "piano"]);
 const VIEW_START = {
     viewAngle: 30,
     sideAngle: 5,
@@ -140,7 +142,7 @@ const settings = {
     autoplay: false,
     metronome: false,
     minimal: false,
-    view: "highway", // or the tablature, or the notation page
+    view: "highway", // or the tablature, the notation page, or the piano
     tabLayout: "scroll",
     tabMarks: "all",
     paper: "dark",
@@ -174,7 +176,7 @@ try {
         delete saved.tabView;
         delete saved.notation;
     }
-    if (!["highway", "tablature", "notation"].includes(saved.view)) delete saved.view;
+    if (!VIEWS.has(saved.view)) delete saved.view;
     if (typeof saved.noteLines !== "number") delete saved.noteLines; // saved while it was an on/off switch
     Object.assign(settings, saved);
 } catch {}
@@ -233,6 +235,7 @@ function applyTheme() {
     root.classList.toggle("flat", theme.glass === false); // no blur behind the sheets and the status
     root.classList.toggle("tab2d", settings.view !== "highway");
     root.classList.toggle("notation", settings.view === "notation");
+    root.classList.toggle("piano", settings.view === "piano");
     for (const b of $("view").children) b.setAttribute("aria-pressed", String(b.value === settings.view));
     $("fonts").href = theme.href;
     document.fonts?.load('40px "Noto Music"', "\u{1D120}"); // the notation's clef, rests, flags and accidentals: the page draws them once it is in
@@ -1329,11 +1332,22 @@ $("legendFind").oninput = (e) => {
     closeGroup();
     $("legendList").lastElementChild.hidden = shown > 0;
 };
+// The piano: bars falling onto a keyboard
+const PIANO_LEGEND = [
+    [
+        "Notes",
+        [
+            ["Note", "Press this key when the bar lands on it, and hold it for as long as the bar is. Its colour is the string the tab plays it on, darker on a black key.", svg(`<rect x="12" y="2" width="8" height="18" rx="2" class="f1"/><rect x="34" y="8" width="8" height="12" rx="2" class="f3"/><path d="M2 22h52" class="la" stroke-width="2.5"/><rect x="2" y="23" width="52" height="8" class="ft"/>`)],
+            ["Sounding key", "A key lights in its note's colour while the note sounds.", svg(`<rect x="2" y="6" width="52" height="24" class="ft"/><rect x="20" y="6" width="9" height="24" class="f1"/><path d="M11 6v24M20 6v24M29 6v24M38 6v24M47 6v24" class="lw" stroke-width=".8" opacity=".5"/>`)],
+            ["Muted", "A grey bar is a dead note: a click with no pitch, on the key its fret would sound.", svg(`<rect x="24" y="4" width="8" height="18" rx="2" class="ft" opacity=".3"/><path d="M2 24h52" class="la" stroke-width="2.5"/>`)],
+        ],
+    ],
+];
 // The marks as the view shows them, highway or tab, then the keyboard shortcuts (see SHORTCUTS); a search stays on
 let shortcutRows = () => [];
 const showLegend = () => {
     $("legendList").replaceChildren(
-        ...legendRows({ highway: LEGEND, tablature: TAB_LEGEND, notation: SHEET_LEGEND }[settings.view]),
+        ...legendRows({ highway: LEGEND, tablature: TAB_LEGEND, notation: SHEET_LEGEND, piano: PIANO_LEGEND }[settings.view]),
         ...shortcutRows(),
         Object.assign(document.createElement("p"), {
             className: "legend-empty",
@@ -2781,7 +2795,7 @@ const toggleMinimal = () => {
     markLoop(); // the loop's box is measured on the phrase bars, which weren't showing
 };
 $("minimal").onclick = $("minimalBack").onclick = toggleMinimal;
-// The view: the highway, the tablature or the notation page, from the bar's switch or its keys, which take a view
+// The view: the highway, the tablature, the notation page or the piano, from the bar's switch or its keys, which take a view
 // back to the highway when pressed again
 const chooseView = (name) => {
     if (name === settings.view) return;
@@ -2985,6 +2999,7 @@ const SHORTCUTS = [
             ],
             [["d"], "D", "Tablature", "Or back to the 3D highway", () => toggleView("tablature")],
             [["n"], "N", "Notation", "The tab as a page of systems, or back to the highway", () => toggleView("notation")],
+            [["p"], "P", "Piano", "The notes falling onto a keyboard, or back to the highway", () => toggleView("piano")],
             [["f"], "F", "Full screen", "", toggleFullscreen],
             [["o"], "O", "Open a song", "", () => $("open").click()],
             [["s"], "S", "Settings", "", () => toggleSheet("settings")],
@@ -3336,7 +3351,7 @@ function frame() {
     lap("song");
     const shown = benchTime() ?? t;
     if (!mounted || canvas.clientWidth) // no width while the page the player is mounted in hides it: nothing to draw on
-        ({ highway: drawHighway, tablature: drawTab, notation: drawSheet })[settings.view](canvas, arr, shown, theme, cam);
+        ({ highway: drawHighway, tablature: drawTab, notation: drawSheet, piano: drawPiano })[settings.view](canvas, arr, shown, theme, cam);
     if (song && arr) updateOverlay(shown);
     lap("overlay");
     endFrame();
@@ -3494,10 +3509,10 @@ window.fretfall = {
         markLoop();
     },
     get view() {
-        return settings.view; // "highway", "tablature" or "notation"
+        return settings.view; // "highway", "tablature", "notation" or "piano"
     },
     set view(name) {
-        if (["highway", "tablature", "notation"].includes(name)) chooseView(name);
+        if (VIEWS.has(name)) chooseView(name);
     },
     get minimal() {
         return settings.minimal; // the view alone, with the lyrics: no bar, no phrases
