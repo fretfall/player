@@ -1792,10 +1792,14 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
   // before (nothing, rather than a text face's likeness); heads, stems, beams and ledger lines are drawn
   const notes = !!t.sheetNotes, sp = sg * 0.6, glyphs = notes && typeof document !== 'undefined' && !!document.fonts?.check(`${4 * sp}px "Noto Music"`, '\u{1D120}');
   const stepOf = (m) => (Math.floor(m / 12) - 1) * 7 + [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][m % 12]; // a written midi note's line or space: E4, the lowest line, is 30
+  // A bass is written on the F clef, an octave above where it sounds as a guitar is on its G clef: on the G clef every
+  // note of it hung under the staff on a ladder of ledger lines, down into the tab. A bass by its highest string: under
+  // a guitar's D. `base` is the staff's lowest line as a step: E4 (30) on the G clef, G2 (18) on the F clef
+  const bassClef = Math.max(...(arr.open?.length ? arr.open : [64])) < 50, base = bassClef ? 18 : 30;
   if (notes && !arr.sheetRange) { // ledger lines over the staff for the highest note, under it for the lowest string
-    let hi = 38;
+    let hi = base + 8;
     for (const note of arr.notes) hi = Math.max(hi, stepOf((arr.open?.[note.string] ?? 40) + note.fret + 12));
-    arr.sheetRange = { over: Math.max(2, Math.ceil((hi - 38) / 2) + 1), under: Math.max(6, Math.floor((30 - stepOf((arr.open?.[0] ?? 40) + 12)) / 2) + 2.5) };
+    arr.sheetRange = { over: Math.max(2, Math.ceil((hi - base - 8) / 2) + 1), under: Math.max(bassClef ? 4 : 6, Math.floor((base - stepOf((arr.open?.[0] ?? 40) + 12)) / 2) + 2.5) };
   }
   const over = notes ? arr.sheetRange.over : 0, under = notes ? arr.sheetRange.under : 0, noteRoom = notes ? sp * (over + 4 + under) : 0;
   const lyricRow = arr.lyrics?.length ? sg * 1.3 : 0, showMarks = t.tabMarks !== 'notes'; // a row for the words under the rhythm; the marks around a note, unless the Marks setting says just the notes
@@ -1844,7 +1848,7 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
     if (y0 > cardBottom) break;
     const page = pages[i], scale = (usable - prefix) / (page.end - page.start), X = (time) => left + prefix + (time - page.start) * scale;
     const staffTop = y0 + rowTop, staffBottom = staffTop + staffH, beamY = staffBottom + 5 + stemLen;
-    const nBot = staffTop - sp * under, nTop = nBot - 4 * sp, yOf = (step) => nBot - ((step - 30) * sp) / 2; // the staff over the tab: E4, its lowest line, is step 30
+    const nBot = staffTop - sp * under, nTop = nBot - 4 * sp, yOf = (step) => nBot - ((step - base) * sp) / 2; // the staff over the tab: its lowest line is `base`, E4 (step 30) on the G clef
     const sysTop = notes ? nTop - sp * over : staffTop; // where the system begins: the bar numbers and what is written over the bars go above it
     for (let s = 0; s < n; s++) {
       lines.moveTo(left, row(staffTop, s));
@@ -1858,9 +1862,10 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
       bars.moveTo(left, nTop); // one line down the system's left, staff to tab
       bars.lineTo(left, staffBottom);
       const clefX = left + sp * 0.6; // the G clef with its 8, its baseline on the lowest line, then the key's sharps or flats at their steps
-      engraved.push(['\u{1D120}', clefX, nBot]);
+      engraved.push([bassClef ? '\u{1D122}' : '\u{1D120}', clefX, nBot]); // a bass's F clef, plain: its octave is the instrument's own
       const order = flats ? [34, 37, 33, 36, 32, 35, 31] : [38, 35, 39, 36, 33, 37, 34]; // the flats' steps, B E A D G C F, and the sharps', F C G D A E B
-      for (let k = 0; k < Math.abs(fifths); k++) engraved.push([ACC[flats ? -1 : 1][0], clefX + sp * (2.84 + 0.5 + k * (flats ? 1.05 : 1.15)), yOf(order[k]) + sp * 0.52]);
+      const lower = bassClef ? 14 : 0; // on the F clef the signature sits a line lower on a staff an octave and a sixth down
+      for (let k = 0; k < Math.abs(fifths); k++) engraved.push([ACC[flats ? -1 : 1][0], clefX + sp * (2.84 + 0.5 + k * (flats ? 1.05 : 1.15)), yOf(order[k] - lower) + sp * 0.52]);
     }
     if (i === 0 && arr.open) for (let s = 0; s < n; s++) labels.push([noteName(arr.open[s]), left - 16, row(staffTop, s) + sg * 0.32, color(t, s)]); // the strings, named on the first system alone
     // bars and beats along the top: the bar's number, a dot a beat; a repeat's bar heavy with its two dots; the meter at the first bar and where it changes
@@ -2002,8 +2007,8 @@ export function drawSheet(canvas, arr, now, t, cam = {}) {
           fills.moveTo(x + r, y);
           fills.ellipse(x, y, r, r * 0.81, -0.35, 0, Math.PI * 2);
         }
-        for (let ledger = 28; ledger >= step; ledger -= 2) { ledgers.moveTo(x - sp * 0.9, yOf(ledger)); ledgers.lineTo(x + sp * 0.9, yOf(ledger)); }
-        for (let ledger = 40; ledger <= step; ledger += 2) { ledgers.moveTo(x - sp * 0.9, yOf(ledger)); ledgers.lineTo(x + sp * 0.9, yOf(ledger)); }
+        for (let ledger = base - 2; ledger >= step; ledger -= 2) { ledgers.moveTo(x - sp * 0.9, yOf(ledger)); ledgers.lineTo(x + sp * 0.9, yOf(ledger)); }
+        for (let ledger = base + 10; ledger <= step; ledger += 2) { ledgers.moveTo(x - sp * 0.9, yOf(ledger)); ledgers.lineTo(x + sp * 0.9, yOf(ledger)); }
         if (state[letters[pc]] !== accs[pc]) { // a quarter space clear of the head's edge
           state[letters[pc]] = accs[pc];
           const [glyph, w] = ACC[accs[pc]];
