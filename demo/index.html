@@ -654,6 +654,10 @@
             :root:not(.notation) .only-notation {
                 display: none;
             }
+            /* Piano: bars and keys alone, so what the tab writes around a note makes way */
+            :root.piano :is(.not-piano, #info) { /* the song's facts lie where the keys are */
+                display: none;
+            }
             :root.minimal #lyrics {
                 top: 24px;
             }
@@ -1539,6 +1543,7 @@
                     <button value="highway" aria-pressed="true">Highway</button>
                     <button value="tablature" aria-pressed="false">Tablature</button>
                     <button value="notation" aria-pressed="false">Notation</button>
+                    <button value="piano" aria-pressed="false">Piano</button>
                 </div>
             </div>
             <div class="group">
@@ -2153,7 +2158,7 @@
                 hidden
             >
                 <div
-                    class="setting only-2d not-notation"
+                    class="setting only-2d not-notation not-piano"
                     title="Notes scrolling in to the play line, or a page of bars that holds still while the play line moves across it"
                 >
                     <div class="setting-head">
@@ -2209,7 +2214,7 @@
                     ></div>
                 </div>
                 <div
-                    class="setting only-2d"
+                    class="setting only-2d not-piano"
                     title="What is written around a note: the finger to press with, and the techniques, chord names and hand positions over and under the staff"
                 >
                     <div class="setting-head">
@@ -2301,7 +2306,7 @@
                     </div>
                 </div>
                 <div
-                    class="setting not-notation"
+                    class="setting not-notation not-piano"
                     title="The finger numbers on a note, and the fret numbers in the tab. The mutes' crosses are white either way"
                 >
                     <div class="setting-head">
@@ -2314,7 +2319,7 @@
                         aria-labelledby="markingsLabel"
                     ></div>
                 </div>
-                <label class="toggle not-notation"
+                <label class="toggle not-notation not-piano"
                     ><span
                         >Hand position guides<small
                             >Where your hand goes: a band down the highway, or

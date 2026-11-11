@@ -2811,3 +2811,122 @@ export function drawTab(canvas, arr, now, t) {
     g.fillText(noteName(arr.open[s]), x, y + measure(g, labelFont, 'E').middle);
   }
 }
+
+// The piano: the part as a keyboard player reads it. A keyboard along the bottom, from the C under the lowest open string
+// to the B over the song's highest note, and each note a bar falling onto its key, as long as it's held, in its string's
+// colour (darker on a black key, grey when muted). A key lights while its note sounds. Note speed spaces the notes out
+// ponytail: a bend, a slide or a harmonic shows at the fretted pitch; curve the bar's key if someone plays leads from this
+const PIANO_SPEED = 260, PIANO_KEYS = 150, PIANO_FADE = 220; // px a note falls a second; px the keyboard is tall; px from the top over which the notes fade in
+const BLACK = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0], WHITE_AT = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6]; // by pitch class: a black key, and the white key it is or follows
+// The keyboard in whole octaves round the midi notes lo to hi, across `width` → { from, to: its first C and last B,
+// white, black: a key's width, x: (midi) → a key's left edge, a black one sitting over the join of its neighbours }
+export function pianoKeys(lo, hi, width) {
+  const first = Math.floor(lo / 12), octaves = Math.floor(hi / 12) - first + 1, white = width / (octaves * 7), black = white * 0.58;
+  const x = (m) => ((Math.floor(m / 12) - first) * 7 + WHITE_AT[m % 12] + BLACK[m % 12]) * white - (BLACK[m % 12] * black) / 2;
+  return { from: first * 12, to: (first + octaves) * 12 - 1, white, black, x };
+}
+const dims = new WeakMap(); // a palette's colours for the black keys, made once
+export function drawPiano(canvas, arr, now, t) {
+  const { g, W } = clearCanvas(canvas);
+  if (!arr) return;
+  const pitch = (note) => (arr.open?.[note.string] ?? 40) + (note.fret || capoAt(arr.capos, note.time)); // an open string sounds at the capo
+  if (!arr.pianoRange) { // two octaves at least, worked out once a song
+    let lo = Math.min(...(arr.open?.length ? arr.open : [40])), hi = lo + 23;
+    for (const note of arr.notes) hi = Math.max(hi, pitch(note));
+    arr.pianoRange = [lo, hi];
+  }
+  const keys = pianoKeys(...arr.pianoRange, W), { white, black } = keys, top = VH - PIANO_KEYS, speed = PIANO_SPEED * (t.noteSpeed ?? 1);
+  const Y = (time) => top - (time - now) * speed;
+  if (!dims.has(t.str)) dims.set(t.str, t.str.map((c) => shade(c, -0.4)));
+  const dim = dims.get(t.str);
+
+  // Behind the notes: a line up from every C and F, where the black keys break, and one across at each bar
+  g.beginPath();
+  for (let m = keys.from; m < keys.to; m += 12) for (const x of [keys.x(m), keys.x(m + 5)]) {
+    g.moveTo(x, 0);
+    g.lineTo(x, top);
+  }
+  for (let b = firstAt(arr.beats, now); b < arr.beats.length && Y(arr.beats[b].time) > 0; b++) {
+    if (arr.beats[b].measure < 0) continue;
+    g.moveTo(0, Y(arr.beats[b].time));
+    g.lineTo(W, Y(arr.beats[b].time));
+  }
+  g.lineWidth = 1;
+  g.strokeStyle = alpha(t.text, 0.09);
+  g.stroke();
+
+  // The notes, a path a colour so a busy bar costs a fill a string, not a note. They sink behind the keyboard
+  const fills = new Map(), lit = [], round = t.gem === 'pill' ? 99 : 5;
+  for (let i = firstAt(arr.notes, now - stringLinks(arr).held - 0.5); i < arr.notes.length; i++) {
+    const note = arr.notes[i], y0 = Y(note.time), y1 = Math.min(y0 - 22, Y(note.time + note.sustain) + 3); // a gap before the next on its key
+    if (y0 < 0) break;
+    if (y1 > top) continue;
+    const m = pitch(note), dark = BLACK[m % 12], muted = note.mute || arr.chords[note.chord]?.fretHandMute;
+    const s = note.string % t.str.length, c = muted ? alpha(t.text, 0.22) : dark ? dim[s] : t.str[s];
+    let path = fills.get(c);
+    if (!path) fills.set(c, (path = new Path2D()));
+    path.roundRect(keys.x(m) + (dark ? 0 : 2), y1, dark ? black : white - 4, y0 - y1, round);
+    if (!muted && note.time <= now && now < note.time + Math.max(note.sustain, 0.15)) lit.push({ m, c, dark });
+  }
+  for (const [c, path] of fills) {
+    g.fillStyle = c;
+    g.fill(path);
+  }
+  g.globalCompositeOperation = 'destination-out'; // they fade in from under the header rather than drop out of it
+  g.fillStyle = unitGradient(g, 'piano', [[0, 'rgba(0, 0, 0, 1)'], [1, 'rgba(0, 0, 0, 0)']]);
+  g.save();
+  g.scale(W, PIANO_FADE);
+  g.fillRect(0, 0, 1, 1);
+  g.restore();
+  g.globalCompositeOperation = 'source-over';
+
+  // The keyboard over them: the white keys with their names, the black keys on top, a sounding key in its note's colour
+  g.fillStyle = t.text;
+  g.fillRect(0, top, W, PIANO_KEYS);
+  for (const key of lit) {
+    if (key.dark) continue;
+    g.fillStyle = key.c;
+    g.fillRect(keys.x(key.m), top, white, PIANO_KEYS);
+  }
+  const edges = new Path2D(), blacks = new Path2D(), blackH = PIANO_KEYS * 0.62;
+  for (let m = keys.from; m <= keys.to; m++) {
+    const x = keys.x(m);
+    if (BLACK[m % 12]) blacks.roundRect(x, top, black, blackH, [0, 0, 3, 3]);
+    else {
+      edges.moveTo(x, top);
+      edges.lineTo(x, VH);
+    }
+  }
+  g.strokeStyle = alpha(t.ink, 0.35);
+  g.stroke(edges);
+  g.fillStyle = t.ink;
+  g.fill(blacks);
+  if (white >= 14) {
+    g.font = `600 ${fontSize(Math.min(17, white * 0.42))}px ${t.ui}`;
+    g.textAlign = 'center';
+    g.textBaseline = 'alphabetic';
+    for (let m = keys.from; m <= keys.to; m++) if (!BLACK[m % 12]) g.fillText(noteName(m), keys.x(m) + white / 2, VH - 10);
+  }
+  for (const key of lit) {
+    if (!key.dark) continue;
+    g.fillStyle = key.c;
+    g.beginPath();
+    g.roundRect(keys.x(key.m), top, black, blackH, [0, 0, 3, 3]);
+    g.fill();
+  }
+
+  // The play line along the top of the keys, glowing, with a spark where a sounding note meets it
+  g.shadowColor = t.accent;
+  g.shadowBlur = 16;
+  g.strokeStyle = t.accent;
+  g.lineWidth = 3;
+  line2(g, 0, top, W, top);
+  g.fillStyle = '#ffffff';
+  for (const key of lit) {
+    g.shadowColor = key.c;
+    g.beginPath();
+    g.arc(keys.x(key.m) + (key.dark ? black : white) / 2, top, 5, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.shadowBlur = 0;
+}
